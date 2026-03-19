@@ -8,6 +8,7 @@ message RegisterRequest {
   string email = 1;
   string password = 2;
   string name = 3;
+  string organization_name = 4;
 }
 
 message RegisterResponse {

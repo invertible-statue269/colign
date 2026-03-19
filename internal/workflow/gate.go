@@ -3,10 +3,10 @@ package workflow
 import "github.com/gobenpark/colign/internal/models"
 
 type GateInput struct {
-	HasProposal    bool
-	HasDesign      bool
-	SpecsCount     int
-	SpecsDone      int
+	HasProposal     bool
+	HasDesign       bool
+	SpecsCount      int
+	SpecsDone       int
 	ApprovalsNeeded int
 	ApprovalsDone   int
 }

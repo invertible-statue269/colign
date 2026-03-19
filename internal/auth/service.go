@@ -9,14 +9,17 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gobenpark/colign/internal/models"
+	"strings"
+
 	"github.com/uptrace/bun"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/gobenpark/colign/internal/models"
 )
 
 var (
-	ErrEmailAlreadyExists = errors.New("이미 사용 중인 이메일입니다")
-	ErrInvalidCredentials = errors.New("이메일 또는 비밀번호가 올바르지 않습니다")
+	ErrEmailAlreadyExists  = errors.New("이미 사용 중인 이메일입니다")
+	ErrInvalidCredentials  = errors.New("이메일 또는 비밀번호가 올바르지 않습니다")
 	ErrInvalidRefreshToken = errors.New("유효하지 않거나 만료된 리프레시 토큰입니다")
 )
 
@@ -30,9 +33,10 @@ func NewService(db *bun.DB, jwtManager *JWTManager) *Service {
 }
 
 type RegisterRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8"`
-	Name     string `json:"name" binding:"required"`
+	Email            string `json:"email" binding:"required,email"`
+	Password         string `json:"password" binding:"required,min=8"`
+	Name             string `json:"name" binding:"required"`
+	OrganizationName string `json:"organization_name"`
 }
 
 type LoginRequest struct {
@@ -54,13 +58,42 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*TokenPair
 		return nil, err
 	}
 
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	user := &models.User{
 		Email:        req.Email,
 		PasswordHash: string(hash),
 		Name:         req.Name,
 	}
 
-	if _, err := s.db.NewInsert().Model(user).Exec(ctx); err != nil {
+	if _, err := tx.NewInsert().Model(user).Exec(ctx); err != nil {
+		return nil, err
+	}
+
+	// Create organization
+	orgName := req.OrganizationName
+	if orgName == "" {
+		orgName = fmt.Sprintf("%s's Workspace", req.Name)
+	}
+	orgSlug := generateOrgSlug(orgName)
+	org := &models.Organization{
+		Name: orgName,
+		Slug: orgSlug,
+	}
+	if _, err := tx.NewInsert().Model(org).Exec(ctx); err != nil {
+		return nil, err
+	}
+
+	orgMember := &models.OrganizationMember{
+		OrganizationID: org.ID,
+		UserID:         user.ID,
+		Role:           models.OrgRoleOwner,
+	}
+	if _, err := tx.NewInsert().Model(orgMember).Exec(ctx); err != nil {
 		return nil, err
 	}
 
@@ -75,13 +108,25 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*TokenPair
 		Token:     hex.EncodeToString(tokenBytes),
 		ExpiresAt: time.Now().Add(24 * time.Hour),
 	}
-	if _, err := s.db.NewInsert().Model(verification).Exec(ctx); err != nil {
+	if _, err := tx.NewInsert().Model(verification).Exec(ctx); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 
 	// TODO: send verification email
 
-	return s.createSession(ctx, user)
+	return s.createSession(ctx, user, org.ID)
+}
+
+func generateOrgSlug(name string) string {
+	slug := strings.ToLower(strings.TrimSpace(name))
+	slug = strings.ReplaceAll(slug, " ", "-")
+	b := make([]byte, 4)
+	_, _ = rand.Read(b)
+	return fmt.Sprintf("%s-%s", slug, hex.EncodeToString(b))
 }
 
 func (s *Service) Login(ctx context.Context, req LoginRequest) (*TokenPair, error) {
@@ -98,7 +143,29 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*TokenPair, erro
 		return nil, ErrInvalidCredentials
 	}
 
-	return s.createSession(ctx, user)
+	// Get user's first organization
+	orgID, err := s.getDefaultOrgID(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.createSession(ctx, user, orgID)
+}
+
+func (s *Service) getDefaultOrgID(ctx context.Context, userID int64) (int64, error) {
+	om := new(models.OrganizationMember)
+	err := s.db.NewSelect().Model(om).
+		Where("user_id = ?", userID).
+		OrderExpr("created_at ASC").
+		Limit(1).
+		Scan(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return om.OrganizationID, nil
 }
 
 func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (*TokenPair, error) {
@@ -120,7 +187,12 @@ func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (*Token
 		return nil, err
 	}
 
-	return s.createSession(ctx, session.User)
+	orgID, err := s.getDefaultOrgID(ctx, session.User.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.createSession(ctx, session.User, orgID)
 }
 
 func (s *Service) VerifyEmail(ctx context.Context, token string) error {
@@ -146,8 +218,8 @@ func (s *Service) VerifyEmail(ctx context.Context, token string) error {
 	return err
 }
 
-func (s *Service) createSession(ctx context.Context, user *models.User) (*TokenPair, error) {
-	tokenPair, err := s.jwtManager.GenerateTokenPair(user.ID, user.Email)
+func (s *Service) createSession(ctx context.Context, user *models.User, orgID int64) (*TokenPair, error) {
+	tokenPair, err := s.jwtManager.GenerateTokenPair(user.ID, user.Email, orgID)
 	if err != nil {
 		return nil, err
 	}

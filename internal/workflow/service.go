@@ -7,14 +7,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gobenpark/colign/internal/models"
 	"github.com/uptrace/bun"
+
+	"github.com/gobenpark/colign/internal/models"
 )
 
 var (
-	ErrChangeNotFound     = errors.New("change not found")
-	ErrInvalidTransition  = errors.New("invalid stage transition")
-	ErrGateNotMet         = errors.New("gate conditions not met")
+	ErrChangeNotFound    = errors.New("change not found")
+	ErrInvalidTransition = errors.New("invalid stage transition")
+	ErrGateNotMet        = errors.New("gate conditions not met")
 )
 
 type Service struct {
@@ -72,12 +73,47 @@ func (s *Service) EvaluateAndAdvance(ctx context.Context, changeID int64) (bool,
 	}
 	_, _ = s.db.NewInsert().Model(event).Exec(ctx)
 
-	// Trigger task generation when entering Ready stage
-	if ShouldTriggerTaskGeneration(change.Stage, next) {
-		// TODO: call task generation service
-	}
+	// TODO: trigger task generation when entering Ready stage
 
 	return true, nil
+}
+
+// Advance manually moves the change to the next stage.
+func (s *Service) Advance(ctx context.Context, changeID int64, userID int64) (models.ChangeStage, error) {
+	change := new(models.Change)
+	err := s.db.NewSelect().Model(change).Where("id = ?", changeID).Scan(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", ErrChangeNotFound
+		}
+		return "", err
+	}
+
+	next, ok := NextStage(change.Stage)
+	if !ok {
+		return change.Stage, fmt.Errorf("already at final stage")
+	}
+
+	_, err = s.db.NewUpdate().Model((*models.Change)(nil)).
+		Set("stage = ?", next).
+		Set("updated_at = ?", time.Now()).
+		Where("id = ?", changeID).
+		Exec(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	event := &models.WorkflowEvent{
+		ChangeID:  changeID,
+		FromStage: string(change.Stage),
+		ToStage:   string(next),
+		Action:    "advance",
+		Reason:    "manually advanced",
+		UserID:    userID,
+	}
+	_, _ = s.db.NewInsert().Model(event).Exec(ctx)
+
+	return next, nil
 }
 
 // Revert moves the change to the previous stage with a recorded reason.
@@ -138,20 +174,12 @@ func (s *Service) GetStatus(ctx context.Context, changeID int64) (models.ChangeS
 	return change.Stage, conditions, nil
 }
 
-func (s *Service) buildGateInput(ctx context.Context, change *models.Change) (*GateInput, error) {
-	// Check which documents exist for this change
-	// Using PostgreSQL EXISTS queries for efficiency
+func (s *Service) buildGateInput(_ context.Context, _ *models.Change) (*GateInput, error) {
 	input := &GateInput{}
 
-	type docCheck struct {
-		HasProposal bool `bun:"has_proposal"`
-		HasDesign   bool `bun:"has_design"`
-	}
-
-	// TODO: integrate with document storage once document models are created
-	// For now, return basic input
-	input.HasProposal = true // placeholder
-	input.HasDesign = false  // placeholder
+	// TODO: integrate with document storage
+	input.HasProposal = true
+	input.HasDesign = false
 
 	return input, nil
 }

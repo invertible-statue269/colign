@@ -25,6 +25,7 @@ vendor/
 .env.local
 
 # Node
+node_modules/
 web/node_modules/
 hocuspocus/node_modules/
 web/.next/

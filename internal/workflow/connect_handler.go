@@ -5,12 +5,14 @@ import (
 	"errors"
 
 	"connectrpc.com/connect"
-	workflowv1 "github.com/gobenpark/colign/gen/proto/workflow/v1"
-	"github.com/gobenpark/colign/gen/proto/workflow/v1/workflowv1connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/gobenpark/colign/internal/models"
+	workflowv1 "github.com/gobenpark/colign/gen/proto/workflow/v1"
+	"github.com/gobenpark/colign/gen/proto/workflow/v1/workflowv1connect"
+
 	"github.com/uptrace/bun"
+
+	"github.com/gobenpark/colign/internal/models"
 )
 
 type ConnectHandler struct {
@@ -45,6 +47,22 @@ func (h *ConnectHandler) GetStatus(ctx context.Context, req *connect.Request[wor
 	return connect.NewResponse(&workflowv1.GetStatusResponse{
 		Stage:      string(stage),
 		Conditions: protoConditions,
+	}), nil
+}
+
+func (h *ConnectHandler) Advance(ctx context.Context, req *connect.Request[workflowv1.AdvanceRequest]) (*connect.Response[workflowv1.AdvanceResponse], error) {
+	userID := int64(1) // TODO: from auth context
+
+	newStage, err := h.service.Advance(ctx, req.Msg.ChangeId, userID)
+	if err != nil {
+		if errors.Is(err, ErrChangeNotFound) {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	return connect.NewResponse(&workflowv1.AdvanceResponse{
+		NewStage: string(newStage),
 	}), nil
 }
 
@@ -89,7 +107,9 @@ func (h *ConnectHandler) RequestChanges(ctx context.Context, req *connect.Reques
 	}
 
 	change := new(models.Change)
-	h.db.NewSelect().Model(change).Where("id = ?", req.Msg.ChangeId).Scan(ctx)
+	if err := h.db.NewSelect().Model(change).Where("id = ?", req.Msg.ChangeId).Scan(ctx); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
 
 	return connect.NewResponse(&workflowv1.RequestChangesResponse{
 		NewStage: string(change.Stage),
@@ -104,7 +124,9 @@ func (h *ConnectHandler) Revert(ctx context.Context, req *connect.Request[workfl
 	}
 
 	change := new(models.Change)
-	h.db.NewSelect().Model(change).Where("id = ?", req.Msg.ChangeId).Scan(ctx)
+	if err := h.db.NewSelect().Model(change).Where("id = ?", req.Msg.ChangeId).Scan(ctx); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
 
 	return connect.NewResponse(&workflowv1.RevertResponse{
 		NewStage: string(change.Stage),

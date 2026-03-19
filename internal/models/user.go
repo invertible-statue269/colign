@@ -24,13 +24,13 @@ type User struct {
 type Account struct {
 	bun.BaseModel `bun:"table:accounts,alias:a"`
 
-	ID                int64  `bun:"id,pk,autoincrement"`
-	UserID            int64  `bun:"user_id,notnull"`
-	Provider          string `bun:"provider,notnull"`
-	ProviderAccountID string `bun:"provider_account_id,notnull"`
-	AccessToken       string `bun:"access_token"`
-	RefreshToken      string `bun:"refresh_token"`
-	ExpiresAt         int64  `bun:"expires_at"`
+	ID                int64     `bun:"id,pk,autoincrement"`
+	UserID            int64     `bun:"user_id,notnull"`
+	Provider          string    `bun:"provider,notnull"`
+	ProviderAccountID string    `bun:"provider_account_id,notnull"`
+	AccessToken       string    `bun:"access_token"`
+	RefreshToken      string    `bun:"refresh_token"`
+	ExpiresAt         int64     `bun:"expires_at"`
 	CreatedAt         time.Time `bun:"created_at,notnull,default:current_timestamp"`
 
 	User *User `bun:"rel:belongs-to,join:user_id=id"`

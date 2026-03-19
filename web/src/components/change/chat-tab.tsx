@@ -74,15 +74,18 @@ export function ChatTab({ changeId }: ChatTabProps) {
         {messages.length === 0 && (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
-              <p className="text-lg font-medium text-muted-foreground">{t("change.startConversation")}</p>
-              <p className="mt-1 text-sm text-muted-foreground/70">
-                {t("change.chatDescription")}
+              <p className="text-lg font-medium text-muted-foreground">
+                {t("change.startConversation")}
               </p>
+              <p className="mt-1 text-sm text-muted-foreground/70">{t("change.chatDescription")}</p>
             </div>
           </div>
         )}
         {messages.map((msg) => (
-          <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+          <div
+            key={msg.id}
+            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+          >
             <div
               className={`max-w-[80%] rounded-xl px-4 py-3 text-sm ${
                 msg.role === "user"
@@ -93,7 +96,11 @@ export function ChatTab({ changeId }: ChatTabProps) {
               <div className="whitespace-pre-wrap">{msg.content}</div>
               {msg.role === "assistant" && msg.content && !isStreaming && (
                 <div className="mt-2 flex gap-1">
-                  <Button variant="ghost" size="sm" className="h-6 cursor-pointer px-2 text-xs text-muted-foreground hover:text-foreground">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 cursor-pointer px-2 text-xs text-muted-foreground hover:text-foreground"
+                  >
                     {t("change.applyToSpec")}
                   </Button>
                 </div>

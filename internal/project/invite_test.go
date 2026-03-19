@@ -8,8 +8,8 @@ import (
 
 func TestValidateInviteRole(t *testing.T) {
 	tests := []struct {
-		role    string
-		valid   bool
+		role  string
+		valid bool
 	}{
 		{"owner", true},
 		{"editor", true},

@@ -82,10 +82,7 @@ export default function ProjectSettingsPage() {
   return (
     <div className="min-h-screen">
       <Header
-        breadcrumbs={[
-          { label: "Project", href: `/projects/${slug}` },
-          { label: "Settings" },
-        ]}
+        breadcrumbs={[{ label: "Project", href: `/projects/${slug}` }, { label: "Settings" }]}
       />
 
       <div className="mx-auto flex max-w-5xl gap-8 px-6 py-8">
@@ -121,14 +118,28 @@ export default function ProjectSettingsPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="project-name">Project Name</Label>
-                  <Input id="project-name" value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="My App" />
+                  <Input
+                    id="project-name"
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value)}
+                    placeholder="My App"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="project-desc">Description</Label>
-                  <Input id="project-desc" value={projectDescription} onChange={(e) => setProjectDescription(e.target.value)} placeholder="A brief description" />
+                  <Input
+                    id="project-desc"
+                    value={projectDescription}
+                    onChange={(e) => setProjectDescription(e.target.value)}
+                    placeholder="A brief description"
+                  />
                 </div>
                 <div className="flex items-center gap-3 pt-2">
-                  <Button onClick={() => handleSave("general")} disabled={saving} className="cursor-pointer">
+                  <Button
+                    onClick={() => handleSave("general")}
+                    disabled={saving}
+                    className="cursor-pointer"
+                  >
                     {saving ? "Saving..." : "Save"}
                   </Button>
                   {saved === "general" && <span className="text-sm text-emerald-400">Saved</span>}
@@ -159,15 +170,25 @@ export default function ProjectSettingsPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="editor" className="cursor-pointer">Editor</SelectItem>
-                        <SelectItem value="viewer" className="cursor-pointer">Viewer</SelectItem>
+                        <SelectItem value="editor" className="cursor-pointer">
+                          Editor
+                        </SelectItem>
+                        <SelectItem value="viewer" className="cursor-pointer">
+                          Viewer
+                        </SelectItem>
                       </SelectContent>
                     </Select>
-                    <Button onClick={() => handleSave("invite")} disabled={saving || !inviteEmail} className="cursor-pointer">
+                    <Button
+                      onClick={() => handleSave("invite")}
+                      disabled={saving || !inviteEmail}
+                      className="cursor-pointer"
+                    >
                       Invite
                     </Button>
                   </div>
-                  {saved === "invite" && <p className="mt-2 text-sm text-emerald-400">Invitation sent</p>}
+                  {saved === "invite" && (
+                    <p className="mt-2 text-sm text-emerald-400">Invitation sent</p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -189,7 +210,9 @@ export default function ProjectSettingsPage() {
                           <p className="text-xs text-muted-foreground">ben@example.com</p>
                         </div>
                       </div>
-                      <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">Owner</span>
+                      <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                        Owner
+                      </span>
                     </div>
                   </div>
                 </CardContent>
@@ -202,7 +225,9 @@ export default function ProjectSettingsPage() {
             <Card className="border-border/50">
               <CardHeader>
                 <CardTitle>Approval Policy</CardTitle>
-                <CardDescription>Configure how changes are approved before implementation</CardDescription>
+                <CardDescription>
+                  Configure how changes are approved before implementation
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
                 <div className="space-y-2">
@@ -223,11 +248,21 @@ export default function ProjectSettingsPage() {
                 {policy !== "auto_pass" && policy !== "all" && (
                   <div className="space-y-2">
                     <Label>Minimum Approvals</Label>
-                    <Input type="number" min={1} max={10} value={minCount} onChange={(e) => setMinCount(Number(e.target.value))} />
+                    <Input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={minCount}
+                      onChange={(e) => setMinCount(Number(e.target.value))}
+                    />
                   </div>
                 )}
                 <div className="flex items-center gap-3 pt-2">
-                  <Button onClick={() => handleSave("approval")} disabled={saving} className="cursor-pointer">
+                  <Button
+                    onClick={() => handleSave("approval")}
+                    disabled={saving}
+                    className="cursor-pointer"
+                  >
                     {saving ? "Saving..." : "Save Policy"}
                   </Button>
                   {saved === "approval" && <span className="text-sm text-emerald-400">Saved</span>}
@@ -247,7 +282,9 @@ export default function ProjectSettingsPage() {
                 <div className="flex items-center justify-between rounded-lg border border-destructive/20 p-4">
                   <div>
                     <p className="text-sm font-medium">Delete this project</p>
-                    <p className="text-xs text-muted-foreground">All changes, specs, and data will be permanently deleted</p>
+                    <p className="text-xs text-muted-foreground">
+                      All changes, specs, and data will be permanently deleted
+                    </p>
                   </div>
                   <Button
                     variant="outline"

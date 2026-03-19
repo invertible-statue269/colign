@@ -9,11 +9,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gobenpark/colign/internal/models"
 	"github.com/uptrace/bun"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
 	"golang.org/x/oauth2/google"
+
+	"github.com/gobenpark/colign/internal/models"
 )
 
 type OAuthConfig struct {
@@ -76,12 +77,12 @@ func (s *OAuthService) HandleCallback(ctx context.Context, provider, code string
 		return nil, err
 	}
 
-	user, err := s.findOrCreateUser(ctx, provider, userInfo, token)
+	user, orgID, err := s.findOrCreateUser(ctx, provider, userInfo, token)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.createSession(ctx, user)
+	return s.createSession(ctx, user, orgID)
 }
 
 type oauthUserInfo struct {
@@ -109,7 +110,7 @@ func (s *OAuthService) fetchGitHubUser(client *http.Client) (*oauthUserInfo, err
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var data struct {
 		ID        int64  `json:"id"`
@@ -132,7 +133,7 @@ func (s *OAuthService) fetchGitHubUser(client *http.Client) (*oauthUserInfo, err
 	if email == "" {
 		resp2, err := client.Get("https://api.github.com/user/emails")
 		if err == nil {
-			defer resp2.Body.Close()
+			defer func() { _ = resp2.Body.Close() }()
 			var emails []struct {
 				Email   string `json:"email"`
 				Primary bool   `json:"primary"`
@@ -161,7 +162,7 @@ func (s *OAuthService) fetchGoogleUser(client *http.Client) (*oauthUserInfo, err
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var data struct {
 		ID      string `json:"id"`
@@ -181,7 +182,7 @@ func (s *OAuthService) fetchGoogleUser(client *http.Client) (*oauthUserInfo, err
 	}, nil
 }
 
-func (s *OAuthService) findOrCreateUser(ctx context.Context, provider string, info *oauthUserInfo, token *oauth2.Token) (*models.User, error) {
+func (s *OAuthService) findOrCreateUser(ctx context.Context, provider string, info *oauthUserInfo, token *oauth2.Token) (*models.User, int64, error) {
 	// Check if account already exists
 	account := new(models.Account)
 	err := s.db.NewSelect().Model(account).
@@ -197,18 +198,21 @@ func (s *OAuthService) findOrCreateUser(ctx context.Context, provider string, in
 		if !token.Expiry.IsZero() {
 			account.ExpiresAt = token.Expiry.Unix()
 		}
-		s.db.NewUpdate().Model(account).WherePK().Exec(ctx)
-		return account.User, nil
+		_, _ = s.db.NewUpdate().Model(account).WherePK().Exec(ctx)
+		orgID := s.getDefaultOrgID(ctx, account.User.ID)
+		return account.User, orgID, nil
 	}
 
 	if !errors.Is(err, sql.ErrNoRows) {
-		return nil, err
+		return nil, 0, err
 	}
 
 	// Check if user with same email exists
 	user := new(models.User)
+	isNewUser := false
 	err = s.db.NewSelect().Model(user).Where("email = ?", info.Email).Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
+		isNewUser = true
 		// Create new user
 		user = &models.User{
 			Email:         info.Email,
@@ -217,10 +221,10 @@ func (s *OAuthService) findOrCreateUser(ctx context.Context, provider string, in
 			EmailVerified: true,
 		}
 		if _, err := s.db.NewInsert().Model(user).Exec(ctx); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 	} else if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	// Link account
@@ -235,14 +239,50 @@ func (s *OAuthService) findOrCreateUser(ctx context.Context, provider string, in
 		newAccount.ExpiresAt = token.Expiry.Unix()
 	}
 	if _, err := s.db.NewInsert().Model(newAccount).Exec(ctx); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return user, nil
+	// Create org for new OAuth users
+	var orgID int64
+	if isNewUser {
+		org := &models.Organization{
+			Name: fmt.Sprintf("%s's Workspace", info.Name),
+			Slug: fmt.Sprintf("%s-oauth", info.ProviderID),
+		}
+		if _, err := s.db.NewInsert().Model(org).Exec(ctx); err != nil {
+			return nil, 0, err
+		}
+		om := &models.OrganizationMember{
+			OrganizationID: org.ID,
+			UserID:         user.ID,
+			Role:           models.OrgRoleOwner,
+		}
+		if _, err := s.db.NewInsert().Model(om).Exec(ctx); err != nil {
+			return nil, 0, err
+		}
+		orgID = org.ID
+	} else {
+		orgID = s.getDefaultOrgID(ctx, user.ID)
+	}
+
+	return user, orgID, nil
 }
 
-func (s *OAuthService) createSession(ctx context.Context, user *models.User) (*TokenPair, error) {
-	tokenPair, err := s.jwtManager.GenerateTokenPair(user.ID, user.Email)
+func (s *OAuthService) getDefaultOrgID(ctx context.Context, userID int64) int64 {
+	om := new(models.OrganizationMember)
+	err := s.db.NewSelect().Model(om).
+		Where("user_id = ?", userID).
+		OrderExpr("created_at ASC").
+		Limit(1).
+		Scan(ctx)
+	if err != nil {
+		return 0
+	}
+	return om.OrganizationID
+}
+
+func (s *OAuthService) createSession(ctx context.Context, user *models.User, orgID int64) (*TokenPair, error) {
+	tokenPair, err := s.jwtManager.GenerateTokenPair(user.ID, user.Email, orgID)
 	if err != nil {
 		return nil, err
 	}

@@ -39,14 +39,10 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       const messages = locales[locale] ?? locales.en;
       return messages?.[section]?.[field] ?? locales.en?.[section]?.[field] ?? key;
     },
-    [locale]
+    [locale],
   );
 
-  return (
-    <I18nContext.Provider value={{ locale, setLocale, t }}>
-      {children}
-    </I18nContext.Provider>
-  );
+  return <I18nContext.Provider value={{ locale, setLocale, t }}>{children}</I18nContext.Provider>;
 }
 
 export function useI18n() {

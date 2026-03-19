@@ -1,11 +1,11 @@
-CREATE TABLE IF NOT EXISTS pending_invitations (
-    id BIGSERIAL PRIMARY KEY,
+CREATE TABLE pending_invitations (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    email VARCHAR(255) NOT NULL,
-    role VARCHAR(20) NOT NULL,
-    token VARCHAR(255) NOT NULL UNIQUE,
+    email TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('owner', 'editor', 'viewer')),
+    token TEXT NOT NULL UNIQUE,
     expires_at TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE(project_id, email)
 );
 

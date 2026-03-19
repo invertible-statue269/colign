@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"connectrpc.com/connect"
+
 	authv1 "github.com/gobenpark/colign/gen/proto/auth/v1"
 	"github.com/gobenpark/colign/gen/proto/auth/v1/authv1connect"
 )
@@ -22,9 +23,10 @@ func NewConnectHandler(service *Service, oauthService *OAuthService) *ConnectHan
 
 func (h *ConnectHandler) Register(ctx context.Context, req *connect.Request[authv1.RegisterRequest]) (*connect.Response[authv1.RegisterResponse], error) {
 	tokenPair, err := h.service.Register(ctx, RegisterRequest{
-		Email:    req.Msg.Email,
-		Password: req.Msg.Password,
-		Name:     req.Msg.Name,
+		Email:            req.Msg.Email,
+		Password:         req.Msg.Password,
+		Name:             req.Msg.Name,
+		OrganizationName: req.Msg.OrganizationName,
 	})
 	if err != nil {
 		if errors.Is(err, ErrEmailAlreadyExists) {

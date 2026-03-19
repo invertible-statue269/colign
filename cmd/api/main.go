@@ -33,7 +33,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create server: %v", err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

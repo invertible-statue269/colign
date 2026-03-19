@@ -129,20 +129,70 @@
 }
 
 /* Tiptap editor styles */
-.tiptap h1 { font-size: 2em; font-weight: 700; margin: 0.67em 0; }
-.tiptap h2 { font-size: 1.5em; font-weight: 600; margin: 0.83em 0; }
-.tiptap h3 { font-size: 1.17em; font-weight: 600; margin: 1em 0; }
-.tiptap h4 { font-size: 1em; font-weight: 600; margin: 1.33em 0; }
-.tiptap p { margin: 0.5em 0; }
-.tiptap ul, .tiptap ol { padding-left: 1.5em; margin: 0.5em 0; }
-.tiptap li { margin: 0.25em 0; }
-.tiptap strong { font-weight: 700; }
-.tiptap em { font-style: italic; }
-.tiptap code { background: rgba(255,255,255,0.06); padding: 0.15em 0.3em; border-radius: 0.25em; font-size: 0.9em; }
-.tiptap pre { background: rgba(255,255,255,0.06); padding: 1em; border-radius: 0.5em; overflow-x: auto; margin: 1em 0; }
-.tiptap pre code { background: none; padding: 0; }
-.tiptap blockquote { border-left: 3px solid rgba(255,255,255,0.15); padding-left: 1em; margin: 1em 0; color: var(--muted-foreground); }
-.tiptap hr { border-color: rgba(255,255,255,0.1); margin: 1.5em 0; }
+.tiptap h1 {
+  font-size: 2em;
+  font-weight: 700;
+  margin: 0.67em 0;
+}
+.tiptap h2 {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin: 0.83em 0;
+}
+.tiptap h3 {
+  font-size: 1.17em;
+  font-weight: 600;
+  margin: 1em 0;
+}
+.tiptap h4 {
+  font-size: 1em;
+  font-weight: 600;
+  margin: 1.33em 0;
+}
+.tiptap p {
+  margin: 0.5em 0;
+}
+.tiptap ul,
+.tiptap ol {
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+.tiptap li {
+  margin: 0.25em 0;
+}
+.tiptap strong {
+  font-weight: 700;
+}
+.tiptap em {
+  font-style: italic;
+}
+.tiptap code {
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.15em 0.3em;
+  border-radius: 0.25em;
+  font-size: 0.9em;
+}
+.tiptap pre {
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1em;
+  border-radius: 0.5em;
+  overflow-x: auto;
+  margin: 1em 0;
+}
+.tiptap pre code {
+  background: none;
+  padding: 0;
+}
+.tiptap blockquote {
+  border-left: 3px solid rgba(255, 255, 255, 0.15);
+  padding-left: 1em;
+  margin: 1em 0;
+  color: var(--muted-foreground);
+}
+.tiptap hr {
+  border-color: rgba(255, 255, 255, 0.1);
+  margin: 1.5em 0;
+}
 .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
@@ -152,15 +202,62 @@
 }
 
 /* Preview prose styles */
-.prose h1 { font-size: 2em; font-weight: 700; margin: 0.67em 0; }
-.prose h2 { font-size: 1.5em; font-weight: 600; margin: 0.83em 0; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.3em; }
-.prose h3 { font-size: 1.17em; font-weight: 600; margin: 1em 0; }
-.prose h4 { font-size: 1em; font-weight: 600; margin: 1.33em 0; }
-.prose p { margin: 0.5em 0; line-height: 1.7; }
-.prose ul, .prose ol { padding-left: 1.5em; margin: 0.5em 0; }
-.prose li { margin: 0.25em 0; }
-.prose strong { font-weight: 700; }
-.prose em { font-style: italic; }
-.prose code { background: rgba(255,255,255,0.06); padding: 0.15em 0.3em; border-radius: 0.25em; font-size: 0.9em; }
-.prose pre { background: rgba(255,255,255,0.06); padding: 1em; border-radius: 0.5em; overflow-x: auto; margin: 1em 0; }
-.prose blockquote { border-left: 3px solid rgba(255,255,255,0.15); padding-left: 1em; margin: 1em 0; color: var(--muted-foreground); }
+.prose h1 {
+  font-size: 2em;
+  font-weight: 700;
+  margin: 0.67em 0;
+}
+.prose h2 {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin: 0.83em 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 0.3em;
+}
+.prose h3 {
+  font-size: 1.17em;
+  font-weight: 600;
+  margin: 1em 0;
+}
+.prose h4 {
+  font-size: 1em;
+  font-weight: 600;
+  margin: 1.33em 0;
+}
+.prose p {
+  margin: 0.5em 0;
+  line-height: 1.7;
+}
+.prose ul,
+.prose ol {
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+.prose li {
+  margin: 0.25em 0;
+}
+.prose strong {
+  font-weight: 700;
+}
+.prose em {
+  font-style: italic;
+}
+.prose code {
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.15em 0.3em;
+  border-radius: 0.25em;
+  font-size: 0.9em;
+}
+.prose pre {
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1em;
+  border-radius: 0.5em;
+  overflow-x: auto;
+  margin: 1em 0;
+}
+.prose blockquote {
+  border-left: 3px solid rgba(255, 255, 255, 0.15);
+  padding-left: 1em;
+  margin: 1em 0;
+  color: var(--muted-foreground);
+}

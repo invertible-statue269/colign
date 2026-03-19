@@ -17,14 +17,16 @@ const (
 type Project struct {
 	bun.BaseModel `bun:"table:projects,alias:p"`
 
-	ID          int64     `bun:"id,pk,autoincrement"`
-	Name        string    `bun:"name,notnull"`
-	Slug        string    `bun:"slug,notnull,unique"`
-	Description string    `bun:"description"`
-	CreatedAt   time.Time `bun:"created_at,notnull,default:current_timestamp"`
-	UpdatedAt   time.Time `bun:"updated_at,notnull,default:current_timestamp"`
+	ID             int64     `bun:"id,pk,autoincrement"`
+	OrganizationID int64     `bun:"organization_id"`
+	Name           string    `bun:"name,notnull"`
+	Slug           string    `bun:"slug,notnull"`
+	Description    string    `bun:"description"`
+	CreatedAt      time.Time `bun:"created_at,notnull,default:current_timestamp"`
+	UpdatedAt      time.Time `bun:"updated_at,notnull,default:current_timestamp"`
 
-	Members []ProjectMember `bun:"rel:has-many,join:id=project_id"`
+	Organization *Organization   `bun:"rel:belongs-to,join:organization_id=id"`
+	Members      []ProjectMember `bun:"rel:has-many,join:id=project_id"`
 }
 
 type ProjectMember struct {

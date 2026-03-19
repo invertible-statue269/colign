@@ -17,6 +17,7 @@ const (
 type Claims struct {
 	UserID int64  `json:"user_id"`
 	Email  string `json:"email"`
+	OrgID  int64  `json:"org_id"`
 	jwt.RegisteredClaims
 }
 
@@ -34,11 +35,12 @@ func NewJWTManager(secret string) *JWTManager {
 	return &JWTManager{secret: []byte(secret)}
 }
 
-func (m *JWTManager) GenerateAccessToken(userID int64, email string) (string, error) {
+func (m *JWTManager) GenerateAccessToken(userID int64, email string, orgID int64) (string, error) {
 	now := time.Now()
 	claims := Claims{
 		UserID: userID,
 		Email:  email,
+		OrgID:  orgID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(now.Add(AccessTokenDuration)),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -77,8 +79,8 @@ func GenerateRefreshToken() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-func (m *JWTManager) GenerateTokenPair(userID int64, email string) (*TokenPair, error) {
-	accessToken, err := m.GenerateAccessToken(userID, email)
+func (m *JWTManager) GenerateTokenPair(userID int64, email string, orgID int64) (*TokenPair, error) {
+	accessToken, err := m.GenerateAccessToken(userID, email, orgID)
 	if err != nil {
 		return nil, err
 	}

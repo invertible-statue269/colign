@@ -28,7 +28,7 @@ export function CollaborativeEditor({
         name: documentId,
         document: ydoc,
       }),
-    [documentId, ydoc]
+    [documentId, ydoc],
   );
 
   const editor = useEditor({

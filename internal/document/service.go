@@ -6,8 +6,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gobenpark/colign/internal/models"
 	"github.com/uptrace/bun"
+
+	"github.com/gobenpark/colign/internal/models"
 )
 
 var ErrDocumentNotFound = errors.New("document not found")
@@ -67,7 +68,9 @@ func (s *Service) Save(ctx context.Context, input SaveInput) (*models.Document, 
 		Version:    doc.Version,
 		UserID:     input.UserID,
 	}
-	s.db.NewInsert().Model(version).Exec(ctx)
+	if _, err := s.db.NewInsert().Model(version).Exec(ctx); err != nil {
+		return nil, err
+	}
 
 	return doc, nil
 }
@@ -113,7 +116,9 @@ func (s *Service) Restore(ctx context.Context, documentID int64, version int, us
 		Version:    doc.Version,
 		UserID:     userID,
 	}
-	s.db.NewInsert().Model(newVersion).Exec(ctx)
+	if _, err := s.db.NewInsert().Model(newVersion).Exec(ctx); err != nil {
+		return nil, err
+	}
 
 	return doc, nil
 }

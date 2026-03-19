@@ -9,10 +9,10 @@ import (
 type ApprovalPolicy struct {
 	bun.BaseModel `bun:"table:approval_policies,alias:ap"`
 
-	ID        int64  `bun:"id,pk,autoincrement"`
-	ProjectID int64  `bun:"project_id,notnull,unique"`
-	Policy    string `bun:"policy,notnull,default:'owner_one'"` // owner_one, editor_two, all, auto_pass
-	MinCount  int    `bun:"min_count,notnull,default:1"`
+	ID        int64     `bun:"id,pk,autoincrement"`
+	ProjectID int64     `bun:"project_id,notnull,unique"`
+	Policy    string    `bun:"policy,notnull,default:'owner_one'"` // owner_one, editor_two, all, auto_pass
+	MinCount  int       `bun:"min_count,notnull,default:1"`
 	CreatedAt time.Time `bun:"created_at,notnull,default:current_timestamp"`
 	UpdatedAt time.Time `bun:"updated_at,notnull,default:current_timestamp"`
 

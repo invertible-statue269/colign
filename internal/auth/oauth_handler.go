@@ -4,8 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"net/http"
-
-	"github.com/gin-gonic/gin"
 )
 
 type OAuthHandler struct {
@@ -17,48 +15,46 @@ func NewOAuthHandler(service *OAuthService, frontendURL string) *OAuthHandler {
 	return &OAuthHandler{service: service, frontendURL: frontendURL}
 }
 
-func (h *OAuthHandler) Redirect(c *gin.Context) {
-	provider := c.Param("provider")
+func (h *OAuthHandler) Redirect(w http.ResponseWriter, r *http.Request) {
+	provider := r.PathValue("provider")
 
 	stateBytes := make([]byte, 16)
-	rand.Read(stateBytes)
+	_, _ = rand.Read(stateBytes)
 	state := hex.EncodeToString(stateBytes)
 
-	c.SetCookie("oauth_state", state, 600, "/", "", false, true)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "oauth_state",
+		Value:    state,
+		Path:     "/",
+		MaxAge:   600,
+		HttpOnly: true,
+	})
 
 	url, err := h.service.GetAuthURL(provider, state)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	c.Redirect(http.StatusTemporaryRedirect, url)
+	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
-func (h *OAuthHandler) Callback(c *gin.Context) {
-	provider := c.Param("provider")
-	code := c.Query("code")
-	state := c.Query("state")
+func (h *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
+	provider := r.PathValue("provider")
+	code := r.URL.Query().Get("code")
+	state := r.URL.Query().Get("state")
 
-	cookieState, err := c.Cookie("oauth_state")
-	if err != nil || cookieState != state {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid state"})
+	cookie, err := r.Cookie("oauth_state")
+	if err != nil || cookie.Value != state {
+		http.Error(w, "invalid state", http.StatusBadRequest)
 		return
 	}
 
-	tokenPair, err := h.service.HandleCallback(c.Request.Context(), provider, code)
+	tokenPair, err := h.service.HandleCallback(r.Context(), provider, code)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "oauth failed"})
+		http.Error(w, "oauth failed", http.StatusInternalServerError)
 		return
 	}
 
-	// Redirect to frontend with tokens
-	c.Redirect(http.StatusTemporaryRedirect,
-		h.frontendURL+"/auth/callback?access_token="+tokenPair.AccessToken+"&refresh_token="+tokenPair.RefreshToken)
-}
-
-func (h *OAuthHandler) RegisterRoutes(r *gin.RouterGroup) {
-	oauth := r.Group("/auth")
-	oauth.GET("/:provider", h.Redirect)
-	oauth.GET("/:provider/callback", h.Callback)
+	http.Redirect(w, r, h.frontendURL+"/auth/callback?access_token="+tokenPair.AccessToken+"&refresh_token="+tokenPair.RefreshToken, http.StatusTemporaryRedirect)
 }

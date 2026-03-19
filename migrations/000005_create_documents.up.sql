@@ -1,23 +1,25 @@
-CREATE TABLE IF NOT EXISTS documents (
-    id BIGSERIAL PRIMARY KEY,
+CREATE TABLE documents (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     change_id BIGINT NOT NULL REFERENCES changes(id) ON DELETE CASCADE,
-    type VARCHAR(20) NOT NULL,
-    title VARCHAR(255),
+    type TEXT NOT NULL CHECK (type IN ('proposal', 'design', 'spec', 'tasks')),
+    title TEXT,
     content TEXT NOT NULL DEFAULT '',
-    version INT NOT NULL DEFAULT 1,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE(change_id, type, title)
 );
 
-CREATE TABLE IF NOT EXISTS document_versions (
-    id BIGSERIAL PRIMARY KEY,
+CREATE INDEX idx_documents_change_id ON documents(change_id);
+
+CREATE TABLE document_versions (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     document_id BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
     content TEXT NOT NULL,
-    version INT NOT NULL,
+    version INTEGER NOT NULL CHECK (version > 0),
     user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_documents_change_id ON documents(change_id);
 CREATE INDEX idx_document_versions_document_id ON document_versions(document_id);
+CREATE INDEX idx_document_versions_user_id ON document_versions(user_id);

@@ -3,32 +3,51 @@ package project
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	projectv1 "github.com/gobenpark/colign/gen/proto/project/v1"
 	"github.com/gobenpark/colign/gen/proto/project/v1/projectv1connect"
+	"github.com/gobenpark/colign/internal/auth"
 	"github.com/gobenpark/colign/internal/models"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type ConnectHandler struct {
-	service *Service
+	service    *Service
+	jwtManager *auth.JWTManager
 }
 
 var _ projectv1connect.ProjectServiceHandler = (*ConnectHandler)(nil)
 
-func NewConnectHandler(service *Service) *ConnectHandler {
-	return &ConnectHandler{service: service}
+func NewConnectHandler(service *Service, jwtManager *auth.JWTManager) *ConnectHandler {
+	return &ConnectHandler{service: service, jwtManager: jwtManager}
+}
+
+func (h *ConnectHandler) extractClaims(header string) (*auth.Claims, error) {
+	parts := strings.SplitN(header, " ", 2)
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid authorization header"))
+	}
+	claims, err := h.jwtManager.ValidateAccessToken(parts[1])
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid or expired token"))
+	}
+	return claims, nil
 }
 
 func (h *ConnectHandler) CreateProject(ctx context.Context, req *connect.Request[projectv1.CreateProjectRequest]) (*connect.Response[projectv1.CreateProjectResponse], error) {
-	// TODO: extract user ID from auth context
-	userID := int64(1)
+	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
 
 	project, err := h.service.Create(ctx, CreateProjectInput{
-		Name:        req.Msg.Name,
-		Description: req.Msg.Description,
-		UserID:      userID,
+		Name:           req.Msg.Name,
+		Description:    req.Msg.Description,
+		UserID:         claims.UserID,
+		OrganizationID: claims.OrgID,
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
@@ -40,7 +59,12 @@ func (h *ConnectHandler) CreateProject(ctx context.Context, req *connect.Request
 }
 
 func (h *ConnectHandler) GetProject(ctx context.Context, req *connect.Request[projectv1.GetProjectRequest]) (*connect.Response[projectv1.GetProjectResponse], error) {
-	project, members, err := h.service.GetBySlug(ctx, req.Msg.Slug)
+	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	project, members, err := h.service.GetBySlug(ctx, req.Msg.Slug, claims.OrgID)
 	if err != nil {
 		if errors.Is(err, ErrProjectNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, err)
@@ -60,9 +84,12 @@ func (h *ConnectHandler) GetProject(ctx context.Context, req *connect.Request[pr
 }
 
 func (h *ConnectHandler) ListProjects(ctx context.Context, req *connect.Request[projectv1.ListProjectsRequest]) (*connect.Response[projectv1.ListProjectsResponse], error) {
-	userID := int64(1) // TODO: from auth context
+	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
 
-	projects, err := h.service.ListByUser(ctx, userID)
+	projects, err := h.service.ListByUser(ctx, claims.UserID, claims.OrgID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}

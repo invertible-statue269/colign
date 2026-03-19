@@ -29,7 +29,7 @@ export function DocumentTab({ changeId, docType, initialContent }: DocumentTabPr
         // retry handled by editor
       }
     },
-    [changeId, docType]
+    [changeId, docType],
   );
 
   return (

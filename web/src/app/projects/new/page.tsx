@@ -6,13 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { projectClient } from "@/lib/project";
 
 export default function NewProjectPage() {
@@ -50,9 +44,7 @@ export default function NewProjectPage() {
         <Card className="border-border/50">
           <CardHeader>
             <CardTitle>Create New Project</CardTitle>
-            <CardDescription>
-              Set up a project to start your SDD workflow
-            </CardDescription>
+            <CardDescription>Set up a project to start your SDD workflow</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-5">

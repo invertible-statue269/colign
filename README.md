@@ -3,7 +3,7 @@
 [![CI](https://github.com/gobenpark/colign/actions/workflows/ci.yml/badge.svg)](https://github.com/gobenpark/colign/actions/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev)
-[![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=next.js&logoColor=white)](https://nextjs.org)
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=next.js&logoColor=white)](https://nextjs.org)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 A Spec-Driven Development (SDD) workflow platform where developers and non-developers collaboratively discuss and write specs with AI.
@@ -12,7 +12,7 @@ A Spec-Driven Development (SDD) workflow platform where developers and non-devel
 
 ```
 ┌──────────────────┐         ┌──────────────────────┐
-│    Next.js 15     │ Connect │     Go + Gin          │
+│    Next.js 16     │ Connect │     Go (net/http)     │
 │    (Frontend)     │◄──────►│     (API Server)      │
 │                   │ (.proto)│                       │
 │  - React 19       │        │  - uptrace/bun (ORM)  │
@@ -33,18 +33,18 @@ A Spec-Driven Development (SDD) workflow platform where developers and non-devel
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | Next.js 15, React 19, TypeScript, Tailwind CSS, shadcn/ui |
+| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4, shadcn/ui |
 | Editor | Tiptap (ProseMirror) + Y.js (CRDT) |
-| API | Connect (buf.build) - gRPC-compatible with JSON support |
-| Backend | Go, Gin, uptrace/bun |
+| API | Connect RPC (buf.build) - gRPC-compatible with JSON support |
+| Backend | Go, net/http, uptrace/bun |
 | Auth | JWT + OAuth2 (GitHub, Google) |
-| Realtime | Hocuspocus (Y.js server), gorilla/websocket |
+| Realtime | Hocuspocus (Y.js server) |
 | AI | Claude API (streaming), MCP Server |
-| Database | PostgreSQL, Redis |
+| Database | PostgreSQL 16, Redis 7 |
 
 ## Prerequisites
 
-- Go 1.21+
+- Go 1.26+
 - Node.js 20+
 - Docker & Docker Compose
 - [buf](https://buf.build/docs/installation)
@@ -52,20 +52,26 @@ A Spec-Driven Development (SDD) workflow platform where developers and non-devel
 ## Getting Started
 
 ```bash
-# Start databases
-make up
-
-# Run migrations
-migrate -path migrations -database "postgres://postgres:postgres@localhost:5432/colign?sslmode=disable" up
-
-# Generate proto code
-make proto
-
-# Run API server
-make run
+# Start all services (API + DB + Redis)
+docker-compose up --build
 
 # Run frontend (separate terminal)
-make web-dev
+cd web && npm install && npm run dev
+```
+
+Open http://localhost:3000 to access the app.
+
+## Development
+
+```bash
+# Generate proto (Go + TypeScript)
+cd proto && buf generate
+
+# Run API server locally
+go run ./cmd/api
+
+# Run tests
+go test ./...
 ```
 
 ## Project Structure
@@ -73,48 +79,29 @@ make web-dev
 ```
 .
 ├── cmd/
-│   ├── api/          # API server entrypoint
-│   └── mcp/          # MCP server entrypoint
+│   ├── api/            # API server entrypoint
+│   └── mcp/            # MCP server entrypoint
 ├── internal/
-│   ├── auth/         # Authentication (JWT, OAuth)
-│   ├── project/      # Project & Change management
-│   ├── workflow/     # Workflow engine (state machine)
-│   ├── document/     # Spec editor backend
-│   ├── collaboration/# Realtime collaboration
-│   ├── chat/         # AI chat
-│   ├── specgen/      # AI spec generation
-│   ├── task/         # Task tracking
-│   ├── mcp/          # MCP server
-│   ├── models/       # Database models
-│   ├── config/       # Configuration
-│   ├── middleware/    # Gin middlewares
-│   ├── server/       # Server setup
-│   ├── database/     # Database connection
-│   ├── cache/        # Redis client
-│   └── email/        # Email sending
-├── proto/            # Protobuf definitions
-├── gen/              # Generated Go code
-├── migrations/       # SQL migrations (golang-migrate)
-├── web/              # Next.js frontend
-├── hocuspocus/       # Y.js collaboration server
+│   ├── auth/           # Authentication (JWT, OAuth, Connect handlers)
+│   ├── project/        # Project & Change management
+│   ├── organization/   # Organization (workspace) management
+│   ├── workflow/       # Workflow engine (state machine)
+│   ├── models/         # Database models (bun)
+│   ├── config/         # Configuration
+│   ├── middleware/     # HTTP middleware (CORS, JWT)
+│   ├── server/         # Server setup (net/http + Connect RPC)
+│   └── database/       # Database connection
+├── proto/              # Protobuf definitions (buf.build)
+│   ├── auth/           # Auth service
+│   ├── project/        # Project service
+│   ├── organization/   # Organization service
+│   └── workflow/       # Workflow service
+├── gen/                # Generated Go proto code
+├── migrations/         # SQL migrations (golang-migrate)
+├── web/                # Next.js frontend
+├── hocuspocus/         # Y.js collaboration server
 ├── docker-compose.yml
-└── Makefile
-```
-
-## Development
-
-```bash
-# Generate proto (Go + TypeScript)
-make proto
-
-# Run tests
-make test
-
-# Build binaries
-make build
-
-# Lint proto files
-make proto-lint
+└── Dockerfile
 ```
 
 ## License

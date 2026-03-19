@@ -35,7 +35,7 @@ func (s *Server) Run() error {
 
 		resp := s.handleRequest(req)
 		respBytes, _ := json.Marshal(resp)
-		fmt.Fprintln(s.writer, string(respBytes))
+		_, _ = fmt.Fprintln(s.writer, string(respBytes))
 	}
 
 	return scanner.Err()

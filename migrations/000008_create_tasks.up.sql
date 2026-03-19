@@ -1,13 +1,13 @@
-CREATE TABLE IF NOT EXISTS tasks (
-    id BIGSERIAL PRIMARY KEY,
+CREATE TABLE tasks (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     change_id BIGINT NOT NULL REFERENCES changes(id) ON DELETE CASCADE,
-    title VARCHAR(500) NOT NULL,
+    title TEXT NOT NULL,
     description TEXT,
-    status VARCHAR(20) NOT NULL DEFAULT 'todo',
-    order_index INT NOT NULL DEFAULT 0,
-    spec_ref VARCHAR(255),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    status TEXT NOT NULL DEFAULT 'todo' CHECK (status IN ('todo', 'in_progress', 'done')),
+    order_index INTEGER NOT NULL DEFAULT 0,
+    spec_ref TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_tasks_change_id ON tasks(change_id);

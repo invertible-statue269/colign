@@ -11,8 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gobenpark/colign/internal/models"
 	"github.com/uptrace/bun"
+
+	"github.com/gobenpark/colign/internal/models"
 )
 
 var (
@@ -40,14 +41,17 @@ func GenerateSlug(name string) string {
 	return slug
 }
 
-func (s *Service) ensureUniqueSlug(ctx context.Context, slug string) (string, error) {
+func (s *Service) ensureUniqueSlug(ctx context.Context, slug string, orgID int64) (string, error) {
 	baseSlug := slug
 	for i := 0; ; i++ {
 		candidate := baseSlug
 		if i > 0 {
 			candidate = fmt.Sprintf("%s-%d", baseSlug, i+1)
 		}
-		exists, err := s.db.NewSelect().Model((*models.Project)(nil)).Where("slug = ?", candidate).Exists(ctx)
+		exists, err := s.db.NewSelect().Model((*models.Project)(nil)).
+			Where("slug = ?", candidate).
+			Where("organization_id = ?", orgID).
+			Exists(ctx)
 		if err != nil {
 			return "", err
 		}
@@ -58,29 +62,31 @@ func (s *Service) ensureUniqueSlug(ctx context.Context, slug string) (string, er
 }
 
 type CreateProjectInput struct {
-	Name        string
-	Description string
-	UserID      int64
+	Name           string
+	Description    string
+	UserID         int64
+	OrganizationID int64
 }
 
 func (s *Service) Create(ctx context.Context, input CreateProjectInput) (*models.Project, error) {
 	slug := GenerateSlug(input.Name)
-	uniqueSlug, err := s.ensureUniqueSlug(ctx, slug)
+	uniqueSlug, err := s.ensureUniqueSlug(ctx, slug, input.OrganizationID)
 	if err != nil {
 		return nil, err
 	}
 
 	project := &models.Project{
-		Name:        input.Name,
-		Slug:        uniqueSlug,
-		Description: input.Description,
+		OrganizationID: input.OrganizationID,
+		Name:           input.Name,
+		Slug:           uniqueSlug,
+		Description:    input.Description,
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.NewInsert().Model(project).Exec(ctx); err != nil {
 		return nil, err
@@ -102,9 +108,12 @@ func (s *Service) Create(ctx context.Context, input CreateProjectInput) (*models
 	return project, nil
 }
 
-func (s *Service) GetBySlug(ctx context.Context, slug string) (*models.Project, []models.ProjectMember, error) {
+func (s *Service) GetBySlug(ctx context.Context, slug string, orgID int64) (*models.Project, []models.ProjectMember, error) {
 	project := new(models.Project)
-	err := s.db.NewSelect().Model(project).Where("slug = ?", slug).Scan(ctx)
+	err := s.db.NewSelect().Model(project).
+		Where("slug = ?", slug).
+		Where("organization_id = ?", orgID).
+		Scan(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil, ErrProjectNotFound
@@ -124,11 +133,12 @@ func (s *Service) GetBySlug(ctx context.Context, slug string) (*models.Project, 
 	return project, members, nil
 }
 
-func (s *Service) ListByUser(ctx context.Context, userID int64) ([]models.Project, error) {
+func (s *Service) ListByUser(ctx context.Context, userID int64, orgID int64) ([]models.Project, error) {
 	var projects []models.Project
 	err := s.db.NewSelect().Model(&projects).
 		Join("JOIN project_members AS pm ON pm.project_id = p.id").
 		Where("pm.user_id = ?", userID).
+		Where("p.organization_id = ?", orgID).
 		OrderExpr("p.updated_at DESC").
 		Scan(ctx)
 	if err != nil {

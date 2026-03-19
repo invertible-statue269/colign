@@ -67,6 +67,14 @@ message GetHistoryResponse {
   repeated WorkflowEvent events = 1;
 }
 
+message AdvanceRequest {
+  int64 change_id = 1;
+}
+
+message AdvanceResponse {
+  string new_stage = 1;
+}
+
 message SetApprovalPolicyRequest {
   int64 project_id = 1;
   string policy = 2;
@@ -77,6 +85,7 @@ message SetApprovalPolicyResponse {}
 
 service WorkflowService {
   rpc GetStatus(GetStatusRequest) returns (GetStatusResponse) {}
+  rpc Advance(AdvanceRequest) returns (AdvanceResponse) {}
   rpc Approve(ApproveRequest) returns (ApproveResponse) {}
   rpc RequestChanges(RequestChangesRequest) returns (RequestChangesResponse) {}
   rpc Revert(RevertRequest) returns (RevertResponse) {}

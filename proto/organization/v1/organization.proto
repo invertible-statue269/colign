@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package organization.v1;
+
+option go_package = "github.com/gobenpark/colign/gen/proto/organization/v1;organizationv1";
+
+import "google/protobuf/timestamp.proto";
+
+message Organization {
+  int64 id = 1;
+  string name = 2;
+  string slug = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message OrganizationMember {
+  int64 id = 1;
+  int64 organization_id = 2;
+  int64 user_id = 3;
+  string role = 4;
+  string user_name = 5;
+  string user_email = 6;
+}
+
+// List organizations the current user belongs to
+message ListOrganizationsRequest {}
+
+message ListOrganizationsResponse {
+  repeated Organization organizations = 1;
+  int64 current_org_id = 2;
+}
+
+// Switch current organization (returns new token pair)
+message SwitchOrganizationRequest {
+  int64 organization_id = 1;
+}
+
+message SwitchOrganizationResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  int64 expires_at = 3;
+  Organization organization = 4;
+}
+
+// Update organization name
+message UpdateOrganizationRequest {
+  int64 id = 1;
+  string name = 2;
+}
+
+message UpdateOrganizationResponse {
+  Organization organization = 1;
+}
+
+service OrganizationService {
+  rpc ListOrganizations(ListOrganizationsRequest) returns (ListOrganizationsResponse) {}
+  rpc SwitchOrganization(SwitchOrganizationRequest) returns (SwitchOrganizationResponse) {}
+  rpc UpdateOrganization(UpdateOrganizationRequest) returns (UpdateOrganizationResponse) {}
+}

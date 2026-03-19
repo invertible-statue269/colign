@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS workflow_events CASCADE;
+DROP TABLE IF EXISTS approvals CASCADE;
+DROP TABLE IF EXISTS approval_policies CASCADE;

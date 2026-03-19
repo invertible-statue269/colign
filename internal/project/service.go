@@ -2,7 +2,9 @@ package project
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"regexp"
@@ -220,8 +222,28 @@ func (s *Service) InviteMember(ctx context.Context, input InviteMemberInput) (*m
 	err := s.db.NewSelect().Model(user).Where("email = ?", input.Email).Scan(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			// TODO: handle invite for non-registered users
-			return nil, fmt.Errorf("user not found: %s", input.Email)
+			// User not registered — create pending invitation
+			tokenBytes := make([]byte, 32)
+			if _, err := rand.Read(tokenBytes); err != nil {
+				return nil, err
+			}
+			invitation := &models.PendingInvitation{
+				ProjectID: input.ProjectID,
+				Email:     input.Email,
+				Role:      input.Role,
+				Token:     hex.EncodeToString(tokenBytes),
+				ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
+			}
+			if _, err := s.db.NewInsert().Model(invitation).
+				On("CONFLICT (project_id, email) DO UPDATE").
+				Set("role = EXCLUDED.role").
+				Set("token = EXCLUDED.token").
+				Set("expires_at = EXCLUDED.expires_at").
+				Exec(ctx); err != nil {
+				return nil, err
+			}
+			// TODO: send invitation email with token
+			return nil, nil
 		}
 		return nil, err
 	}
@@ -240,4 +262,39 @@ func (s *Service) InviteMember(ctx context.Context, input InviteMemberInput) (*m
 	}
 
 	return member, nil
+}
+
+// ProcessPendingInvitations converts pending invitations to project memberships
+// after a new user registers. Called during user registration flow.
+func (s *Service) ProcessPendingInvitations(ctx context.Context, userID int64, email string) error {
+	var invitations []models.PendingInvitation
+	err := s.db.NewSelect().Model(&invitations).
+		Where("email = ?", email).
+		Where("expires_at > ?", time.Now()).
+		Scan(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, inv := range invitations {
+		member := &models.ProjectMember{
+			ProjectID: inv.ProjectID,
+			UserID:    userID,
+			Role:      inv.Role,
+		}
+		if _, err := s.db.NewInsert().Model(member).
+			On("CONFLICT (project_id, user_id) DO NOTHING").
+			Exec(ctx); err != nil {
+			return err
+		}
+	}
+
+	// Clean up processed invitations
+	if len(invitations) > 0 {
+		_, err = s.db.NewDelete().Model((*models.PendingInvitation)(nil)).
+			Where("email = ?", email).
+			Exec(ctx)
+	}
+
+	return err
 }

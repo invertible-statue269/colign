@@ -14,7 +14,9 @@ import (
 
 	"github.com/gobenpark/CoSpec/gen/proto/auth/v1/authv1connect"
 	"github.com/gobenpark/CoSpec/gen/proto/project/v1/projectv1connect"
+	"github.com/gobenpark/CoSpec/gen/proto/workflow/v1/workflowv1connect"
 	"github.com/gobenpark/CoSpec/internal/project"
+	"github.com/gobenpark/CoSpec/internal/workflow"
 )
 
 type Server struct {
@@ -83,6 +85,12 @@ func (s *Server) setupRoutes(cfg *config.Config) {
 	projectConnectHandler := project.NewConnectHandler(projectService)
 	projectPath, projectHandler := projectv1connect.NewProjectServiceHandler(projectConnectHandler)
 	s.router.Any(projectPath+"/*path", gin.WrapH(projectHandler))
+
+	// Workflow service (Connect)
+	workflowService := workflow.NewService(s.db)
+	workflowConnectHandler := workflow.NewConnectHandler(workflowService, s.db)
+	workflowPath, workflowHandler := workflowv1connect.NewWorkflowServiceHandler(workflowConnectHandler)
+	s.router.Any(workflowPath+"/*path", gin.WrapH(workflowHandler))
 
 	// Protected routes group
 	_ = s.router.Group("/api").Use(middleware.JWTAuth(s.jwtManager))

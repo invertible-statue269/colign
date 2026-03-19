@@ -36,5 +36,5 @@ web/src/gen/
 # OS
 .DS_Store
 Thumbs.db
-api
+/api
 .claude/

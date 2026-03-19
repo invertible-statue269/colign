@@ -9,22 +9,34 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
 
-  hocuspocus:
-    image: node:20-alpine
-    working_dir: /app
-    volumes:
-      - ./hocuspocus:/app
+  api:
+    build: .
     ports:
-      - "1234:1234"
-    command: sh -c "npm install && npx tsx src/index.ts"
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      DATABASE_URL: "postgres://postgres:postgres@postgres:5432/cospec?sslmode=disable"
+      REDIS_URL: "redis://redis:6379"
+      JWT_SECRET: "dev-secret-change-in-production"
+      FRONTEND_URL: "http://localhost:3000"
+      REDIRECT_BASE_URL: "http://localhost:8080"
+      MIGRATIONS_PATH: "/migrations"
     depends_on:
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
 volumes:
   pgdata:

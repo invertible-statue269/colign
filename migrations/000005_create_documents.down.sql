@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS document_versions CASCADE;
+DROP TABLE IF EXISTS documents CASCADE;

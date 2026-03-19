@@ -83,37 +83,37 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: oklch(0.1 0 0);
+  --foreground: oklch(0.95 0 0);
+  --card: oklch(0.155 0 0);
+  --card-foreground: oklch(0.95 0 0);
+  --popover: oklch(0.155 0 0);
+  --popover-foreground: oklch(0.95 0 0);
+  --primary: oklch(0.623 0.214 259.815);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.205 0 0);
+  --secondary-foreground: oklch(0.95 0 0);
+  --muted: oklch(0.205 0 0);
+  --muted-foreground: oklch(0.6 0 0);
+  --accent: oklch(0.205 0 0);
+  --accent-foreground: oklch(0.95 0 0);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 10%);
+  --ring: oklch(0.623 0.214 259.815);
+  --chart-1: oklch(0.623 0.214 259.815);
+  --chart-2: oklch(0.7 0.15 150);
+  --chart-3: oklch(0.75 0.15 50);
+  --chart-4: oklch(0.65 0.2 310);
+  --chart-5: oklch(0.55 0.2 25);
+  --sidebar: oklch(0.12 0 0);
+  --sidebar-foreground: oklch(0.95 0 0);
+  --sidebar-primary: oklch(0.623 0.214 259.815);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-accent: oklch(0.18 0 0);
+  --sidebar-accent-foreground: oklch(0.95 0 0);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.623 0.214 259.815);
 }
 
 @layer base {
@@ -127,3 +127,40 @@
     @apply font-sans;
   }
 }
+
+/* Tiptap editor styles */
+.tiptap h1 { font-size: 2em; font-weight: 700; margin: 0.67em 0; }
+.tiptap h2 { font-size: 1.5em; font-weight: 600; margin: 0.83em 0; }
+.tiptap h3 { font-size: 1.17em; font-weight: 600; margin: 1em 0; }
+.tiptap h4 { font-size: 1em; font-weight: 600; margin: 1.33em 0; }
+.tiptap p { margin: 0.5em 0; }
+.tiptap ul, .tiptap ol { padding-left: 1.5em; margin: 0.5em 0; }
+.tiptap li { margin: 0.25em 0; }
+.tiptap strong { font-weight: 700; }
+.tiptap em { font-style: italic; }
+.tiptap code { background: rgba(255,255,255,0.06); padding: 0.15em 0.3em; border-radius: 0.25em; font-size: 0.9em; }
+.tiptap pre { background: rgba(255,255,255,0.06); padding: 1em; border-radius: 0.5em; overflow-x: auto; margin: 1em 0; }
+.tiptap pre code { background: none; padding: 0; }
+.tiptap blockquote { border-left: 3px solid rgba(255,255,255,0.15); padding-left: 1em; margin: 1em 0; color: var(--muted-foreground); }
+.tiptap hr { border-color: rgba(255,255,255,0.1); margin: 1.5em 0; }
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--muted-foreground);
+  pointer-events: none;
+  height: 0;
+}
+
+/* Preview prose styles */
+.prose h1 { font-size: 2em; font-weight: 700; margin: 0.67em 0; }
+.prose h2 { font-size: 1.5em; font-weight: 600; margin: 0.83em 0; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.3em; }
+.prose h3 { font-size: 1.17em; font-weight: 600; margin: 1em 0; }
+.prose h4 { font-size: 1em; font-weight: 600; margin: 1.33em 0; }
+.prose p { margin: 0.5em 0; line-height: 1.7; }
+.prose ul, .prose ol { padding-left: 1.5em; margin: 0.5em 0; }
+.prose li { margin: 0.25em 0; }
+.prose strong { font-weight: 700; }
+.prose em { font-style: italic; }
+.prose code { background: rgba(255,255,255,0.06); padding: 0.15em 0.3em; border-radius: 0.25em; font-size: 0.9em; }
+.prose pre { background: rgba(255,255,255,0.06); padding: 1em; border-radius: 0.5em; overflow-x: auto; margin: 1em 0; }
+.prose blockquote { border-left: 3px solid rgba(255,255,255,0.15); padding-left: 1em; margin: 1em 0; color: var(--muted-foreground); }

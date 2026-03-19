@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package workflow.v1;
+
+option go_package = "github.com/gobenpark/CoSpec/gen/proto/workflow/v1;workflowv1";
+
+import "google/protobuf/timestamp.proto";
+
+message GateCondition {
+  string name = 1;
+  string description = 2;
+  bool met = 3;
+}
+
+message WorkflowEvent {
+  int64 id = 1;
+  string from_stage = 2;
+  string to_stage = 3;
+  string action = 4;
+  string reason = 5;
+  int64 user_id = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message GetStatusRequest {
+  int64 change_id = 1;
+}
+
+message GetStatusResponse {
+  string stage = 1;
+  repeated GateCondition conditions = 2;
+}
+
+message ApproveRequest {
+  int64 change_id = 1;
+  string comment = 2;
+}
+
+message ApproveResponse {
+  bool advanced = 1;
+  string new_stage = 2;
+}
+
+message RequestChangesRequest {
+  int64 change_id = 1;
+  string reason = 2;
+}
+
+message RequestChangesResponse {
+  string new_stage = 1;
+}
+
+message RevertRequest {
+  int64 change_id = 1;
+  string reason = 2;
+}
+
+message RevertResponse {
+  string new_stage = 1;
+}
+
+message GetHistoryRequest {
+  int64 change_id = 1;
+}
+
+message GetHistoryResponse {
+  repeated WorkflowEvent events = 1;
+}
+
+message SetApprovalPolicyRequest {
+  int64 project_id = 1;
+  string policy = 2;
+  int32 min_count = 3;
+}
+
+message SetApprovalPolicyResponse {}
+
+service WorkflowService {
+  rpc GetStatus(GetStatusRequest) returns (GetStatusResponse) {}
+  rpc Approve(ApproveRequest) returns (ApproveResponse) {}
+  rpc RequestChanges(RequestChangesRequest) returns (RequestChangesResponse) {}
+  rpc Revert(RevertRequest) returns (RevertResponse) {}
+  rpc GetHistory(GetHistoryRequest) returns (GetHistoryResponse) {}
+  rpc SetApprovalPolicy(SetApprovalPolicyRequest) returns (SetApprovalPolicyResponse) {}
+}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gobenpark/CoSpec/internal/config"
+	"github.com/gobenpark/CoSpec/internal/database"
 	"github.com/gobenpark/CoSpec/internal/server"
 )
 
@@ -17,6 +18,15 @@ func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
+	}
+
+	// Run migrations
+	migrationsPath := cfg.MigrationsPath
+	if migrationsPath == "" {
+		migrationsPath = "migrations"
+	}
+	if err := database.RunMigrations(cfg.DatabaseURL, migrationsPath); err != nil {
+		log.Printf("warning: migration failed: %v", err)
 	}
 
 	s, err := server.New(cfg)

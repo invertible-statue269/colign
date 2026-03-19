@@ -15,6 +15,7 @@ type Config struct {
 	GoogleClientSecret string
 	RedirectBaseURL    string
 	FrontendURL        string
+	MigrationsPath     string
 }
 
 func Load() (*Config, error) {
@@ -31,6 +32,7 @@ func Load() (*Config, error) {
 		GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
 		RedirectBaseURL:    getEnv("REDIRECT_BASE_URL", "http://localhost:8080"),
 		FrontendURL:        getEnv("FRONTEND_URL", "http://localhost:3000"),
+		MigrationsPath:     getEnv("MIGRATIONS_PATH", "migrations"),
 	}, nil
 }
 

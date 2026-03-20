@@ -98,12 +98,12 @@ export function TaskRow({ task, members, onUpdate, onDelete }: TaskRowProps) {
     }
   }
 
-  function handleStatusChange(value: string) {
-    onUpdate(task.id, { status: value });
+  function handleStatusChange(value: string | null) {
+    if (value) onUpdate(task.id, { status: value });
   }
 
-  function handleAssigneeChange(value: string) {
-    if (value === "unassigned") {
+  function handleAssigneeChange(value: string | null) {
+    if (!value || value === "unassigned") {
       onUpdate(task.id, { assigneeId: null });
     } else {
       onUpdate(task.id, { assigneeId: BigInt(value) });

@@ -54,20 +54,21 @@ export function SpecEditor(props: SpecEditorProps) {
   const isCollaborative = !!documentId;
   const hocuspocusUrl = process.env.NEXT_PUBLIC_HOCUSPOCUS_URL ?? "ws://localhost:1234";
 
-  const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
-  const [provider, setProvider] = useState<HocuspocusProvider | null>(null);
-
+  const [collabReady, setCollabReady] = useState<{
+    ydoc: Y.Doc;
+    provider: HocuspocusProvider;
+  } | null>(null);
   const [collabFailed, setCollabFailed] = useState(false);
 
   useEffect(() => {
     if (!isCollaborative || !documentId) return;
 
     try {
-      const doc = new Y.Doc();
-      const prov = new HocuspocusProvider({
+      const ydoc = new Y.Doc();
+      const provider = new HocuspocusProvider({
         url: hocuspocusUrl,
         name: documentId,
-        document: doc,
+        document: ydoc,
         token: getAccessToken() ?? undefined,
         onAuthenticationFailed: () => {
           console.warn("Hocuspocus auth failed, falling back to standalone mode");
@@ -75,14 +76,26 @@ export function SpecEditor(props: SpecEditorProps) {
         },
       });
 
-      setYdoc(doc);
-      setProvider(prov);
+      // Wait for provider to sync before mounting editor
+      const onSynced = () => {
+        setCollabReady({ ydoc, provider });
+      };
+      provider.on("synced", onSynced);
+
+      // Timeout fallback — mount after 3s even if not synced
+      const timeout = setTimeout(() => {
+        setCollabReady({ ydoc, provider });
+      }, 3000);
 
       return () => {
-        prov.destroy();
-        doc.destroy();
-        setYdoc(null);
-        setProvider(null);
+        clearTimeout(timeout);
+        provider.off("synced", onSynced);
+        setCollabReady(null);
+        // Delay destruction to avoid React Strict Mode stale reference crash
+        setTimeout(() => {
+          provider.destroy();
+          ydoc.destroy();
+        }, 100);
       };
     } catch (err) {
       console.warn("Failed to create Hocuspocus provider:", err);
@@ -90,21 +103,18 @@ export function SpecEditor(props: SpecEditorProps) {
     }
   }, [isCollaborative, documentId, hocuspocusUrl]);
 
-  // Collaborative failed → render standalone
   if (collabFailed) {
     return (
       <SpecEditorInner
         key="standalone-fallback"
         {...props}
-        ydoc={null}
-        provider={null}
+        collab={null}
         userName={userName}
       />
     );
   }
 
-  // Collaborative mode: wait for ydoc + provider
-  if (isCollaborative && (!ydoc || !provider)) {
+  if (isCollaborative && !collabReady) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -116,8 +126,7 @@ export function SpecEditor(props: SpecEditorProps) {
     <SpecEditorInner
       key={isCollaborative ? `collab-${documentId}` : "standalone"}
       {...props}
-      ydoc={ydoc}
-      provider={provider}
+      collab={collabReady}
       userName={userName}
     />
   );
@@ -132,23 +141,21 @@ function SpecEditorInner({
   onAddComment,
   onHighlightClick,
   editorRef,
-  ydoc,
-  provider,
+  collab,
   userName = "Anonymous",
 }: SpecEditorProps & {
-  ydoc: Y.Doc | null;
-  provider: HocuspocusProvider | null;
+  collab: { ydoc: Y.Doc; provider: HocuspocusProvider } | null;
 }) {
   const { t } = useI18n();
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error" | "idle">("idle");
   const [connectionStatus, setConnectionStatus] = useState<"connected" | "disconnected" | "connecting">("connecting");
   const savedSelectionRef = useRef<{ from: number; to: number } | null>(null);
 
-  const isCollaborative = ydoc != null && provider != null;
+  const isCollaborative = collab != null;
 
   // Track connection status
   useEffect(() => {
-    if (!provider) {
+    if (!collab) {
       setConnectionStatus("disconnected");
       return;
     }
@@ -157,30 +164,30 @@ function SpecEditorInner({
       else if (status === "connecting") setConnectionStatus("connecting");
       else setConnectionStatus("disconnected");
     };
-    provider.on("status", onStatus);
+    collab.provider.on("status", onStatus);
     return () => {
-      provider.off("status", onStatus);
+      collab.provider.off("status", onStatus);
     };
-  }, [provider]);
+  }, [collab]);
 
-  // Build extensions — ydoc/provider are guaranteed ready here
+  // Build extensions — collab.ydoc/provider are guaranteed ready here
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const extensions: any[] = [
     isCollaborative
-      ? StarterKit.configure({ history: false } as any)
+      ? StarterKit.configure({ undoRedo: false } as any)
       : StarterKit,
     Placeholder.configure({ placeholder }),
     CommentHighlight,
   ];
 
-  if (isCollaborative) {
-    extensions.push(Collaboration.configure({ document: ydoc }));
-    extensions.push(
-      CollaborationCursor.configure({
-        provider,
-        user: { name: userName, color: userColor(userName) },
-      }),
-    );
+  if (collab) {
+    extensions.push(Collaboration.configure({
+      fragment: collab.ydoc.getXmlFragment("default"),
+    }));
+    // TODO: CollaborationCursor disabled due to y-prosemirror cursor-plugin
+    // crash (ystate undefined in createDecorations). This is a known compat
+    // issue between @tiptap/extension-collaboration-cursor v3 and y-prosemirror.
+    // Cursor display will be added via custom awareness subscription.
   }
 
   const editor = useEditor({
@@ -193,12 +200,29 @@ function SpecEditorInner({
     },
   });
 
-  // For non-collaborative mode: set initial content
+  // Set initial content
   useEffect(() => {
-    if (!isCollaborative && editor && initialContent) {
+    if (!editor || !initialContent) return;
+
+    if (isCollaborative && collab) {
+      // Wait for sync, then load content if Y.js doc is empty
+      const onSynced = () => {
+        if (editor.isEmpty) {
+          editor.commands.setContent(initialContent);
+        }
+      };
+      collab.provider.on("synced", onSynced);
+      // Also check immediately in case already synced
+      if (editor.isEmpty) {
+        editor.commands.setContent(initialContent);
+      }
+      return () => {
+        collab.provider.off("synced", onSynced);
+      };
+    } else if (!isCollaborative) {
       editor.commands.setContent(initialContent);
     }
-  }, [isCollaborative, initialContent, editor]);
+  }, [isCollaborative, initialContent, editor, collab]);
 
   // Expose editor methods via ref
   useEffect(() => {

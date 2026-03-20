@@ -21,6 +21,21 @@ func NewService(db *bun.DB) *Service {
 	return &Service{db: db}
 }
 
+func (s *Service) Get(ctx context.Context, changeID int64, docType models.DocumentType) (*models.Document, error) {
+	doc := new(models.Document)
+	err := s.db.NewSelect().Model(doc).
+		Where("change_id = ?", changeID).
+		Where("type = ?", docType).
+		Scan(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return doc, nil
+}
+
 type SaveInput struct {
 	ChangeID int64
 	Type     models.DocumentType

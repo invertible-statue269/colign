@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package document.v1;
+
+option go_package = "github.com/gobenpark/colign/gen/proto/document/v1;documentv1";
+
+import "google/protobuf/timestamp.proto";
+
+message Document {
+  int64 id = 1;
+  int64 change_id = 2;
+  string type = 3;
+  string title = 4;
+  string content = 5;
+  int32 version = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message GetDocumentRequest {
+  int64 change_id = 1;
+  string type = 2;
+}
+
+message GetDocumentResponse {
+  Document document = 1;
+}
+
+message SaveDocumentRequest {
+  int64 change_id = 1;
+  string type = 2;
+  string title = 3;
+  string content = 4;
+}
+
+message SaveDocumentResponse {
+  Document document = 1;
+}
+
+service DocumentService {
+  rpc GetDocument(GetDocumentRequest) returns (GetDocumentResponse) {}
+  rpc SaveDocument(SaveDocumentRequest) returns (SaveDocumentResponse) {}
+}

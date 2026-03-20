@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, useEffect } from "react";
 import { SpecEditor } from "@/components/editor/spec-editor";
 import { CommentPanel } from "@/components/comment/comment-panel";
 import { sddTemplates } from "@/components/editor/templates";
 import { commentClient } from "@/lib/comment";
+import { documentClient } from "@/lib/document";
 import { getTokenPayload } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { MessageSquare, X } from "lucide-react";
@@ -15,10 +16,30 @@ interface DocumentTabProps {
   initialContent?: string;
 }
 
-export function DocumentTab({ changeId, docType, initialContent }: DocumentTabProps) {
+export function DocumentTab({ changeId, docType }: DocumentTabProps) {
   const { t } = useI18n();
-  const [content] = useState(initialContent || sddTemplates[docType] || "");
+  const [content, setContent] = useState("");
+  const [loading, setLoading] = useState(true);
   const [commentPanelOpen, setCommentPanelOpen] = useState(false);
+
+  // Load document from server
+  useEffect(() => {
+    async function loadDocument() {
+      try {
+        const res = await documentClient.getDocument({ changeId, type: docType });
+        if (res.document) {
+          setContent(res.document.content);
+        } else {
+          setContent(sddTemplates[docType] || "");
+        }
+      } catch {
+        setContent(sddTemplates[docType] || "");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadDocument();
+  }, [changeId, docType]);
   const [pendingQuotedText, setPendingQuotedText] = useState<string | null>(null);
   const [commentInput, setCommentInput] = useState("");
   const payload = typeof window !== "undefined" ? getTokenPayload() : null;
@@ -35,14 +56,10 @@ export function DocumentTab({ changeId, docType, initialContent }: DocumentTabPr
   const handleSave = useCallback(
     async (newContent: string) => {
       try {
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/api/documents`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            change_id: Number(changeId),
-            type: docType,
-            content: newContent,
-          }),
+        await documentClient.saveDocument({
+          changeId,
+          type: docType,
+          content: newContent,
         });
       } catch {
         // retry handled by editor
@@ -91,6 +108,14 @@ export function DocumentTab({ changeId, docType, initialContent }: DocumentTabPr
   const handleCommentClick = (commentId: string) => {
     editorRef.current?.scrollToHighlight(commentId);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex gap-4 py-4">

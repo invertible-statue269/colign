@@ -11,7 +11,7 @@ import { useI18n } from "@/lib/i18n";
 
 interface DocumentTabProps {
   changeId: bigint;
-  docType: "proposal" | "design" | "spec" | "tasks";
+  docType: "proposal" | "design" | "spec";
 }
 
 export function DocumentTab({ changeId, docType }: DocumentTabProps) {

@@ -6,7 +6,9 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { workflowClient } from "@/lib/workflow";
+import { projectClient } from "@/lib/project";
 import { DocumentTab } from "@/components/change/document-tab";
+import { TaskBoard } from "@/components/task/task-board";
 
 interface GateCondition {
   name: string;
@@ -75,11 +77,19 @@ export default function ChangeDetailPage() {
   const [loading, setLoading] = useState(true);
   const [animatingFrom, setAnimatingFrom] = useState<number | null>(null);
   const [showConfirmAdvance, setShowConfirmAdvance] = useState(false);
+  const [members, setMembers] = useState<Array<{ userId: bigint; userName: string }>>([]);
 
   const prevStageRef = useRef(stage);
 
   async function loadAll() {
     try {
+      const projectRes = await projectClient.getProject({ slug });
+      setMembers(
+        (projectRes.members || []).map((m) => ({
+          userId: m.userId,
+          userName: m.userName,
+        }))
+      );
       const [statusRes, historyRes] = await Promise.all([
         workflowClient.getStatus({ changeId }),
         workflowClient.getHistory({ changeId }),
@@ -392,7 +402,7 @@ export default function ChangeDetailPage() {
             {activeTab === "proposal" && <DocumentTab changeId={changeId} docType="proposal" />}
             {activeTab === "design" && <DocumentTab changeId={changeId} docType="design" />}
             {activeTab === "specs" && <DocumentTab changeId={changeId} docType="spec" />}
-            {activeTab === "tasks" && <DocumentTab changeId={changeId} docType="tasks" />}
+            {activeTab === "tasks" && <TaskBoard changeId={changeId} members={members} />}
             {activeTab === "history" && (
               <div className="space-y-4">
                 {history.length === 0 ? (

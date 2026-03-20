@@ -18,8 +18,21 @@ jobs:
 
       - uses: bufbuild/buf-setup-action@v1
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install proto plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install connectrpc.com/connect/cmd/protoc-gen-connect-go@latest
+          cd web && npm ci
+
       - name: Buf lint
         run: cd proto && buf lint
+
+      - name: Buf generate
+        run: cd proto && buf generate
 
       - name: Go test
         run: go test ./...

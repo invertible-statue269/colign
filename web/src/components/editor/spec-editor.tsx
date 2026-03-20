@@ -17,8 +17,6 @@ import {
   List,
   Code,
   MessageSquarePlus,
-  Wifi,
-  WifiOff,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { getAccessToken } from "@/lib/auth";
@@ -148,27 +146,9 @@ function SpecEditorInner({
 }) {
   const { t } = useI18n();
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error" | "idle">("idle");
-  const [connectionStatus, setConnectionStatus] = useState<"connected" | "disconnected" | "connecting">("connecting");
   const savedSelectionRef = useRef<{ from: number; to: number } | null>(null);
 
   const isCollaborative = collab != null;
-
-  // Track connection status
-  useEffect(() => {
-    if (!collab) {
-      setConnectionStatus("disconnected");
-      return;
-    }
-    const onStatus = ({ status }: { status: string }) => {
-      if (status === "connected") setConnectionStatus("connected");
-      else if (status === "connecting") setConnectionStatus("connecting");
-      else setConnectionStatus("disconnected");
-    };
-    collab.provider.on("status", onStatus);
-    return () => {
-      collab.provider.off("status", onStatus);
-    };
-  }, [collab]);
 
   // Build extensions — collab.ydoc/provider are guaranteed ready here
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -334,14 +314,6 @@ function SpecEditorInner({
             {saveStatus === "saving" && t("common.saving")}
             {saveStatus === "error" && "Save failed"}
           </span>
-          {isCollaborative && (
-            <span className={`flex items-center gap-1 text-[11px] ${
-              connectionStatus === "connected" ? "text-emerald-400" : "text-muted-foreground"
-            }`}>
-              {connectionStatus === "connected" ? <Wifi className="size-3" /> : <WifiOff className="size-3" />}
-              {connectionStatus === "connecting" && "Connecting..."}
-            </span>
-          )}
         </div>
         {readOnly && (
           <span className="text-[11px] text-muted-foreground">View only</span>

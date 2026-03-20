@@ -93,11 +93,11 @@ const server = new Hocuspocus({
 
       if (!content) return;
 
-      // Upsert document
+      // Upsert document (unique on change_id, type, title)
       await pool.query(
-        `INSERT INTO documents (change_id, type, content, version)
-         VALUES ($1, $2, $3, 1)
-         ON CONFLICT (change_id, type)
+        `INSERT INTO documents (change_id, type, title, content, version)
+         VALUES ($1, $2, '', $3, 1)
+         ON CONFLICT (change_id, type, title)
          DO UPDATE SET content = $3, version = documents.version + 1, updated_at = NOW()`,
         [changeId, docType, content],
       );

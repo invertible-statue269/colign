@@ -18,11 +18,13 @@ import (
 	"github.com/gobenpark/colign/gen/proto/document/v1/documentv1connect"
 	"github.com/gobenpark/colign/gen/proto/organization/v1/organizationv1connect"
 	"github.com/gobenpark/colign/gen/proto/project/v1/projectv1connect"
+	taskv1connect "github.com/gobenpark/colign/gen/proto/task/v1/taskv1connect"
 	"github.com/gobenpark/colign/gen/proto/workflow/v1/workflowv1connect"
 	"github.com/gobenpark/colign/internal/comment"
 	"github.com/gobenpark/colign/internal/document"
 	"github.com/gobenpark/colign/internal/organization"
 	"github.com/gobenpark/colign/internal/project"
+	"github.com/gobenpark/colign/internal/task"
 	"github.com/gobenpark/colign/internal/workflow"
 )
 
@@ -103,6 +105,12 @@ func (s *Server) setupRoutes(cfg *config.Config) {
 	documentConnectHandler := document.NewConnectHandler(documentService, s.jwtManager)
 	documentPath, documentHandler := documentv1connect.NewDocumentServiceHandler(documentConnectHandler)
 	s.mux.Handle(documentPath, documentHandler)
+
+	// Task service (Connect)
+	taskService := task.NewService(s.db)
+	taskConnectHandler := task.NewConnectHandler(taskService, s.jwtManager)
+	taskPath, taskHandler := taskv1connect.NewTaskServiceHandler(taskConnectHandler)
+	s.mux.Handle(taskPath, taskHandler)
 }
 
 func (s *Server) Handler() http.Handler {

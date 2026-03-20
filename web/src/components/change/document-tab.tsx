@@ -167,7 +167,7 @@ export function DocumentTab({ changeId, docType }: DocumentTabProps) {
             onAddComment={handleAddComment}
             onHighlightClick={handleHighlightClick}
             editorRef={editorRef}
-            documentId={undefined}
+            documentId={undefined} /* TODO: enable when Y.js integration is stable: process.env.NEXT_PUBLIC_HOCUSPOCUS_URL ? `change-${changeId}-${docType}` : undefined */
             userName={payload?.name || payload?.email?.split("@")[0] || "Anonymous"}
           />
         </div>

@@ -8,7 +8,7 @@ import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import { CommentHighlight } from "./extensions/comment-highlight";
-import { useCallback, useEffect, useRef, useMemo } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Bold,
   Italic,
@@ -20,12 +20,10 @@ import {
   Wifi,
   WifiOff,
 } from "lucide-react";
-import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { getAccessToken } from "@/lib/auth";
 import * as Y from "yjs";
 
-// Generate a consistent color from user name
 function userColor(name: string): string {
   const colors = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
   let hash = 0;
@@ -50,7 +48,83 @@ interface SpecEditorProps {
   userName?: string;
 }
 
-export function SpecEditor({
+// Outer component: manages Y.js lifecycle, renders inner editor only when ready
+export function SpecEditor(props: SpecEditorProps) {
+  const { documentId, userName = "Anonymous" } = props;
+  const isCollaborative = !!documentId;
+  const hocuspocusUrl = process.env.NEXT_PUBLIC_HOCUSPOCUS_URL ?? "ws://localhost:1234";
+
+  const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
+  const [provider, setProvider] = useState<HocuspocusProvider | null>(null);
+
+  const [collabFailed, setCollabFailed] = useState(false);
+
+  useEffect(() => {
+    if (!isCollaborative || !documentId) return;
+
+    try {
+      const doc = new Y.Doc();
+      const prov = new HocuspocusProvider({
+        url: hocuspocusUrl,
+        name: documentId,
+        document: doc,
+        token: getAccessToken() ?? undefined,
+        onAuthenticationFailed: () => {
+          console.warn("Hocuspocus auth failed, falling back to standalone mode");
+          setCollabFailed(true);
+        },
+      });
+
+      setYdoc(doc);
+      setProvider(prov);
+
+      return () => {
+        prov.destroy();
+        doc.destroy();
+        setYdoc(null);
+        setProvider(null);
+      };
+    } catch (err) {
+      console.warn("Failed to create Hocuspocus provider:", err);
+      setCollabFailed(true);
+    }
+  }, [isCollaborative, documentId, hocuspocusUrl]);
+
+  // Collaborative failed → render standalone
+  if (collabFailed) {
+    return (
+      <SpecEditorInner
+        key="standalone-fallback"
+        {...props}
+        ydoc={null}
+        provider={null}
+        userName={userName}
+      />
+    );
+  }
+
+  // Collaborative mode: wait for ydoc + provider
+  if (isCollaborative && (!ydoc || !provider)) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  return (
+    <SpecEditorInner
+      key={isCollaborative ? `collab-${documentId}` : "standalone"}
+      {...props}
+      ydoc={ydoc}
+      provider={provider}
+      userName={userName}
+    />
+  );
+}
+
+// Inner component: actual Tiptap editor, receives ready ydoc/provider
+function SpecEditorInner({
   initialContent = "",
   placeholder = "Start writing...",
   onSave,
@@ -58,42 +132,19 @@ export function SpecEditor({
   onAddComment,
   onHighlightClick,
   editorRef,
-  documentId,
+  ydoc,
+  provider,
   userName = "Anonymous",
-}: SpecEditorProps) {
+}: SpecEditorProps & {
+  ydoc: Y.Doc | null;
+  provider: HocuspocusProvider | null;
+}) {
   const { t } = useI18n();
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error" | "idle">("idle");
   const [connectionStatus, setConnectionStatus] = useState<"connected" | "disconnected" | "connecting">("connecting");
   const savedSelectionRef = useRef<{ from: number; to: number } | null>(null);
 
-  const isCollaborative = !!documentId;
-  const hocuspocusUrl = process.env.NEXT_PUBLIC_HOCUSPOCUS_URL ?? "ws://localhost:1234";
-
-  // Y.js doc and provider (only for collaborative mode)
-  const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
-  const [provider, setProvider] = useState<HocuspocusProvider | null>(null);
-
-  useEffect(() => {
-    if (!isCollaborative || !documentId) return;
-
-    const doc = new Y.Doc();
-    const prov = new HocuspocusProvider({
-      url: hocuspocusUrl,
-      name: documentId,
-      document: doc,
-      token: getAccessToken() ?? undefined,
-    });
-
-    setYdoc(doc);
-    setProvider(prov);
-
-    return () => {
-      prov.destroy();
-      doc.destroy();
-      setYdoc(null);
-      setProvider(null);
-    };
-  }, [isCollaborative, documentId, hocuspocusUrl]);
+  const isCollaborative = ydoc != null && provider != null;
 
   // Track connection status
   useEffect(() => {
@@ -112,49 +163,42 @@ export function SpecEditor({
     };
   }, [provider]);
 
+  // Build extensions — ydoc/provider are guaranteed ready here
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const extensions: any[] = [
+    isCollaborative
+      ? StarterKit.configure({ history: false } as any)
+      : StarterKit,
+    Placeholder.configure({ placeholder }),
+    CommentHighlight,
+  ];
 
-  // Build extensions
-  const canCollaborate = isCollaborative && ydoc != null && provider != null;
-
-  const extensions = useMemo(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const exts: any[] = [
-      canCollaborate
-        ? StarterKit.configure({ history: false } as any)
-        : StarterKit,
-      Placeholder.configure({ placeholder }),
-      CommentHighlight,
-    ];
-
-    if (canCollaborate) {
-      exts.push(Collaboration.configure({ document: ydoc! }));
-      exts.push(
-        CollaborationCursor.configure({
-          provider: provider!,
-          user: { name: userName, color: userColor(userName) },
-        }),
-      );
-    }
-
-    return exts;
-  }, [canCollaborate, ydoc, provider, placeholder, userName]);
+  if (isCollaborative) {
+    extensions.push(Collaboration.configure({ document: ydoc }));
+    extensions.push(
+      CollaborationCursor.configure({
+        provider,
+        user: { name: userName, color: userColor(userName) },
+      }),
+    );
+  }
 
   const editor = useEditor({
     extensions,
-    content: canCollaborate ? undefined : initialContent,
+    content: isCollaborative ? undefined : initialContent,
     editable: !readOnly,
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
       debouncedSave(editor.getHTML());
     },
-  }, [canCollaborate]);
+  });
 
   // For non-collaborative mode: set initial content
   useEffect(() => {
-    if (!canCollaborate && editor && initialContent) {
+    if (!isCollaborative && editor && initialContent) {
       editor.commands.setContent(initialContent);
     }
-  }, [canCollaborate, initialContent, editor]);
+  }, [isCollaborative, initialContent, editor]);
 
   // Expose editor methods via ref
   useEffect(() => {

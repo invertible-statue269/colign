@@ -7,6 +7,7 @@ import (
 
 	"connectrpc.com/connect"
 
+	acceptancev1 "github.com/gobenpark/colign/gen/proto/acceptance/v1"
 	documentv1 "github.com/gobenpark/colign/gen/proto/document/v1"
 	projectv1 "github.com/gobenpark/colign/gen/proto/project/v1"
 	taskv1 "github.com/gobenpark/colign/gen/proto/task/v1"
@@ -28,6 +29,10 @@ func (s *Server) callTool(ctx context.Context, name string, args json.RawMessage
 		return s.handleUpdateTask(ctx, args)
 	case "suggest_spec":
 		return s.handleSuggestSpec(ctx, args)
+	case "list_acceptance_criteria":
+		return s.handleListAC(ctx, args)
+	case "create_acceptance_criteria":
+		return s.handleCreateAC(ctx, args)
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", name)
 	}
@@ -246,5 +251,92 @@ func (s *Server) handleSuggestSpec(ctx context.Context, args json.RawMessage) (a
 		"current_content": resp.Msg.Document.Content,
 		"doc_type":        params.DocType,
 		"suggestion":      "Review the current content and suggest improvements based on the document type. For proposals, ensure Problem, Scope, and Approach sections are clear. For designs, ensure architecture decisions and implementation steps are well-defined.",
+	}, nil
+}
+
+func (s *Server) handleListAC(ctx context.Context, args json.RawMessage) (any, error) {
+	var params struct {
+		ChangeID int64 `json:"change_id"`
+	}
+	if err := json.Unmarshal(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
+	}
+
+	resp, err := s.clients.acceptance.ListAC(ctx, connect.NewRequest(&acceptancev1.ListACRequest{
+		ChangeId: params.ChangeID,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	type stepInfo struct {
+		Keyword string `json:"keyword"`
+		Text    string `json:"text"`
+	}
+	type acInfo struct {
+		ID       int64      `json:"id"`
+		Scenario string     `json:"scenario"`
+		Steps    []stepInfo `json:"steps"`
+		Met      bool       `json:"met"`
+	}
+
+	items := make([]acInfo, len(resp.Msg.Criteria))
+	for i, ac := range resp.Msg.Criteria {
+		steps := make([]stepInfo, len(ac.Steps))
+		for j, s := range ac.Steps {
+			steps[j] = stepInfo{Keyword: s.Keyword, Text: s.Text}
+		}
+		items[i] = acInfo{
+			ID:       ac.Id,
+			Scenario: ac.Scenario,
+			Steps:    steps,
+			Met:      ac.Met,
+		}
+	}
+
+	return map[string]any{
+		"change_id": params.ChangeID,
+		"criteria":  items,
+		"total":     len(items),
+	}, nil
+}
+
+func (s *Server) handleCreateAC(ctx context.Context, args json.RawMessage) (any, error) {
+	var params struct {
+		ChangeID int64  `json:"change_id"`
+		Scenario string `json:"scenario"`
+		Steps    string `json:"steps"`
+	}
+	if err := json.Unmarshal(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
+	}
+
+	var steps []struct {
+		Keyword string `json:"keyword"`
+		Text    string `json:"text"`
+	}
+	if err := json.Unmarshal([]byte(params.Steps), &steps); err != nil {
+		return nil, fmt.Errorf("invalid steps JSON: %w", err)
+	}
+
+	protoSteps := make([]*acceptancev1.ACStep, len(steps))
+	for i, s := range steps {
+		protoSteps[i] = &acceptancev1.ACStep{Keyword: s.Keyword, Text: s.Text}
+	}
+
+	resp, err := s.clients.acceptance.CreateAC(ctx, connect.NewRequest(&acceptancev1.CreateACRequest{
+		ChangeId: params.ChangeID,
+		Scenario: params.Scenario,
+		Steps:    protoSteps,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	ac := resp.Msg.Criteria
+	return map[string]any{
+		"id":       ac.Id,
+		"scenario": ac.Scenario,
+		"created":  true,
 	}, nil
 }

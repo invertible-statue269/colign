@@ -116,5 +116,29 @@ func ListTools() []Tool {
 				Required: []string{"change_id", "doc_type"},
 			},
 		},
+		{
+			Name:        "list_acceptance_criteria",
+			Description: "List acceptance criteria (Given/When/Then scenarios) for a change",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"change_id": {Type: "integer", Description: "Change ID"},
+				},
+				Required: []string{"change_id"},
+			},
+		},
+		{
+			Name:        "create_acceptance_criteria",
+			Description: "Create an acceptance criteria with BDD-style Given/When/Then steps for a change",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"change_id": {Type: "integer", Description: "Change ID"},
+					"scenario":  {Type: "string", Description: "Scenario name describing the test case"},
+					"steps":     {Type: "string", Description: "JSON array of steps, each with keyword (Given/When/Then/And/But) and text. Example: [{\"keyword\":\"Given\",\"text\":\"a user is logged in\"},{\"keyword\":\"When\",\"text\":\"they click logout\"},{\"keyword\":\"Then\",\"text\":\"they are redirected to login page\"}]"},
+				},
+				Required: []string{"change_id", "scenario", "steps"},
+			},
+		},
 	}
 }

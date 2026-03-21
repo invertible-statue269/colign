@@ -3,15 +3,17 @@ package mcp
 import (
 	"net/http"
 
+	"github.com/gobenpark/colign/gen/proto/acceptance/v1/acceptancev1connect"
 	"github.com/gobenpark/colign/gen/proto/document/v1/documentv1connect"
 	"github.com/gobenpark/colign/gen/proto/project/v1/projectv1connect"
 	"github.com/gobenpark/colign/gen/proto/task/v1/taskv1connect"
 )
 
 type apiClients struct {
-	project  projectv1connect.ProjectServiceClient
-	document documentv1connect.DocumentServiceClient
-	task     taskv1connect.TaskServiceClient
+	project    projectv1connect.ProjectServiceClient
+	document   documentv1connect.DocumentServiceClient
+	task       taskv1connect.TaskServiceClient
+	acceptance acceptancev1connect.AcceptanceCriteriaServiceClient
 }
 
 // tokenTransport injects the Authorization header into every request.
@@ -34,8 +36,9 @@ func newAPIClients(apiURL, apiToken string) *apiClients {
 	}
 
 	return &apiClients{
-		project:  projectv1connect.NewProjectServiceClient(httpClient, apiURL),
-		document: documentv1connect.NewDocumentServiceClient(httpClient, apiURL),
-		task:     taskv1connect.NewTaskServiceClient(httpClient, apiURL),
+		project:    projectv1connect.NewProjectServiceClient(httpClient, apiURL),
+		document:   documentv1connect.NewDocumentServiceClient(httpClient, apiURL),
+		task:       taskv1connect.NewTaskServiceClient(httpClient, apiURL),
+		acceptance: acceptancev1connect.NewAcceptanceCriteriaServiceClient(httpClient, apiURL),
 	}
 }

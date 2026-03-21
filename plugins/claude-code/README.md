@@ -2,17 +2,21 @@
 
 Connect Claude Code to the Colign spec management platform. Read, write, and manage specs directly from your terminal.
 
+No binary to install — connects via Streamable HTTP.
+
 ## Setup
 
 ### 1. Generate an API Token
 
 Go to Colign Settings > AI & API Keys and generate a new API token.
 
-### 2. Set Environment Variables
+### 2. Set Environment Variable
 
 ```bash
 export COLIGN_API_TOKEN=col_your_token_here
-export COLIGN_API_URL=https://your-colign-instance.com  # defaults to http://localhost:8080
+
+# Optional: for self-hosted instances
+export COLIGN_MCP_URL=https://your-instance.com/mcp  # defaults to https://app.colign.dev/mcp
 ```
 
 ### 3. Install the Plugin
@@ -30,18 +34,19 @@ claude plugin install colign
 The plugin follows Colign's change lifecycle:
 
 ```
-explore → propose → plan → implement → complete
+onboard → explore → propose → plan → implement → complete
 ```
 
 | Skill | Stage | Description |
 |-------|-------|-------------|
+| `/colign:onboard` | Setup | Verify MCP connection and API token |
 | `/colign:explore` | Any | Browse projects, read specs, check change status |
 | `/colign:propose` | Draft → Problem | Define the problem, scope, and write a structured proposal |
 | `/colign:plan` | Problem → Solution | Break proposal into architecture, implementation steps, and tasks |
 | `/colign:implement` | Solution → Review | Code against the spec, update task progress |
 | `/colign:complete` | Review → Done | Verify all tasks are done, advance the workflow |
 
-Skills also auto-trigger based on context. For example, saying "implement the next task" will trigger `/colign:implement` automatically.
+Skills auto-trigger based on context (e.g., "implement the next task") or can be invoked explicitly.
 
 ## MCP Tools
 
@@ -49,10 +54,10 @@ Skills also auto-trigger based on context. For example, saying "implement the ne
 |------|-------------|
 | `list_projects` | List all accessible projects |
 | `get_change` | Get change details including stage and artifacts |
-| `read_spec` | Read a spec document |
+| `read_spec` | Read a spec document (proposal, design, spec, tasks) |
 | `write_spec` | Write or update a spec document |
 | `list_tasks` | List implementation tasks for a change |
-| `update_task` | Update a task's status |
+| `update_task` | Update a task's status (todo, in_progress, done) |
 | `suggest_spec` | Get AI suggestions for improving a spec |
 
 ## Example Usage

@@ -491,10 +491,9 @@ export default function SettingsPage() {
                       {`{
   "mcpServers": {
     "colign": {
-      "command": "colign-mcp",
-      "env": {
-        "COLIGN_API_TOKEN": "col_your_token_here",
-        "COLIGN_API_URL": "http://localhost:8080"
+      "url": "https://app.colign.dev/mcp",
+      "headers": {
+        "Authorization": "Bearer col_your_token_here"
       }
     }
   }

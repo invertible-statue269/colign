@@ -60,10 +60,21 @@ func New(cfg *config.Config) (*Server, error) {
 }
 
 func (s *Server) setupRoutes(cfg *config.Config) {
-	// Health check
+	// Liveness — process alive
 	s.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	})
+
+	// Readiness — dependencies healthy
+	s.mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if err := s.db.PingContext(r.Context()); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "error", "db": err.Error()})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "db": "connected"})
 	})
 
 	// Auth service (Connect)

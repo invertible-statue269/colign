@@ -3,6 +3,8 @@ package workflow
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/gobenpark/colign/internal/models"
 )
 
@@ -28,10 +30,8 @@ func TestCanTransition(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := CanTransition(tt.from, tt.to)
-		if got != tt.allowed {
-			t.Errorf("CanTransition(%s, %s) = %v, want %v", tt.from, tt.to, got, tt.allowed)
-		}
+		assert.Equal(t, tt.allowed, CanTransition(tt.from, tt.to),
+			"CanTransition(%s, %s)", tt.from, tt.to)
 	}
 }
 
@@ -49,11 +49,9 @@ func TestNextStage(t *testing.T) {
 
 	for _, tt := range tests {
 		next, ok := NextStage(tt.current)
-		if ok != tt.hasNext {
-			t.Errorf("NextStage(%s) hasNext = %v, want %v", tt.current, ok, tt.hasNext)
-		}
-		if ok && next != tt.expected {
-			t.Errorf("NextStage(%s) = %s, want %s", tt.current, next, tt.expected)
+		assert.Equal(t, tt.hasNext, ok, "NextStage(%s) hasNext", tt.current)
+		if ok {
+			assert.Equal(t, tt.expected, next, "NextStage(%s)", tt.current)
 		}
 	}
 }
@@ -72,11 +70,9 @@ func TestPrevStage(t *testing.T) {
 
 	for _, tt := range tests {
 		prev, ok := PrevStage(tt.current)
-		if ok != tt.hasPrev {
-			t.Errorf("PrevStage(%s) hasPrev = %v, want %v", tt.current, ok, tt.hasPrev)
-		}
-		if ok && prev != tt.expected {
-			t.Errorf("PrevStage(%s) = %s, want %s", tt.current, prev, tt.expected)
+		assert.Equal(t, tt.hasPrev, ok, "PrevStage(%s) hasPrev", tt.current)
+		if ok {
+			assert.Equal(t, tt.expected, prev, "PrevStage(%s)", tt.current)
 		}
 	}
 }

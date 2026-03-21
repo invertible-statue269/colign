@@ -3,6 +3,9 @@ package project
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/gobenpark/colign/internal/models"
 )
 
@@ -19,24 +22,15 @@ func TestValidateInviteRole(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := ValidateRole(tt.role)
-		if got != tt.valid {
-			t.Errorf("ValidateRole(%q) = %v, want %v", tt.role, got, tt.valid)
-		}
+		assert.Equal(t, tt.valid, ValidateRole(tt.role), "ValidateRole(%q)", tt.role)
 	}
 }
 
 func TestParseRole(t *testing.T) {
 	role, err := ParseRole("editor")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if role != models.RoleEditor {
-		t.Errorf("expected RoleEditor, got %s", role)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, models.RoleEditor, role)
 
 	_, err = ParseRole("invalid")
-	if err == nil {
-		t.Error("expected error for invalid role")
-	}
+	assert.Error(t, err, "expected error for invalid role")
 }

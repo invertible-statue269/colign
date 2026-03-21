@@ -3,6 +3,8 @@ package workflow
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/gobenpark/colign/internal/models"
 )
 
@@ -19,9 +21,7 @@ func TestShouldTriggerTaskGeneration(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := ShouldTriggerTaskGeneration(tt.from, tt.to)
-		if got != tt.trigger {
-			t.Errorf("ShouldTriggerTaskGeneration(%s, %s) = %v, want %v", tt.from, tt.to, got, tt.trigger)
-		}
+		assert.Equal(t, tt.trigger, ShouldTriggerTaskGeneration(tt.from, tt.to),
+			"ShouldTriggerTaskGeneration(%s, %s)", tt.from, tt.to)
 	}
 }

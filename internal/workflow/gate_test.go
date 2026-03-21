@@ -3,6 +3,9 @@ package workflow
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/gobenpark/colign/internal/models"
 )
 
@@ -15,20 +18,14 @@ func TestGateConditions_Draft(t *testing.T) {
 		HasDesign:   false,
 	})
 
-	if len(conditions) == 0 {
-		t.Error("expected conditions for Draft gate")
-	}
-	if conditions[0].Met {
-		t.Error("proposal condition should not be met")
-	}
+	require.NotEmpty(t, conditions, "expected conditions for Draft gate")
+	assert.False(t, conditions[0].Met, "proposal condition should not be met")
 
 	// With proposal
 	conditions = gate.Check(models.StageDraft, GateInput{
 		HasProposal: true,
 	})
-	if !conditions[0].Met {
-		t.Error("proposal condition should be met")
-	}
+	assert.True(t, conditions[0].Met, "proposal condition should be met")
 }
 
 func TestGateConditions_Design(t *testing.T) {
@@ -40,15 +37,9 @@ func TestGateConditions_Design(t *testing.T) {
 		HasDesign:   false,
 	})
 
-	if len(conditions) == 0 {
-		t.Error("expected conditions for Design gate")
-	}
-	if conditions[0].Name != "design" {
-		t.Error("expected design condition")
-	}
-	if conditions[0].Met {
-		t.Error("design condition should not be met")
-	}
+	require.NotEmpty(t, conditions, "expected conditions for Design gate")
+	assert.Equal(t, "design", conditions[0].Name)
+	assert.False(t, conditions[0].Met, "design condition should not be met")
 
 	// With design
 	conditions = gate.Check(models.StageDesign, GateInput{
@@ -57,20 +48,15 @@ func TestGateConditions_Design(t *testing.T) {
 	})
 
 	for _, c := range conditions {
-		if !c.Met {
-			t.Errorf("condition %s should be met", c.Name)
-		}
+		assert.True(t, c.Met, "condition %s should be met", c.Name)
 	}
 }
 
 func TestGateConditions_AllMet(t *testing.T) {
 	gate := NewGateChecker()
 
-	if !gate.AllMet(models.StageDraft, GateInput{HasProposal: true}) {
-		t.Error("Draft gate should pass with proposal")
-	}
-
-	if gate.AllMet(models.StageDraft, GateInput{HasProposal: false}) {
-		t.Error("Draft gate should fail without proposal")
-	}
+	assert.True(t, gate.AllMet(models.StageDraft, GateInput{HasProposal: true}),
+		"Draft gate should pass with proposal")
+	assert.False(t, gate.AllMet(models.StageDraft, GateInput{HasProposal: false}),
+		"Draft gate should fail without proposal")
 }

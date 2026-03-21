@@ -13,14 +13,15 @@ import (
 )
 
 type ConnectHandler struct {
-	service    *Service
-	jwtManager *auth.JWTManager
+	service           *Service
+	jwtManager        *auth.JWTManager
+	apiTokenValidator auth.APITokenValidator
 }
 
 var _ documentv1connect.DocumentServiceHandler = (*ConnectHandler)(nil)
 
-func NewConnectHandler(service *Service, jwtManager *auth.JWTManager) *ConnectHandler {
-	return &ConnectHandler{service: service, jwtManager: jwtManager}
+func NewConnectHandler(service *Service, jwtManager *auth.JWTManager, apiTokenValidator auth.APITokenValidator) *ConnectHandler {
+	return &ConnectHandler{service: service, jwtManager: jwtManager, apiTokenValidator: apiTokenValidator}
 }
 
 func (h *ConnectHandler) GetDocument(ctx context.Context, req *connect.Request[documentv1.GetDocumentRequest]) (*connect.Response[documentv1.GetDocumentResponse], error) {
@@ -37,7 +38,7 @@ func (h *ConnectHandler) GetDocument(ctx context.Context, req *connect.Request[d
 }
 
 func (h *ConnectHandler) SaveDocument(ctx context.Context, req *connect.Request[documentv1.SaveDocumentRequest]) (*connect.Response[documentv1.SaveDocumentResponse], error) {
-	claims, err := auth.ExtractClaims(h.jwtManager, req.Header().Get("Authorization"))
+	claims, err := auth.ResolveFromHeader(h.jwtManager, h.apiTokenValidator, ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, err)
 	}

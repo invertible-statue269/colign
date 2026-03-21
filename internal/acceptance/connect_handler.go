@@ -14,18 +14,19 @@ import (
 )
 
 type ConnectHandler struct {
-	service    *Service
-	jwtManager *auth.JWTManager
+	service           *Service
+	jwtManager        *auth.JWTManager
+	apiTokenValidator auth.APITokenValidator
 }
 
 var _ acceptancev1connect.AcceptanceCriteriaServiceHandler = (*ConnectHandler)(nil)
 
-func NewConnectHandler(service *Service, jwtManager *auth.JWTManager) *ConnectHandler {
-	return &ConnectHandler{service: service, jwtManager: jwtManager}
+func NewConnectHandler(service *Service, jwtManager *auth.JWTManager, apiTokenValidator auth.APITokenValidator) *ConnectHandler {
+	return &ConnectHandler{service: service, jwtManager: jwtManager, apiTokenValidator: apiTokenValidator}
 }
 
 func (h *ConnectHandler) CreateAC(ctx context.Context, req *connect.Request[acceptancev1.CreateACRequest]) (*connect.Response[acceptancev1.CreateACResponse], error) {
-	if _, err := auth.ExtractClaims(h.jwtManager, req.Header().Get("Authorization")); err != nil {
+	if _, err := auth.ResolveFromHeader(h.jwtManager, h.apiTokenValidator, ctx, req.Header().Get("Authorization")); err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, err)
 	}
 
@@ -61,7 +62,7 @@ func (h *ConnectHandler) ListAC(ctx context.Context, req *connect.Request[accept
 }
 
 func (h *ConnectHandler) UpdateAC(ctx context.Context, req *connect.Request[acceptancev1.UpdateACRequest]) (*connect.Response[acceptancev1.UpdateACResponse], error) {
-	if _, err := auth.ExtractClaims(h.jwtManager, req.Header().Get("Authorization")); err != nil {
+	if _, err := auth.ResolveFromHeader(h.jwtManager, h.apiTokenValidator, ctx, req.Header().Get("Authorization")); err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, err)
 	}
 
@@ -79,7 +80,7 @@ func (h *ConnectHandler) UpdateAC(ctx context.Context, req *connect.Request[acce
 }
 
 func (h *ConnectHandler) ToggleAC(ctx context.Context, req *connect.Request[acceptancev1.ToggleACRequest]) (*connect.Response[acceptancev1.ToggleACResponse], error) {
-	if _, err := auth.ExtractClaims(h.jwtManager, req.Header().Get("Authorization")); err != nil {
+	if _, err := auth.ResolveFromHeader(h.jwtManager, h.apiTokenValidator, ctx, req.Header().Get("Authorization")); err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, err)
 	}
 
@@ -97,7 +98,7 @@ func (h *ConnectHandler) ToggleAC(ctx context.Context, req *connect.Request[acce
 }
 
 func (h *ConnectHandler) DeleteAC(ctx context.Context, req *connect.Request[acceptancev1.DeleteACRequest]) (*connect.Response[acceptancev1.DeleteACResponse], error) {
-	if _, err := auth.ExtractClaims(h.jwtManager, req.Header().Get("Authorization")); err != nil {
+	if _, err := auth.ResolveFromHeader(h.jwtManager, h.apiTokenValidator, ctx, req.Header().Get("Authorization")); err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, err)
 	}
 

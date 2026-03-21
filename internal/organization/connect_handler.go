@@ -14,18 +14,19 @@ import (
 )
 
 type ConnectHandler struct {
-	service    *Service
-	jwtManager *auth.JWTManager
+	service           *Service
+	jwtManager        *auth.JWTManager
+	apiTokenValidator auth.APITokenValidator
 }
 
 var _ organizationv1connect.OrganizationServiceHandler = (*ConnectHandler)(nil)
 
-func NewConnectHandler(service *Service, jwtManager *auth.JWTManager) *ConnectHandler {
-	return &ConnectHandler{service: service, jwtManager: jwtManager}
+func NewConnectHandler(service *Service, jwtManager *auth.JWTManager, apiTokenValidator auth.APITokenValidator) *ConnectHandler {
+	return &ConnectHandler{service: service, jwtManager: jwtManager, apiTokenValidator: apiTokenValidator}
 }
 
-func (h *ConnectHandler) extractClaims(header string) (*auth.Claims, error) {
-	claims, err := auth.ExtractClaims(h.jwtManager, header)
+func (h *ConnectHandler) extractClaims(ctx context.Context, header string) (*auth.Claims, error) {
+	claims, err := auth.ResolveFromHeader(h.jwtManager, h.apiTokenValidator, ctx, header)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, err)
 	}
@@ -33,7 +34,7 @@ func (h *ConnectHandler) extractClaims(header string) (*auth.Claims, error) {
 }
 
 func (h *ConnectHandler) ListOrganizations(ctx context.Context, req *connect.Request[organizationv1.ListOrganizationsRequest]) (*connect.Response[organizationv1.ListOrganizationsResponse], error) {
-	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +56,7 @@ func (h *ConnectHandler) ListOrganizations(ctx context.Context, req *connect.Req
 }
 
 func (h *ConnectHandler) SwitchOrganization(ctx context.Context, req *connect.Request[organizationv1.SwitchOrganizationRequest]) (*connect.Response[organizationv1.SwitchOrganizationResponse], error) {
-	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +90,7 @@ func (h *ConnectHandler) SwitchOrganization(ctx context.Context, req *connect.Re
 }
 
 func (h *ConnectHandler) UpdateOrganization(ctx context.Context, req *connect.Request[organizationv1.UpdateOrganizationRequest]) (*connect.Response[organizationv1.UpdateOrganizationResponse], error) {
-	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}

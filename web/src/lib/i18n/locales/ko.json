@@ -255,7 +255,18 @@
     "reviewRequests": "리뷰 요청",
     "reviewRequestsDesc": "리뷰가 요청되었을 때",
     "stageChanges": "단계 변경",
-    "stageChangesDesc": "Change가 다음 단계로 진행될 때"
+    "stageChangesDesc": "Change가 다음 단계로 진행될 때",
+    "apiTokens": "API 토큰",
+    "apiTokensDesc": "MCP 서버 및 외부 AI 도구 연동을 위한 토큰을 생성하세요",
+    "tokenNamePlaceholder": "토큰 이름 (예: Claude Code, Cursor)",
+    "generateToken": "토큰 생성",
+    "tokenCreatedWarning": "이 토큰을 지금 복사하세요. 다시 볼 수 없습니다.",
+    "dismissToken": "복사했습니다",
+    "mcpSetupGuide": "MCP 설정",
+    "noTokens": "API 토큰이 없습니다",
+    "tokenCreated": "생성일",
+    "tokenLastUsed": "마지막 사용",
+    "tokenNeverUsed": "사용 안 함"
   },
   "projectSettings": {
     "general": "일반",

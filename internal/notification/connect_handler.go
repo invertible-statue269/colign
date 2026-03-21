@@ -13,18 +13,19 @@ import (
 )
 
 type ConnectHandler struct {
-	service    *Service
-	jwtManager *auth.JWTManager
+	service           *Service
+	jwtManager        *auth.JWTManager
+	apiTokenValidator auth.APITokenValidator
 }
 
 var _ notificationv1connect.NotificationServiceHandler = (*ConnectHandler)(nil)
 
-func NewConnectHandler(service *Service, jwtManager *auth.JWTManager) *ConnectHandler {
-	return &ConnectHandler{service: service, jwtManager: jwtManager}
+func NewConnectHandler(service *Service, jwtManager *auth.JWTManager, apiTokenValidator auth.APITokenValidator) *ConnectHandler {
+	return &ConnectHandler{service: service, jwtManager: jwtManager, apiTokenValidator: apiTokenValidator}
 }
 
-func (h *ConnectHandler) extractClaims(header string) (*auth.Claims, error) {
-	claims, err := auth.ExtractClaims(h.jwtManager, header)
+func (h *ConnectHandler) extractClaims(ctx context.Context, header string) (*auth.Claims, error) {
+	claims, err := auth.ResolveFromHeader(h.jwtManager, h.apiTokenValidator, ctx, header)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, err)
 	}
@@ -32,7 +33,7 @@ func (h *ConnectHandler) extractClaims(header string) (*auth.Claims, error) {
 }
 
 func (h *ConnectHandler) ListNotifications(ctx context.Context, req *connect.Request[notificationv1.ListNotificationsRequest]) (*connect.Response[notificationv1.ListNotificationsResponse], error) {
-	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +55,7 @@ func (h *ConnectHandler) ListNotifications(ctx context.Context, req *connect.Req
 }
 
 func (h *ConnectHandler) MarkRead(ctx context.Context, req *connect.Request[notificationv1.MarkReadRequest]) (*connect.Response[notificationv1.MarkReadResponse], error) {
-	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +68,7 @@ func (h *ConnectHandler) MarkRead(ctx context.Context, req *connect.Request[noti
 }
 
 func (h *ConnectHandler) MarkAllRead(ctx context.Context, req *connect.Request[notificationv1.MarkAllReadRequest]) (*connect.Response[notificationv1.MarkAllReadResponse], error) {
-	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +81,7 @@ func (h *ConnectHandler) MarkAllRead(ctx context.Context, req *connect.Request[n
 }
 
 func (h *ConnectHandler) GetUnreadCount(ctx context.Context, req *connect.Request[notificationv1.GetUnreadCountRequest]) (*connect.Response[notificationv1.GetUnreadCountResponse], error) {
-	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}

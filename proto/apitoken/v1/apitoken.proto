@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package apitoken.v1;
+
+option go_package = "github.com/gobenpark/colign/gen/proto/apitoken/v1;apitokenv1";
+
+import "google/protobuf/timestamp.proto";
+
+message ApiToken {
+  int64 id = 1;
+  string name = 2;
+  string prefix = 3;
+  google.protobuf.Timestamp last_used_at = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message CreateApiTokenRequest {
+  string name = 1;
+}
+
+message CreateApiTokenResponse {
+  ApiToken token = 1;
+  string raw_token = 2;
+}
+
+message ListApiTokensRequest {}
+
+message ListApiTokensResponse {
+  repeated ApiToken tokens = 1;
+}
+
+message DeleteApiTokenRequest {
+  int64 id = 1;
+}
+
+message DeleteApiTokenResponse {}
+
+service ApiTokenService {
+  rpc CreateApiToken(CreateApiTokenRequest) returns (CreateApiTokenResponse) {}
+  rpc ListApiTokens(ListApiTokensRequest) returns (ListApiTokensResponse) {}
+  rpc DeleteApiToken(DeleteApiTokenRequest) returns (DeleteApiTokenResponse) {}
+}

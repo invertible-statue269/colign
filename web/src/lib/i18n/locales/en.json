@@ -255,7 +255,18 @@
     "reviewRequests": "Review requests",
     "reviewRequestsDesc": "When someone requests your review",
     "stageChanges": "Stage changes",
-    "stageChangesDesc": "When a change advances to the next stage"
+    "stageChangesDesc": "When a change advances to the next stage",
+    "apiTokens": "API Tokens",
+    "apiTokensDesc": "Generate tokens for MCP servers and external AI tool integrations",
+    "tokenNamePlaceholder": "Token name (e.g., Claude Code, Cursor)",
+    "generateToken": "Generate Token",
+    "tokenCreatedWarning": "Copy this token now. You won't be able to see it again.",
+    "dismissToken": "I've copied it",
+    "mcpSetupGuide": "MCP Configuration",
+    "noTokens": "No API tokens yet",
+    "tokenCreated": "Created",
+    "tokenLastUsed": "Last used",
+    "tokenNeverUsed": "Never used"
   },
   "projectSettings": {
     "general": "General",

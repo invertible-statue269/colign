@@ -9,12 +9,14 @@ import (
 )
 
 type Server struct {
-	reader io.Reader
-	writer io.Writer
+	reader   io.Reader
+	writer   io.Writer
+	apiToken string
+	apiURL   string
 }
 
-func NewServer(reader io.Reader, writer io.Writer) *Server {
-	return &Server{reader: reader, writer: writer}
+func NewServer(reader io.Reader, writer io.Writer, apiToken, apiURL string) *Server {
+	return &Server{reader: reader, writer: writer, apiToken: apiToken, apiURL: apiURL}
 }
 
 func (s *Server) Run() error {

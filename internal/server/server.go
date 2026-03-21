@@ -14,6 +14,7 @@ import (
 	"github.com/gobenpark/colign/internal/database"
 
 	"github.com/gobenpark/colign/gen/proto/acceptance/v1/acceptancev1connect"
+	"github.com/gobenpark/colign/gen/proto/apitoken/v1/apitokenv1connect"
 	"github.com/gobenpark/colign/gen/proto/auth/v1/authv1connect"
 	"github.com/gobenpark/colign/gen/proto/comment/v1/commentv1connect"
 	"github.com/gobenpark/colign/gen/proto/document/v1/documentv1connect"
@@ -24,6 +25,7 @@ import (
 	taskv1connect "github.com/gobenpark/colign/gen/proto/task/v1/taskv1connect"
 	"github.com/gobenpark/colign/gen/proto/workflow/v1/workflowv1connect"
 	"github.com/gobenpark/colign/internal/acceptance"
+	"github.com/gobenpark/colign/internal/apitoken"
 	"github.com/gobenpark/colign/internal/comment"
 	"github.com/gobenpark/colign/internal/document"
 	"github.com/gobenpark/colign/internal/memory"
@@ -82,57 +84,63 @@ func (s *Server) setupRoutes(cfg *config.Config) {
 	s.mux.HandleFunc("GET /api/auth/{provider}", oauthHandler.Redirect)
 	s.mux.HandleFunc("GET /api/auth/{provider}/callback", oauthHandler.Callback)
 
+	// API Token service (Connect) — must be created first as it serves as APITokenValidator
+	apiTokenService := apitoken.NewService(s.db)
+	apiTokenConnectHandler := apitoken.NewConnectHandler(apiTokenService, s.jwtManager)
+	apiTokenPath, apiTokenHandler := apitokenv1connect.NewApiTokenServiceHandler(apiTokenConnectHandler)
+	s.mux.Handle(apiTokenPath, apiTokenHandler)
+
 	// Project service (Connect)
 	projectService := project.NewService(s.db)
-	projectConnectHandler := project.NewConnectHandler(projectService, s.jwtManager)
+	projectConnectHandler := project.NewConnectHandler(projectService, s.jwtManager, apiTokenService)
 	projectPath, projectHandler := projectv1connect.NewProjectServiceHandler(projectConnectHandler)
 	s.mux.Handle(projectPath, projectHandler)
 
 	// Organization service (Connect)
 	orgService := organization.NewService(s.db)
-	orgConnectHandler := organization.NewConnectHandler(orgService, s.jwtManager)
+	orgConnectHandler := organization.NewConnectHandler(orgService, s.jwtManager, apiTokenService)
 	orgPath, orgHandler := organizationv1connect.NewOrganizationServiceHandler(orgConnectHandler)
 	s.mux.Handle(orgPath, orgHandler)
 
 	// Workflow service (Connect)
 	workflowService := workflow.NewService(s.db)
-	workflowConnectHandler := workflow.NewConnectHandler(workflowService, s.db, s.jwtManager)
+	workflowConnectHandler := workflow.NewConnectHandler(workflowService, s.db, s.jwtManager, apiTokenService)
 	workflowPath, workflowHandler := workflowv1connect.NewWorkflowServiceHandler(workflowConnectHandler)
 	s.mux.Handle(workflowPath, workflowHandler)
 
 	// Comment service (Connect)
 	commentService := comment.NewService(s.db)
-	commentConnectHandler := comment.NewConnectHandler(commentService, s.jwtManager)
+	commentConnectHandler := comment.NewConnectHandler(commentService, s.jwtManager, apiTokenService)
 	commentPath, commentHandler := commentv1connect.NewCommentServiceHandler(commentConnectHandler)
 	s.mux.Handle(commentPath, commentHandler)
 
 	// Document service (Connect)
 	documentService := document.NewService(s.db)
-	documentConnectHandler := document.NewConnectHandler(documentService, s.jwtManager)
+	documentConnectHandler := document.NewConnectHandler(documentService, s.jwtManager, apiTokenService)
 	documentPath, documentHandler := documentv1connect.NewDocumentServiceHandler(documentConnectHandler)
 	s.mux.Handle(documentPath, documentHandler)
 
 	// Task service (Connect)
 	taskService := task.NewService(s.db)
-	taskConnectHandler := task.NewConnectHandler(taskService, s.jwtManager)
+	taskConnectHandler := task.NewConnectHandler(taskService, s.jwtManager, apiTokenService)
 	taskPath, taskHandler := taskv1connect.NewTaskServiceHandler(taskConnectHandler)
 	s.mux.Handle(taskPath, taskHandler)
 
 	// Acceptance Criteria service (Connect)
 	acService := acceptance.NewService(s.db)
-	acConnectHandler := acceptance.NewConnectHandler(acService, s.jwtManager)
+	acConnectHandler := acceptance.NewConnectHandler(acService, s.jwtManager, apiTokenService)
 	acPath, acHandler := acceptancev1connect.NewAcceptanceCriteriaServiceHandler(acConnectHandler)
 	s.mux.Handle(acPath, acHandler)
 
 	// Notification service (Connect)
 	notifService := notification.NewService(s.db)
-	notifConnectHandler := notification.NewConnectHandler(notifService, s.jwtManager)
+	notifConnectHandler := notification.NewConnectHandler(notifService, s.jwtManager, apiTokenService)
 	notifPath, notifHandler := notificationv1connect.NewNotificationServiceHandler(notifConnectHandler)
 	s.mux.Handle(notifPath, notifHandler)
 
 	// Memory service (Connect)
 	memoryService := memory.NewService(s.db)
-	memoryConnectHandler := memory.NewConnectHandler(memoryService, s.jwtManager)
+	memoryConnectHandler := memory.NewConnectHandler(memoryService, s.jwtManager, apiTokenService)
 	memoryPath, memoryHandler := memoryv1connect.NewMemoryServiceHandler(memoryConnectHandler)
 	s.mux.Handle(memoryPath, memoryHandler)
 }

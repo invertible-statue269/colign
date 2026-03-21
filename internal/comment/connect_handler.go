@@ -14,18 +14,19 @@ import (
 )
 
 type ConnectHandler struct {
-	service    *Service
-	jwtManager *auth.JWTManager
+	service           *Service
+	jwtManager        *auth.JWTManager
+	apiTokenValidator auth.APITokenValidator
 }
 
 var _ commentv1connect.CommentServiceHandler = (*ConnectHandler)(nil)
 
-func NewConnectHandler(service *Service, jwtManager *auth.JWTManager) *ConnectHandler {
-	return &ConnectHandler{service: service, jwtManager: jwtManager}
+func NewConnectHandler(service *Service, jwtManager *auth.JWTManager, apiTokenValidator auth.APITokenValidator) *ConnectHandler {
+	return &ConnectHandler{service: service, jwtManager: jwtManager, apiTokenValidator: apiTokenValidator}
 }
 
-func (h *ConnectHandler) extractClaims(header string) (*auth.Claims, error) {
-	claims, err := auth.ExtractClaims(h.jwtManager, header)
+func (h *ConnectHandler) extractClaims(ctx context.Context, header string) (*auth.Claims, error) {
+	claims, err := auth.ResolveFromHeader(h.jwtManager, h.apiTokenValidator, ctx, header)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, err)
 	}
@@ -33,7 +34,7 @@ func (h *ConnectHandler) extractClaims(header string) (*auth.Claims, error) {
 }
 
 func (h *ConnectHandler) CreateComment(ctx context.Context, req *connect.Request[commentv1.CreateCommentRequest]) (*connect.Response[commentv1.CreateCommentResponse], error) {
-	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +66,7 @@ func (h *ConnectHandler) ListComments(ctx context.Context, req *connect.Request[
 }
 
 func (h *ConnectHandler) ResolveComment(ctx context.Context, req *connect.Request[commentv1.ResolveCommentRequest]) (*connect.Response[commentv1.ResolveCommentResponse], error) {
-	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +85,7 @@ func (h *ConnectHandler) ResolveComment(ctx context.Context, req *connect.Reques
 }
 
 func (h *ConnectHandler) DeleteComment(ctx context.Context, req *connect.Request[commentv1.DeleteCommentRequest]) (*connect.Response[commentv1.DeleteCommentResponse], error) {
-	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +104,7 @@ func (h *ConnectHandler) DeleteComment(ctx context.Context, req *connect.Request
 }
 
 func (h *ConnectHandler) CreateReply(ctx context.Context, req *connect.Request[commentv1.CreateReplyRequest]) (*connect.Response[commentv1.CreateReplyResponse], error) {
-	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}

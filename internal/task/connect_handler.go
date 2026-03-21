@@ -14,18 +14,19 @@ import (
 )
 
 type ConnectHandler struct {
-	service    *Service
-	jwtManager *auth.JWTManager
+	service           *Service
+	jwtManager        *auth.JWTManager
+	apiTokenValidator auth.APITokenValidator
 }
 
-func NewConnectHandler(service *Service, jwtManager *auth.JWTManager) *ConnectHandler {
-	return &ConnectHandler{service: service, jwtManager: jwtManager}
+func NewConnectHandler(service *Service, jwtManager *auth.JWTManager, apiTokenValidator auth.APITokenValidator) *ConnectHandler {
+	return &ConnectHandler{service: service, jwtManager: jwtManager, apiTokenValidator: apiTokenValidator}
 }
 
 var _ taskv1connect.TaskServiceHandler = (*ConnectHandler)(nil)
 
-func (h *ConnectHandler) extractClaims(header string) (*auth.Claims, error) {
-	claims, err := auth.ExtractClaims(h.jwtManager, header)
+func (h *ConnectHandler) extractClaims(ctx context.Context, header string) (*auth.Claims, error) {
+	claims, err := auth.ResolveFromHeader(h.jwtManager, h.apiTokenValidator, ctx, header)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, err)
 	}
@@ -49,7 +50,7 @@ func (h *ConnectHandler) ListTasks(ctx context.Context, req *connect.Request[tas
 }
 
 func (h *ConnectHandler) CreateTask(ctx context.Context, req *connect.Request[taskv1.CreateTaskRequest]) (*connect.Response[taskv1.CreateTaskResponse], error) {
-	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +90,7 @@ func (h *ConnectHandler) CreateTask(ctx context.Context, req *connect.Request[ta
 }
 
 func (h *ConnectHandler) UpdateTask(ctx context.Context, req *connect.Request[taskv1.UpdateTaskRequest]) (*connect.Response[taskv1.UpdateTaskResponse], error) {
-	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +125,7 @@ func (h *ConnectHandler) UpdateTask(ctx context.Context, req *connect.Request[ta
 }
 
 func (h *ConnectHandler) DeleteTask(ctx context.Context, req *connect.Request[taskv1.DeleteTaskRequest]) (*connect.Response[taskv1.DeleteTaskResponse], error) {
-	_, err := h.extractClaims(req.Header().Get("Authorization"))
+	_, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +141,7 @@ func (h *ConnectHandler) DeleteTask(ctx context.Context, req *connect.Request[ta
 }
 
 func (h *ConnectHandler) ReorderTasks(ctx context.Context, req *connect.Request[taskv1.ReorderTasksRequest]) (*connect.Response[taskv1.ReorderTasksResponse], error) {
-	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}

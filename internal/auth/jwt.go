@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -82,6 +83,33 @@ func ExtractClaims(jwtManager *JWTManager, header string) (*Claims, error) {
 		return nil, errors.New("invalid authorization header")
 	}
 	return jwtManager.ValidateAccessToken(parts[1])
+}
+
+// APITokenValidator resolves API tokens (col_*) to user identity.
+type APITokenValidator interface {
+	ValidateTokenForAuth(ctx context.Context, rawToken string) (userID int64, email string, orgID int64, err error)
+}
+
+// ResolveFromHeader handles both JWT and API token (col_*) authentication.
+func ResolveFromHeader(jwtManager *JWTManager, apiTokenValidator APITokenValidator, ctx context.Context, header string) (*Claims, error) {
+	parts := strings.SplitN(header, " ", 2)
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return nil, errors.New("invalid authorization header")
+	}
+	tokenStr := parts[1]
+
+	if strings.HasPrefix(tokenStr, "col_") {
+		if apiTokenValidator == nil {
+			return nil, errors.New("API token authentication not available")
+		}
+		userID, email, orgID, err := apiTokenValidator.ValidateTokenForAuth(ctx, tokenStr)
+		if err != nil {
+			return nil, err
+		}
+		return &Claims{UserID: userID, Email: email, OrgID: orgID}, nil
+	}
+
+	return jwtManager.ValidateAccessToken(tokenStr)
 }
 
 func GenerateRefreshToken() (string, error) {

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n";
-import Link from "next/link";
+import { apiTokenClient } from "@/lib/apitoken";
+import type { ApiToken } from "@/gen/proto/apitoken/v1/apitoken_pb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,6 +60,14 @@ export default function SettingsPage() {
   const [claudeApiKey, setClaudeApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
 
+  // API Token state
+  const [tokens, setTokens] = useState<ApiToken[]>([]);
+  const [newTokenName, setNewTokenName] = useState("");
+  const [createdToken, setCreatedToken] = useState<string | null>(null);
+  const [loadingTokens, setLoadingTokens] = useState(false);
+  const [creatingToken, setCreatingToken] = useState(false);
+  const [copied, setCopied] = useState(false);
+
   // Appearance state
   const [theme, setTheme] = useState("dark");
 
@@ -74,6 +83,57 @@ export default function SettingsPage() {
   function showSaved(section: string) {
     setSaved(section);
     setTimeout(() => setSaved(""), 2000);
+  }
+
+  const loadTokens = useCallback(async () => {
+    setLoadingTokens(true);
+    try {
+      const res = await apiTokenClient.listApiTokens({});
+      setTokens(res.tokens);
+    } catch {
+      // ignore
+    } finally {
+      setLoadingTokens(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "ai") {
+      loadTokens();
+    }
+  }, [activeTab, loadTokens]);
+
+  async function handleCreateToken() {
+    if (!newTokenName.trim()) return;
+    setCreatingToken(true);
+    try {
+      const res = await apiTokenClient.createApiToken({ name: newTokenName });
+      setCreatedToken(res.rawToken);
+      setNewTokenName("");
+      setCopied(false);
+      loadTokens();
+    } catch {
+      // ignore
+    } finally {
+      setCreatingToken(false);
+    }
+  }
+
+  async function handleDeleteToken(id: bigint) {
+    try {
+      await apiTokenClient.deleteApiToken({ id });
+      loadTokens();
+    } catch {
+      // ignore
+    }
+  }
+
+  function handleCopyToken() {
+    if (createdToken) {
+      navigator.clipboard.writeText(createdToken);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   }
 
   async function handleSave(section: string) {
@@ -279,52 +339,171 @@ export default function SettingsPage() {
 
           {/* AI & API Keys */}
           {activeTab === "ai" && (
-            <Card className="border-border/50">
-              <CardHeader>
-                <CardTitle>AI & API Keys</CardTitle>
-                <CardDescription>
-                  Configure your own API key for AI features. Without a key, AI features use the
-                  platform&apos;s shared quota.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="claude-key">Claude API Key</Label>
+            <>
+              <Card className="border-border/50">
+                <CardHeader>
+                  <CardTitle>AI & API Keys</CardTitle>
+                  <CardDescription>
+                    Configure your own API key for AI features. Without a key, AI features use the
+                    platform&apos;s shared quota.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="claude-key">Claude API Key</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="claude-key"
+                        type={showApiKey ? "text" : "password"}
+                        value={claudeApiKey}
+                        onChange={(e) => setClaudeApiKey(e.target.value)}
+                        placeholder="sk-ant-..."
+                        className="flex-1"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowApiKey(!showApiKey)}
+                        className="cursor-pointer text-muted-foreground"
+                      >
+                        {showApiKey ? "Hide" : "Show"}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Your key is encrypted and stored securely. It&apos;s only used for your
+                      requests.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 pt-2">
+                    <Button
+                      onClick={() => handleSave("ai")}
+                      disabled={saving}
+                      className="cursor-pointer"
+                    >
+                      {saving ? "Saving..." : "Save API Key"}
+                    </Button>
+                    {saved === "ai" && <span className="text-sm text-emerald-400">Saved</span>}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/50">
+                <CardHeader>
+                  <CardTitle>{t("settings.apiTokens")}</CardTitle>
+                  <CardDescription>{t("settings.apiTokensDesc")}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Create token form */}
                   <div className="flex gap-2">
                     <Input
-                      id="claude-key"
-                      type={showApiKey ? "text" : "password"}
-                      value={claudeApiKey}
-                      onChange={(e) => setClaudeApiKey(e.target.value)}
-                      placeholder="sk-ant-..."
+                      value={newTokenName}
+                      onChange={(e) => setNewTokenName(e.target.value)}
+                      placeholder={t("settings.tokenNamePlaceholder")}
+                      onKeyDown={(e) => e.key === "Enter" && handleCreateToken()}
                       className="flex-1"
                     />
                     <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      className="cursor-pointer text-muted-foreground"
+                      onClick={handleCreateToken}
+                      disabled={!newTokenName.trim() || creatingToken}
+                      className="cursor-pointer"
                     >
-                      {showApiKey ? "Hide" : "Show"}
+                      {creatingToken ? t("common.loading") : t("settings.generateToken")}
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Your key is encrypted and stored securely. It&apos;s only used for your
-                    requests.
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 pt-2">
-                  <Button
-                    onClick={() => handleSave("ai")}
-                    disabled={saving}
-                    className="cursor-pointer"
-                  >
-                    {saving ? "Saving..." : "Save API Key"}
-                  </Button>
-                  {saved === "ai" && <span className="text-sm text-emerald-400">Saved</span>}
-                </div>
-              </CardContent>
-            </Card>
+
+                  {/* Created token display */}
+                  {createdToken && (
+                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
+                      <p className="mb-2 text-sm font-medium text-emerald-400">
+                        {t("settings.tokenCreatedWarning")}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <code className="flex-1 overflow-x-auto rounded bg-muted px-3 py-2 font-mono text-xs">
+                          {createdToken}
+                        </code>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleCopyToken}
+                          className="cursor-pointer"
+                        >
+                          {copied ? t("common.saved") : "Copy"}
+                        </Button>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="mt-2 cursor-pointer text-muted-foreground"
+                        onClick={() => setCreatedToken(null)}
+                      >
+                        {t("settings.dismissToken")}
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Token list */}
+                  {loadingTokens ? (
+                    <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+                  ) : tokens.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">{t("settings.noTokens")}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {tokens.map((token) => (
+                        <div
+                          key={String(token.id)}
+                          className="flex items-center justify-between rounded-lg border border-border/50 p-3"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">{token.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {token.prefix}...
+                              {" \u00B7 "}
+                              {t("settings.tokenCreated")}{" "}
+                              {token.createdAt
+                                ? new Date(
+                                    Number(token.createdAt.seconds) * 1000,
+                                  ).toLocaleDateString()
+                                : ""}
+                              {" \u00B7 "}
+                              {token.lastUsedAt
+                                ? `${t("settings.tokenLastUsed")} ${new Date(Number(token.lastUsedAt.seconds) * 1000).toLocaleDateString()}`
+                                : t("settings.tokenNeverUsed")}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="cursor-pointer text-destructive hover:bg-destructive/10"
+                            onClick={() => handleDeleteToken(token.id)}
+                          >
+                            {t("common.delete")}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* MCP setup guide */}
+                  <Separator />
+                  <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
+                    <p className="mb-2 text-sm font-medium">{t("settings.mcpSetupGuide")}</p>
+                    <pre className="overflow-x-auto text-xs text-muted-foreground">
+                      {`{
+  "mcpServers": {
+    "colign": {
+      "command": "colign-mcp",
+      "env": {
+        "COLIGN_API_TOKEN": "col_your_token_here",
+        "COLIGN_API_URL": "http://localhost:8080"
+      }
+    }
+  }
+}`}
+                    </pre>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
           )}
 
           {/* Appearance */}

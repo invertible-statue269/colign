@@ -17,19 +17,20 @@ import (
 )
 
 type ConnectHandler struct {
-	service    *Service
-	db         *bun.DB
-	jwtManager *auth.JWTManager
+	service           *Service
+	db                *bun.DB
+	jwtManager        *auth.JWTManager
+	apiTokenValidator auth.APITokenValidator
 }
 
 var _ workflowv1connect.WorkflowServiceHandler = (*ConnectHandler)(nil)
 
-func NewConnectHandler(service *Service, db *bun.DB, jwtManager *auth.JWTManager) *ConnectHandler {
-	return &ConnectHandler{service: service, db: db, jwtManager: jwtManager}
+func NewConnectHandler(service *Service, db *bun.DB, jwtManager *auth.JWTManager, apiTokenValidator auth.APITokenValidator) *ConnectHandler {
+	return &ConnectHandler{service: service, db: db, jwtManager: jwtManager, apiTokenValidator: apiTokenValidator}
 }
 
-func (h *ConnectHandler) extractClaims(header string) (*auth.Claims, error) {
-	claims, err := auth.ExtractClaims(h.jwtManager, header)
+func (h *ConnectHandler) extractClaims(ctx context.Context, header string) (*auth.Claims, error) {
+	claims, err := auth.ResolveFromHeader(h.jwtManager, h.apiTokenValidator, ctx, header)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, err)
 	}
@@ -61,7 +62,7 @@ func (h *ConnectHandler) GetStatus(ctx context.Context, req *connect.Request[wor
 }
 
 func (h *ConnectHandler) Advance(ctx context.Context, req *connect.Request[workflowv1.AdvanceRequest]) (*connect.Response[workflowv1.AdvanceResponse], error) {
-	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +81,7 @@ func (h *ConnectHandler) Advance(ctx context.Context, req *connect.Request[workf
 }
 
 func (h *ConnectHandler) Approve(ctx context.Context, req *connect.Request[workflowv1.ApproveRequest]) (*connect.Response[workflowv1.ApproveResponse], error) {
-	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +117,7 @@ func (h *ConnectHandler) Approve(ctx context.Context, req *connect.Request[workf
 }
 
 func (h *ConnectHandler) RequestChanges(ctx context.Context, req *connect.Request[workflowv1.RequestChangesRequest]) (*connect.Response[workflowv1.RequestChangesResponse], error) {
-	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +137,7 @@ func (h *ConnectHandler) RequestChanges(ctx context.Context, req *connect.Reques
 }
 
 func (h *ConnectHandler) Revert(ctx context.Context, req *connect.Request[workflowv1.RevertRequest]) (*connect.Response[workflowv1.RevertResponse], error) {
-	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}

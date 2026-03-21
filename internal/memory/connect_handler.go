@@ -13,18 +13,19 @@ import (
 )
 
 type ConnectHandler struct {
-	service    *Service
-	jwtManager *auth.JWTManager
+	service           *Service
+	jwtManager        *auth.JWTManager
+	apiTokenValidator auth.APITokenValidator
 }
 
 var _ memoryv1connect.MemoryServiceHandler = (*ConnectHandler)(nil)
 
-func NewConnectHandler(service *Service, jwtManager *auth.JWTManager) *ConnectHandler {
-	return &ConnectHandler{service: service, jwtManager: jwtManager}
+func NewConnectHandler(service *Service, jwtManager *auth.JWTManager, apiTokenValidator auth.APITokenValidator) *ConnectHandler {
+	return &ConnectHandler{service: service, jwtManager: jwtManager, apiTokenValidator: apiTokenValidator}
 }
 
-func (h *ConnectHandler) extractClaims(header string) (*auth.Claims, error) {
-	claims, err := auth.ExtractClaims(h.jwtManager, header)
+func (h *ConnectHandler) extractClaims(ctx context.Context, header string) (*auth.Claims, error) {
+	claims, err := auth.ResolveFromHeader(h.jwtManager, h.apiTokenValidator, ctx, header)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, err)
 	}
@@ -32,7 +33,7 @@ func (h *ConnectHandler) extractClaims(header string) (*auth.Claims, error) {
 }
 
 func (h *ConnectHandler) GetMemory(ctx context.Context, req *connect.Request[memoryv1.GetMemoryRequest]) (*connect.Response[memoryv1.GetMemoryResponse], error) {
-	_, err := h.extractClaims(req.Header().Get("Authorization"))
+	_, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +52,7 @@ func (h *ConnectHandler) GetMemory(ctx context.Context, req *connect.Request[mem
 }
 
 func (h *ConnectHandler) SaveMemory(ctx context.Context, req *connect.Request[memoryv1.SaveMemoryRequest]) (*connect.Response[memoryv1.SaveMemoryResponse], error) {
-	claims, err := h.extractClaims(req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}

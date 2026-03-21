@@ -16,6 +16,7 @@ type Config struct {
 	RedirectBaseURL    string
 	FrontendURL        string
 	MigrationsPath     string
+	Edition            string // "ce" (Community) or "ee" (Enterprise)
 }
 
 func Load() (*Config, error) {
@@ -33,6 +34,7 @@ func Load() (*Config, error) {
 		RedirectBaseURL:    getEnv("REDIRECT_BASE_URL", "http://localhost:8080"),
 		FrontendURL:        getEnv("FRONTEND_URL", "http://localhost:3000"),
 		MigrationsPath:     getEnv("MIGRATIONS_PATH", "migrations"),
+		Edition:            getEnv("COLIGN_EDITION", "ce"),
 	}, nil
 }
 

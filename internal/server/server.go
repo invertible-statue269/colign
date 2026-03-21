@@ -13,6 +13,7 @@ import (
 	"github.com/gobenpark/colign/internal/config"
 	"github.com/gobenpark/colign/internal/database"
 
+	eeoauth "github.com/gobenpark/colign/ee/mcp/oauth"
 	"github.com/gobenpark/colign/gen/proto/acceptance/v1/acceptancev1connect"
 	"github.com/gobenpark/colign/gen/proto/apitoken/v1/apitokenv1connect"
 	"github.com/gobenpark/colign/gen/proto/auth/v1/authv1connect"
@@ -157,10 +158,17 @@ func (s *Server) setupRoutes(cfg *config.Config) {
 	s.mux.Handle(memoryPath, memoryHandler)
 
 	// MCP Streamable HTTP endpoint
-	// Uses per-request auth: extracts Bearer token from Authorization header
 	apiURL := fmt.Sprintf("http://localhost:%s", cfg.Port)
 	mcpHandler := mcpserver.NewStreamableHandlerWithAuth(apiURL)
-	s.mux.Handle("/mcp", mcpHandler)
+
+	if cfg.Edition == "ee" {
+		// Enterprise: OAuth discovery + 401 middleware for MCP
+		mcpMiddleware := eeoauth.RegisterRoutes(s.mux, s.db, s.jwtManager, apiTokenService, cfg.RedirectBaseURL)
+		s.mux.Handle("/mcp", mcpMiddleware(mcpHandler))
+	} else {
+		// Community: Bearer token only
+		s.mux.Handle("/mcp", mcpHandler)
+	}
 }
 
 func (s *Server) Handler() http.Handler {

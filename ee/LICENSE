@@ -1,0 +1,14 @@
+Colign Enterprise License
+
+Copyright (c) 2026 Colign
+
+The code in the "ee/" directory is licensed under the Colign Enterprise License.
+
+This license grants you the right to view and contribute to this code, but
+you may not use, copy, modify, or distribute the code without a valid
+Colign Enterprise subscription.
+
+For licensing inquiries, contact: enterprise@colign.co
+
+The code outside of the "ee/" directory is licensed under AGPL-3.0.
+See the root LICENSE file for details.

@@ -60,50 +60,80 @@ Traditional PRDs tried to put everything in one 30-page document. Colign splits 
 
 > For design decisions and competitive analysis behind this structure, see [docs/structured-proposal.md](docs/structured-proposal.md).
 
+## MCP Integration
+
+Colign exposes an MCP (Model Context Protocol) server so any AI tool — Claude Code, Cursor, Windsurf, VS Code Copilot — can read and write specs directly.
+
+### Streamable HTTP (SaaS)
+
+No binary to install. Just add the URL and your API token:
+
+```json
+{
+  "mcpServers": {
+    "colign": {
+      "url": "https://app.colign.dev/mcp",
+      "headers": {
+        "Authorization": "Bearer col_your_token_here"
+      }
+    }
+  }
+}
+```
+
+Generate an API token at **Settings > AI & API Keys** in the Colign web app.
+
+### stdio (Local / Self-hosted)
+
+For local development or self-hosted instances:
+
+```bash
+go build -o colign-mcp ./cmd/mcp
+
+COLIGN_API_TOKEN=col_... COLIGN_API_URL=http://localhost:8080 ./colign-mcp
+```
+
+### MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_projects` | List all accessible projects |
+| `get_change` | Get change details including stage |
+| `read_spec` | Read a spec document (proposal, design, spec, tasks) |
+| `write_spec` | Write or update a spec document |
+| `list_tasks` | List implementation tasks for a change |
+| `update_task` | Update a task's status (todo, in_progress, done) |
+| `suggest_spec` | Get suggestions for improving a spec |
+
 ## Claude Code Plugin
 
-Colign ships with a [Claude Code plugin](plugins/claude-code/) that connects your terminal directly to the platform via MCP.
+Colign ships with a [Claude Code plugin](plugins/claude-code/) that adds workflow skills on top of MCP.
 
 ### Install
 
 ```bash
-# Set your API token (generate at Settings > AI & API Keys)
 export COLIGN_API_TOKEN=col_your_token_here
-
-# Install the plugin
 claude --plugin-dir ./plugins/claude-code
 ```
 
 ### Workflow Skills
 
-The plugin provides 6 skills that follow the change lifecycle:
+6 skills that follow the change lifecycle:
 
 ```
-/colign:onboard → /colign:explore → /colign:propose → /colign:plan → /colign:implement → /colign:complete
+onboard → explore → propose → plan → implement → complete
 ```
 
-| Skill | Description |
-|-------|-------------|
-| `onboard` | Set up and verify MCP connection |
-| `explore` | Browse projects, read specs, check status |
-| `propose` | Write a structured proposal |
-| `plan` | Break proposal into implementation tasks |
-| `implement` | Code against the spec, update task progress |
-| `complete` | Verify tasks are done, advance workflow |
+| Skill | Stage | Description |
+|-------|-------|-------------|
+| `/colign:onboard` | Setup | Verify MCP connection and API token |
+| `/colign:explore` | Any | Browse projects, read specs, check status |
+| `/colign:propose` | Draft → Problem | Write a structured proposal |
+| `/colign:plan` | Problem → Solution | Break proposal into architecture and tasks |
+| `/colign:implement` | Solution → Review | Code against the spec, update task progress |
+| `/colign:complete` | Review → Done | Verify all tasks done, advance workflow |
 
 Skills trigger automatically by context (e.g., "implement the next task") or explicitly via `/colign:implement`.
-
-### MCP Server
-
-The MCP server can also be used standalone with any MCP-compatible tool:
-
-```bash
-# Build the binary
-go build -o colign-mcp ./cmd/mcp
-
-# Configure in your AI tool
-COLIGN_API_TOKEN=col_... COLIGN_API_URL=http://localhost:8080 ./colign-mcp
-```
 
 ## Getting Started
 

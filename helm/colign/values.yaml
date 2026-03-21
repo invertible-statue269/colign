@@ -21,6 +21,7 @@ api:
       memory: 512Mi
   migrate:
     enabled: true
+  edition: ""       # "ee" for Enterprise Edition with OAuth MCP, empty for Community
   frontendURL: ""   # e.g., https://app.colign.co (defaults to internal service URL)
   redirectBaseURL: ""  # e.g., https://api.colign.co (defaults to internal service URL)
   env:

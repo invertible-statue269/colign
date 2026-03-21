@@ -136,11 +136,17 @@ func (s *Server) handleWriteSpec(ctx context.Context, args json.RawMessage) (any
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
+	// For non-proposal doc types, convert markdown to simple HTML for TipTap editor
+	content := params.Content
+	if params.DocType != "proposal" {
+		content = markdownToHTML(content)
+	}
+
 	resp, err := s.clients.document.SaveDocument(ctx, connect.NewRequest(&documentv1.SaveDocumentRequest{
 		ChangeId: params.ChangeID,
 		Type:     params.DocType,
 		Title:    params.DocType,
-		Content:  params.Content,
+		Content:  content,
 	}))
 	if err != nil {
 		return nil, err

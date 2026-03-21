@@ -58,7 +58,7 @@ func ListTools() []Tool {
 		},
 		{
 			Name:        "read_spec",
-			Description: "Read a spec document for a change",
+			Description: "Read a spec document for a change. For proposals, the content field is a JSON string with keys: problem, scope, outOfScope, approach.",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]Property{
@@ -70,13 +70,13 @@ func ListTools() []Tool {
 		},
 		{
 			Name:        "write_spec",
-			Description: "Write or update a spec document for a change",
+			Description: "Write or update a spec document for a change. For proposals, content must be a JSON string with keys: problem (required), scope (required), outOfScope (optional), approach (optional). Example: {\"problem\":\"...\",\"scope\":\"...\",\"outOfScope\":\"...\",\"approach\":\"...\"}. For other doc types, content is plain markdown.",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]Property{
 					"change_id": {Type: "integer", Description: "Change ID"},
 					"doc_type":  {Type: "string", Description: "Document type: proposal, design, spec, tasks"},
-					"content":   {Type: "string", Description: "Document content in markdown"},
+					"content":   {Type: "string", Description: "For proposal: JSON with problem, scope, outOfScope, approach. For others: markdown text."},
 				},
 				Required: []string{"change_id", "doc_type", "content"},
 			},

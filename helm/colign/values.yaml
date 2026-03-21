@@ -1,0 +1,103 @@
+## Colign Helm Chart Values
+
+## API Server
+api:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/gobenpark/colign
+    tag: ""  # defaults to Chart.appVersion
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    jwtSecret: ""  # required: set via --set or secrets
+    claudeApiKey: ""
+    githubClientId: ""
+    githubClientSecret: ""
+    googleClientId: ""
+    googleClientSecret: ""
+
+## Web Frontend (Next.js)
+web:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ghcr.io/gobenpark/colign-web
+    tag: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+## Hocuspocus (Real-time collaboration)
+hocuspocus:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ghcr.io/gobenpark/colign-hocuspocus
+    tag: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 1234
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+## Ingress
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: colign.example.com
+      paths:
+        - path: /
+          service: web
+        - path: /api
+          service: api
+        - path: /mcp
+          service: api
+        - path: /ws
+          service: hocuspocus
+  tls: []
+
+## PostgreSQL (Bitnami subchart)
+postgresql:
+  enabled: true
+  auth:
+    username: colign
+    password: ""  # auto-generated if empty
+    database: colign
+  primary:
+    persistence:
+      size: 10Gi
+
+## Redis (Bitnami subchart)
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+  master:
+    persistence:
+      size: 1Gi

@@ -1,0 +1,18 @@
+{{- if .Values.hocuspocus.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-hocuspocus
+  labels:
+    {{- include "colign.labels" . | nindent 4 }}
+    app.kubernetes.io/component: hocuspocus
+spec:
+  type: {{ .Values.hocuspocus.service.type }}
+  ports:
+    - port: {{ .Values.hocuspocus.service.port }}
+      targetPort: 1234
+      protocol: TCP
+  selector:
+    {{- include "colign.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: hocuspocus
+{{- end }}

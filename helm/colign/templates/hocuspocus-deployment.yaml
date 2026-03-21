@@ -1,0 +1,43 @@
+{{- if .Values.hocuspocus.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-hocuspocus
+  labels:
+    {{- include "colign.labels" . | nindent 4 }}
+    app.kubernetes.io/component: hocuspocus
+spec:
+  replicas: {{ .Values.hocuspocus.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "colign.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: hocuspocus
+  template:
+    metadata:
+      labels:
+        {{- include "colign.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: hocuspocus
+    spec:
+      containers:
+        - name: hocuspocus
+          image: "{{ .Values.hocuspocus.image.repository }}:{{ .Values.hocuspocus.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.hocuspocus.image.pullPolicy }}
+          ports:
+            - containerPort: 1234
+              protocol: TCP
+          env:
+            - name: DATABASE_URL
+              value: {{ include "colign.databaseURL" . | quote }}
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-secrets
+                  key: jwt-secret
+          readinessProbe:
+            tcpSocket:
+              port: 1234
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.hocuspocus.resources | nindent 12 }}
+{{- end }}

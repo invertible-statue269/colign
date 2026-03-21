@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
@@ -67,13 +67,29 @@ const tabI18nKeys: Record<TabId, string> = {
   history: "change.history",
 };
 
+const validTabs: TabId[] = ["proposal", "design", "tasks", "history"];
+
 export default function ChangeDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const slug = params.slug as string;
   const changeId = BigInt(params.changeId as string);
   const { t } = useI18n();
 
-  const [activeTab, setActiveTab] = useState<TabId>("proposal");
+  const tabParam = searchParams.get("tab") as TabId | null;
+  const initialTab = tabParam && validTabs.includes(tabParam) ? tabParam : "proposal";
+  const [activeTab, setActiveTabState] = useState<TabId>(initialTab);
+
+  const setActiveTab = useCallback(
+    (tab: TabId) => {
+      setActiveTabState(tab);
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", tab);
+      router.replace(url.pathname + url.search, { scroll: false });
+    },
+    [router],
+  );
   const [stage, setStage] = useState("");
   const [conditions, setConditions] = useState<GateCondition[]>([]);
   const [history, setHistory] = useState<WorkflowEvent[]>([]);

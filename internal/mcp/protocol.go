@@ -82,6 +82,20 @@ func ListTools() []Tool {
 			},
 		},
 		{
+			Name:        "create_task",
+			Description: "Create a new implementation task for a change",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"change_id":   {Type: "integer", Description: "Change ID"},
+					"title":       {Type: "string", Description: "Task title"},
+					"description": {Type: "string", Description: "Task description (optional)"},
+					"status":      {Type: "string", Description: "Initial status: todo, in_progress, done (default: todo)"},
+				},
+				Required: []string{"change_id", "title"},
+			},
+		},
+		{
 			Name:        "list_tasks",
 			Description: "List implementation tasks for a change",
 			InputSchema: InputSchema{

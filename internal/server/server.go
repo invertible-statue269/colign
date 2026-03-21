@@ -29,6 +29,7 @@ import (
 	"github.com/gobenpark/colign/internal/apitoken"
 	"github.com/gobenpark/colign/internal/comment"
 	"github.com/gobenpark/colign/internal/document"
+	"github.com/gobenpark/colign/internal/events"
 	mcpserver "github.com/gobenpark/colign/internal/mcp"
 	"github.com/gobenpark/colign/internal/memory"
 	"github.com/gobenpark/colign/internal/notification"
@@ -43,17 +44,20 @@ type Server struct {
 	db         *bun.DB
 	jwtManager *auth.JWTManager
 	cfg        *config.Config
+	EventHub   *events.Hub
 }
 
 func New(cfg *config.Config) (*Server, error) {
 	db := database.New(cfg.DatabaseURL, cfg.Debug)
 	jwtManager := auth.NewJWTManager(cfg.JWTSecret)
+	hub := events.NewHub()
 
 	s := &Server{
 		mux:        http.NewServeMux(),
 		db:         db,
 		jwtManager: jwtManager,
 		cfg:        cfg,
+		EventHub:   hub,
 	}
 
 	s.setupRoutes(cfg)
@@ -147,7 +151,7 @@ func (s *Server) setupRoutes(cfg *config.Config) {
 
 	// Notification service (Connect)
 	notifService := notification.NewService(s.db)
-	notifConnectHandler := notification.NewConnectHandler(notifService, s.jwtManager, apiTokenService)
+	notifConnectHandler := notification.NewConnectHandler(notifService, s.jwtManager, apiTokenService, s.EventHub)
 	notifPath, notifHandler := notificationv1connect.NewNotificationServiceHandler(notifConnectHandler)
 	s.mux.Handle(notifPath, notifHandler)
 
@@ -159,7 +163,12 @@ func (s *Server) setupRoutes(cfg *config.Config) {
 
 	// MCP Streamable HTTP endpoint
 	apiURL := fmt.Sprintf("http://localhost:%s", cfg.Port)
-	mcpHandler := mcpserver.NewStreamableHandlerWithAuth(apiURL)
+	var mcpOpts []mcpserver.ClientOption
+	if cfg.HocuspocusURL != "" {
+		mcpOpts = append(mcpOpts, mcpserver.WithHocuspocus(cfg.HocuspocusURL, cfg.HocuspocusAPISecret))
+	}
+	mcpOpts = append(mcpOpts, mcpserver.WithEventHub(s.EventHub))
+	mcpHandler := mcpserver.NewStreamableHandlerWithAuth(apiURL, mcpOpts...)
 
 	if cfg.Edition == "ee" {
 		// Enterprise: OAuth discovery + 401 middleware for MCP

@@ -22,6 +22,9 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
     if (!token) {
       setHasToken(false);
       setVerified(true);
+      if (!NO_SIDEBAR_PATHS.some((p) => pathname.startsWith(p))) {
+        router.replace("/auth");
+      }
       return;
     }
 
@@ -84,7 +87,7 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
         {/* Mobile hamburger */}
         <div className="flex items-center gap-2 border-b border-border/50 px-4 py-2 md:hidden">
           <SidebarTrigger />
-          <span className="text-sm font-semibold">Colign</span>
+          <img src="/logo.png" alt="Colign" className="h-5" />
         </div>
         {children}
       </SidebarInset>

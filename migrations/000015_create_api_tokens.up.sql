@@ -3,6 +3,7 @@ CREATE TABLE api_tokens (
     user_id      BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     org_id       BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     name         TEXT NOT NULL,
+    token_type   TEXT NOT NULL DEFAULT 'personal' CHECK (token_type IN ('personal', 'oauth')),
     token_hash   TEXT NOT NULL UNIQUE,
     prefix       TEXT NOT NULL,
     last_used_at TIMESTAMPTZ,

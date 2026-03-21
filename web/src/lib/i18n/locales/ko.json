@@ -223,6 +223,7 @@
     "title": "설정",
     "profile": "프로필",
     "account": "계정",
+    "organization": "조직",
     "aiApiKeys": "AI & API 키",
     "appearance": "외관",
     "notifications": "알림",

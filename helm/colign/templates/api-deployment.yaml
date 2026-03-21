@@ -83,6 +83,12 @@ spec:
                   name: {{ .Release.Name }}-secrets
                   key: google-client-secret
             {{- end }}
+            {{- if and .Values.hocuspocus.enabled .Values.hocuspocus.apiSecret }}
+            - name: HOCUSPOCUS_URL
+              value: {{ printf "http://%s-hocuspocus:%v" .Release.Name (.Values.hocuspocus.service.port | default 1234) | quote }}
+            - name: HOCUSPOCUS_API_SECRET
+              value: {{ .Values.hocuspocus.apiSecret | quote }}
+            {{- end }}
           lifecycle:
             preStop:
               exec:

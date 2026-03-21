@@ -52,8 +52,46 @@ message UpdateOrganizationResponse {
   Organization organization = 1;
 }
 
+// List members of the current organization
+message ListMembersRequest {}
+
+message ListMembersResponse {
+  repeated OrganizationMember members = 1;
+}
+
+// Invite a user to the organization by email
+message InviteOrgMemberRequest {
+  string email = 1;
+  string role = 2; // "owner", "admin", "member"
+}
+
+message InviteOrgMemberResponse {
+  OrganizationMember member = 1;
+}
+
+// Remove a member from the organization
+message RemoveOrgMemberRequest {
+  int64 user_id = 1;
+}
+
+message RemoveOrgMemberResponse {}
+
+// Update a member's role
+message UpdateOrgMemberRoleRequest {
+  int64 user_id = 1;
+  string role = 2;
+}
+
+message UpdateOrgMemberRoleResponse {
+  OrganizationMember member = 1;
+}
+
 service OrganizationService {
   rpc ListOrganizations(ListOrganizationsRequest) returns (ListOrganizationsResponse) {}
   rpc SwitchOrganization(SwitchOrganizationRequest) returns (SwitchOrganizationResponse) {}
   rpc UpdateOrganization(UpdateOrganizationRequest) returns (UpdateOrganizationResponse) {}
+  rpc ListMembers(ListMembersRequest) returns (ListMembersResponse) {}
+  rpc InviteOrgMember(InviteOrgMemberRequest) returns (InviteOrgMemberResponse) {}
+  rpc RemoveOrgMember(RemoveOrgMemberRequest) returns (RemoveOrgMemberResponse) {}
+  rpc UpdateOrgMemberRole(UpdateOrgMemberRoleRequest) returns (UpdateOrgMemberRoleResponse) {}
 }

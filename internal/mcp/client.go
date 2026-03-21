@@ -7,13 +7,17 @@ import (
 	"github.com/gobenpark/colign/gen/proto/document/v1/documentv1connect"
 	"github.com/gobenpark/colign/gen/proto/project/v1/projectv1connect"
 	"github.com/gobenpark/colign/gen/proto/task/v1/taskv1connect"
+	"github.com/gobenpark/colign/internal/events"
 )
 
 type apiClients struct {
-	project    projectv1connect.ProjectServiceClient
-	document   documentv1connect.DocumentServiceClient
-	task       taskv1connect.TaskServiceClient
-	acceptance acceptancev1connect.AcceptanceCriteriaServiceClient
+	project             projectv1connect.ProjectServiceClient
+	document            documentv1connect.DocumentServiceClient
+	task                taskv1connect.TaskServiceClient
+	acceptance          acceptancev1connect.AcceptanceCriteriaServiceClient
+	hocuspocusURL       string
+	hocuspocusAPISecret string
+	eventHub            *events.Hub
 }
 
 // tokenTransport injects the Authorization header into every request.
@@ -27,7 +31,7 @@ func (t *tokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.base.RoundTrip(req)
 }
 
-func newAPIClients(apiURL, apiToken string) *apiClients {
+func newAPIClients(apiURL, apiToken string, opts ...clientOption) *apiClients {
 	httpClient := &http.Client{
 		Transport: &tokenTransport{
 			token: apiToken,
@@ -35,10 +39,32 @@ func newAPIClients(apiURL, apiToken string) *apiClients {
 		},
 	}
 
-	return &apiClients{
+	c := &apiClients{
 		project:    projectv1connect.NewProjectServiceClient(httpClient, apiURL),
 		document:   documentv1connect.NewDocumentServiceClient(httpClient, apiURL),
 		task:       taskv1connect.NewTaskServiceClient(httpClient, apiURL),
 		acceptance: acceptancev1connect.NewAcceptanceCriteriaServiceClient(httpClient, apiURL),
+	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
+}
+
+// ClientOption configures additional options for MCP API clients.
+type ClientOption = clientOption
+
+type clientOption func(*apiClients)
+
+func WithHocuspocus(url, secret string) clientOption {
+	return func(c *apiClients) {
+		c.hocuspocusURL = url
+		c.hocuspocusAPISecret = secret
+	}
+}
+
+func WithEventHub(hub *events.Hub) clientOption {
+	return func(c *apiClients) {
+		c.eventHub = hub
 	}
 }

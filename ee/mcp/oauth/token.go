@@ -1,7 +1,6 @@
 package oauth
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -67,8 +66,8 @@ func (h *TokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create API token using existing service
-	token, rawToken, err := h.apiTokenService.Create(context.Background(), authCode.UserID, authCode.OrgID, "MCP OAuth")
+	// Create OAuth token (replaces existing one for same user+org)
+	token, rawToken, err := h.apiTokenService.CreateOAuth(r.Context(), authCode.UserID, authCode.OrgID, "MCP OAuth")
 	if err != nil {
 		writeTokenError(w, "server_error", "failed to create access token")
 		return

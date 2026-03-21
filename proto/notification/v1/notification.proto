@@ -49,9 +49,22 @@ message GetUnreadCountResponse {
   int32 count = 1;
 }
 
+// Real-time event streaming
+message SubscribeRequest {
+  int64 change_id = 1; // subscribe to events for a specific change (0 = all)
+}
+
+message Event {
+  string type = 1;       // "task_created", "task_updated", "document_updated", "change_updated"
+  int64 change_id = 2;
+  string payload = 3;    // JSON-encoded event data
+  google.protobuf.Timestamp timestamp = 4;
+}
+
 service NotificationService {
   rpc ListNotifications(ListNotificationsRequest) returns (ListNotificationsResponse) {}
   rpc MarkRead(MarkReadRequest) returns (MarkReadResponse) {}
   rpc MarkAllRead(MarkAllReadRequest) returns (MarkAllReadResponse) {}
   rpc GetUnreadCount(GetUnreadCountRequest) returns (GetUnreadCountResponse) {}
+  rpc Subscribe(SubscribeRequest) returns (stream Event) {}
 }

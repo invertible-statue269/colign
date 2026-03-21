@@ -40,17 +40,23 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-secrets
                   key: jwt-secret
+            {{- if .Values.hocuspocus.apiSecret }}
+            - name: HOCUSPOCUS_API_SECRET
+              value: {{ .Values.hocuspocus.apiSecret | quote }}
+            {{- end }}
           lifecycle:
             preStop:
               exec:
                 command: ["sh", "-c", "sleep 5"]
           readinessProbe:
-            tcpSocket:
+            httpGet:
+              path: /healthz
               port: ws
             periodSeconds: 10
             failureThreshold: 3
           livenessProbe:
-            tcpSocket:
+            httpGet:
+              path: /healthz
               port: ws
             periodSeconds: 30
             failureThreshold: 3

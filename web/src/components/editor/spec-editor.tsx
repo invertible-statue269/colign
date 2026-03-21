@@ -8,15 +8,7 @@ import Collaboration from "@tiptap/extension-collaboration";
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import { CommentHighlight } from "./extensions/comment-highlight";
 import { useEffect, useRef, useState } from "react";
-import {
-  Bold,
-  Italic,
-  Heading2,
-  Heading3,
-  List,
-  Code,
-  MessageSquarePlus,
-} from "lucide-react";
+import { Bold, Italic, Heading2, Heading3, List, Code, MessageSquarePlus } from "lucide-react";
 import { getAccessToken } from "@/lib/auth";
 import * as Y from "yjs";
 
@@ -133,9 +125,18 @@ function SpecEditorInner({
     if (!editor || initializedRef.current) return;
     initializedRef.current = true;
 
-    if (editor.isEmpty && initialContent) {
-      const yMeta = collab.ydoc.getMap("meta");
-      const legacyHtml = yMeta.get("initialHtml") as string | undefined;
+    const yMeta = collab.ydoc.getMap("meta");
+    const legacyHtml = yMeta.get("initialHtml") as string | undefined;
+
+    // Check if Y.js fragment has real structured content (headings, lists, etc.)
+    const fragment = collab.ydoc.getXmlFragment("default");
+    const hasStructure = fragment.toArray().some((node) => {
+      const name = (node as any).nodeName;
+      return name && name !== "paragraph";
+    });
+
+    // Initialize if editor is empty OR Y.js has no structured content
+    if ((editor.isEmpty || !hasStructure) && (legacyHtml || initialContent)) {
       const contentToUse = legacyHtml || initialContent;
       editor.commands.setContent(contentToUse);
       if (legacyHtml) {
@@ -151,12 +152,7 @@ function SpecEditorInner({
       addHighlightAtSavedSelection: (commentId: string) => {
         const sel = savedSelectionRef.current;
         if (!sel) return;
-        editor
-          .chain()
-          .focus()
-          .setTextSelection(sel)
-          .setCommentHighlight({ commentId })
-          .run();
+        editor.chain().focus().setTextSelection(sel).setCommentHighlight({ commentId }).run();
         savedSelectionRef.current = null;
       },
       removeHighlight: (commentId: string) => {
@@ -202,11 +198,7 @@ function SpecEditorInner({
     onAddComment(text);
   };
 
-  const bubbleBtn = (
-    active: boolean,
-    onClick: () => void,
-    children: React.ReactNode,
-  ) => (
+  const bubbleBtn = (active: boolean, onClick: () => void, children: React.ReactNode) => (
     <button
       onMouseDown={(e) => {
         e.preventDefault();

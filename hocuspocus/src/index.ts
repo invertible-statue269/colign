@@ -1,22 +1,32 @@
 import { Hocuspocus } from "@hocuspocus/server";
+import { IncomingMessage, ServerResponse } from "http";
 import { Pool } from "pg";
 import * as Y from "yjs";
 import * as crypto from "crypto";
+import { htmlToYXmlFragment } from "./html-to-yjs";
 
-const pool = new Pool({
-  connectionString:
-    process.env.DATABASE_URL ??
-    "postgres://postgres:postgres@localhost:5432/colign",
+const dbUrl = new URL(
+  process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/colign",
+);
+const searchPath = dbUrl.searchParams.get("search_path") ?? "public";
+// Remove search_path from URL since pg driver doesn't handle it natively
+dbUrl.searchParams.delete("search_path");
+
+const pool = new Pool({ connectionString: dbUrl.toString() });
+
+// Set search_path on every new connection
+pool.on("connect", (client) => {
+  client.query(`SET search_path TO ${searchPath}`);
 });
 
 const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret-change-in-production";
+const API_SECRET = process.env.HOCUSPOCUS_API_SECRET ?? "";
 
 function verifyJwt(token: string): { user_id: number; email: string; name: string } | null {
   try {
     const parts = token.split(".");
     if (parts.length !== 3) return null;
 
-    // Verify signature
     const header = parts[0];
     const payload = parts[1];
     const signature = parts[2];
@@ -29,7 +39,6 @@ function verifyJwt(token: string): { user_id: number; email: string; name: strin
 
     const decoded = JSON.parse(Buffer.from(payload, "base64url").toString());
 
-    // Check expiry
     if (decoded.exp && decoded.exp < Date.now() / 1000) return null;
 
     return decoded;
@@ -37,6 +46,24 @@ function verifyJwt(token: string): { user_id: number; email: string; name: strin
     return null;
   }
 }
+
+// ── REST API helpers ──
+
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.on("data", (chunk: Buffer) => { body += chunk.toString(); });
+    req.on("end", () => resolve(body));
+    req.on("error", reject);
+  });
+}
+
+function sendJson(res: ServerResponse, status: number, data: unknown): void {
+  res.writeHead(status, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(data));
+}
+
+// ── Hocuspocus Server ──
 
 const server = new Hocuspocus({
   port: Number(process.env.PORT ?? 1234),
@@ -49,8 +76,24 @@ const server = new Hocuspocus({
     return { user: payload };
   },
 
+  async onRequest({ request, response }: { request: IncomingMessage; response: ServerResponse }) {
+    const url = request.url ?? "";
+
+    // POST /api/documents — update document via Y.js
+    if (request.method === "POST" && url === "/api/documents") {
+      await handleDocumentUpdate(request, response);
+      // Throw empty error to prevent default "OK" response
+      throw null;
+    }
+
+    // GET /healthz — health check
+    if (request.method === "GET" && url === "/healthz") {
+      sendJson(response, 200, { status: "ok" });
+      throw null;
+    }
+  },
+
   async onLoadDocument({ documentName, document }) {
-    // documentName format: "change-{id}-{docType}"
     const parts = documentName.split("-");
     if (parts.length < 3) return;
 
@@ -66,7 +109,6 @@ const server = new Hocuspocus({
       if (result.rows.length > 0 && result.rows[0].content) {
         const yXmlFragment = document.getXmlFragment("default");
         if (yXmlFragment.length === 0) {
-          // Fix corrupted HTML with Tiptap node names
           const html = fixTiptapNodeNames(result.rows[0].content);
           const yMeta = document.getMap("meta");
           yMeta.set("initialHtml", html);
@@ -78,7 +120,6 @@ const server = new Hocuspocus({
   },
 
   async onStoreDocument({ documentName, document }) {
-    // Save Y.js document content back to DB
     const parts = documentName.split("-");
     if (parts.length < 3) return;
 
@@ -86,13 +127,11 @@ const server = new Hocuspocus({
     const docType = parts.slice(2).join("-");
 
     try {
-      // Get HTML from Y.js XML fragment
       const yXmlFragment = document.getXmlFragment("default");
       const content = yXmlFragmentToHtml(yXmlFragment);
 
       if (!content) return;
 
-      // Upsert document (unique on change_id, type, title)
       await pool.query(
         `INSERT INTO documents (change_id, type, title, content, version)
          VALUES ($1, $2, '', $3, 1)
@@ -114,14 +153,72 @@ const server = new Hocuspocus({
   },
 });
 
-// Fix corrupted HTML that used Tiptap node names instead of HTML tags
+// ── REST API: Document Update ──
+
+async function handleDocumentUpdate(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  // Verify internal API secret
+  if (!API_SECRET) {
+    sendJson(res, 503, { error: "HOCUSPOCUS_API_SECRET not configured" });
+    return;
+  }
+
+  const authHeader = req.headers.authorization ?? "";
+  if (authHeader !== `Bearer ${API_SECRET}`) {
+    sendJson(res, 401, { error: "unauthorized" });
+    return;
+  }
+
+  const body = await readBody(req);
+  let payload: { document_name: string; content: string };
+  try {
+    payload = JSON.parse(body);
+  } catch {
+    sendJson(res, 400, { error: "invalid JSON body" });
+    return;
+  }
+
+  if (!payload.document_name || !payload.content) {
+    sendJson(res, 400, { error: "document_name and content are required" });
+    return;
+  }
+
+  try {
+    const connection = await server.openDirectConnection(payload.document_name, {
+      user: { id: "mcp-server", name: "MCP Server" },
+    });
+
+    await connection.transact((doc) => {
+      const fragment = doc.getXmlFragment("default");
+
+      // Clear existing content
+      while (fragment.length > 0) {
+        fragment.delete(0, 1);
+      }
+
+      // Convert HTML to Y.js XML nodes and insert
+      htmlToYXmlFragment(doc, fragment, payload.content);
+    });
+
+    await connection.disconnect();
+
+    sendJson(res, 200, { ok: true, document_name: payload.document_name });
+  } catch (err) {
+    console.error("Failed to update document:", err);
+    sendJson(res, 500, { error: "failed to update document" });
+  }
+}
+
+server.listen();
+console.log(`Hocuspocus listening on port ${process.env.PORT ?? 1234}`);
+
+// ── Utility functions ──
+
 function fixTiptapNodeNames(html: string): string {
   return html
     .replace(/<paragraph>/g, "<p>")
     .replace(/<\/paragraph>/g, "</p>")
     .replace(/<heading level="(\d)">/g, (_m, level) => `<h${level}>`)
     .replace(/<\/heading>/g, (match, offset, str) => {
-      // Find the matching opening tag to get the level
       const before = str.substring(0, offset);
       const lastOpen = before.lastIndexOf("<h");
       if (lastOpen >= 0) {
@@ -142,7 +239,6 @@ function fixTiptapNodeNames(html: string): string {
     .replace(/<horizontalRule\s*\/?>/g, "<hr />");
 }
 
-// Map Tiptap node names to HTML tags
 const NODE_TO_TAG: Record<string, string> = {
   paragraph: "p",
   bulletList: "ul",
@@ -206,7 +302,6 @@ function xmlElementToHtml(element: Y.XmlElement): string {
   const nodeName = element.nodeName;
   const attrs = element.getAttributes();
 
-  // Resolve tag name
   let tag: string;
   if (nodeName === "heading") {
     const level = attrs.level || 1;
@@ -215,7 +310,6 @@ function xmlElementToHtml(element: Y.XmlElement): string {
     tag = NODE_TO_TAG[nodeName] || nodeName;
   }
 
-  // Build attribute string (skip Tiptap-internal attrs)
   let attrStr = "";
   for (const [key, value] of Object.entries(attrs)) {
     if (nodeName === "heading" && key === "level") continue;
@@ -228,12 +322,10 @@ function xmlElementToHtml(element: Y.XmlElement): string {
   if (nodeName === "taskList") attrStr += ' data-type="taskList"';
   if (nodeName === "taskItem") attrStr += ' data-type="taskItem"';
 
-  // Self-closing tags
   if (SELF_CLOSING.has(tag)) {
     return `<${tag}${attrStr} />`;
   }
 
-  // Build inner content
   let inner = "";
   element.forEach((child) => {
     if (child instanceof Y.XmlElement) {
@@ -243,13 +335,9 @@ function xmlElementToHtml(element: Y.XmlElement): string {
     }
   });
 
-  // codeBlock wraps content in <code>
   if (nodeName === "codeBlock") {
     inner = `<code>${inner}</code>`;
   }
 
   return `<${tag}${attrStr}>${inner}</${tag}>`;
 }
-
-server.listen();
-console.log(`Hocuspocus listening on port ${process.env.PORT ?? 1234}`);

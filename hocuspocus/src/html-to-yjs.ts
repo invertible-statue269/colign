@@ -1,0 +1,200 @@
+import * as Y from "yjs";
+
+/**
+ * Converts simple HTML (from TipTap/markdownToHTML) into Y.js XmlFragment nodes.
+ * Handles: headings (h1-h3), paragraphs, bullet lists, ordered lists, bold, italic, code.
+ */
+export function htmlToYXmlFragment(
+  doc: Y.Doc,
+  fragment: Y.XmlFragment,
+  html: string,
+): void {
+  const tokens = tokenize(html);
+  let i = 0;
+
+  // Merge adjacent list items into a single list
+  while (i < tokens.length) {
+    const token = tokens[i];
+
+    if (token.type === "heading") {
+      const el = new Y.XmlElement("heading");
+      el.setAttribute("level", String(token.level));
+      const text = new Y.XmlText();
+      applyInlineFormatting(text, token.content);
+      el.insert(0, [text]);
+      fragment.insert(fragment.length, [el]);
+      i++;
+    } else if (token.type === "paragraph") {
+      const el = new Y.XmlElement("paragraph");
+      const text = new Y.XmlText();
+      applyInlineFormatting(text, token.content);
+      el.insert(0, [text]);
+      fragment.insert(fragment.length, [el]);
+      i++;
+    } else if (token.type === "listitem") {
+      // Collect consecutive list items of the same list type
+      const listType = token.listType;
+      const listEl = new Y.XmlElement(
+        listType === "ol" ? "orderedList" : "bulletList",
+      );
+
+      while (i < tokens.length && tokens[i].type === "listitem" && tokens[i].listType === listType) {
+        const li = new Y.XmlElement("listItem");
+        const p = new Y.XmlElement("paragraph");
+        const text = new Y.XmlText();
+        applyInlineFormatting(text, tokens[i].content);
+        p.insert(0, [text]);
+        li.insert(0, [p]);
+        listEl.insert(listEl.length, [li]);
+        i++;
+      }
+
+      fragment.insert(fragment.length, [listEl]);
+    } else {
+      i++;
+    }
+  }
+}
+
+interface Token {
+  type: "heading" | "paragraph" | "listitem";
+  content: string;
+  level?: number;
+  listType?: "ul" | "ol";
+}
+
+function tokenize(html: string): Token[] {
+  const tokens: Token[] = [];
+  // Match top-level HTML elements
+  const tagRegex = /<(h[1-6]|p|ul|ol)([^>]*)>([\s\S]*?)<\/\1>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = tagRegex.exec(html)) !== null) {
+    const tag = match[1].toLowerCase();
+    const content = match[3];
+
+    if (tag.startsWith("h")) {
+      const level = parseInt(tag[1], 10);
+      tokens.push({
+        type: "heading",
+        content: stripTags(content),
+        level,
+      });
+    } else if (tag === "p") {
+      tokens.push({
+        type: "paragraph",
+        content: content,
+      });
+    } else if (tag === "ul" || tag === "ol") {
+      // Extract <li> items
+      const liRegex = /<li>([\s\S]*?)<\/li>/gi;
+      let liMatch: RegExpExecArray | null;
+      while ((liMatch = liRegex.exec(content)) !== null) {
+        tokens.push({
+          type: "listitem",
+          content: stripTags(liMatch[1]),
+          listType: tag as "ul" | "ol",
+        });
+      }
+    }
+  }
+
+  return tokens;
+}
+
+function stripTags(html: string): string {
+  return html.replace(/<[^>]+>/g, "");
+}
+
+/**
+ * Applies inline formatting (bold, italic, code) from simple HTML to Y.XmlText.
+ * For plain text without formatting, just inserts the text directly.
+ */
+function applyInlineFormatting(xmlText: Y.XmlText, html: string): void {
+  // Simple case: no inline formatting tags
+  if (!/<(strong|em|code|b|i|u|s)[\s>]/i.test(html)) {
+    xmlText.insert(0, unescapeHtml(html));
+    return;
+  }
+
+  // Parse inline formatting
+  const segments = parseInlineHtml(html);
+  let offset = 0;
+  for (const seg of segments) {
+    const attrs: Record<string, boolean> = {};
+    if (seg.bold) attrs.bold = true;
+    if (seg.italic) attrs.italic = true;
+    if (seg.code) attrs.code = true;
+    if (seg.underline) attrs.underline = true;
+    if (seg.strike) attrs.strike = true;
+
+    const text = unescapeHtml(seg.text);
+    if (Object.keys(attrs).length > 0) {
+      xmlText.insert(offset, text, attrs);
+    } else {
+      xmlText.insert(offset, text);
+    }
+    offset += text.length;
+  }
+}
+
+interface InlineSegment {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+  code?: boolean;
+  underline?: boolean;
+  strike?: boolean;
+}
+
+function parseInlineHtml(html: string): InlineSegment[] {
+  const segments: InlineSegment[] = [];
+  let remaining = html;
+
+  while (remaining.length > 0) {
+    // Find the next inline tag
+    const tagMatch = remaining.match(
+      /<(strong|em|code|b|i|u|s)>([\s\S]*?)<\/\1>/i,
+    );
+
+    if (!tagMatch || tagMatch.index === undefined) {
+      // No more tags, rest is plain text
+      if (remaining) {
+        segments.push({ text: stripTags(remaining) });
+      }
+      break;
+    }
+
+    // Add text before the tag
+    if (tagMatch.index > 0) {
+      const before = remaining.substring(0, tagMatch.index);
+      if (before) {
+        segments.push({ text: stripTags(before) });
+      }
+    }
+
+    const tag = tagMatch[1].toLowerCase();
+    const content = tagMatch[2];
+    const seg: InlineSegment = { text: stripTags(content) };
+
+    if (tag === "strong" || tag === "b") seg.bold = true;
+    if (tag === "em" || tag === "i") seg.italic = true;
+    if (tag === "code") seg.code = true;
+    if (tag === "u") seg.underline = true;
+    if (tag === "s") seg.strike = true;
+
+    segments.push(seg);
+    remaining = remaining.substring(tagMatch.index + tagMatch[0].length);
+  }
+
+  return segments;
+}
+
+function unescapeHtml(text: string): string {
+  return text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}

@@ -62,6 +62,7 @@ hocuspocus:
   service:
     type: ClusterIP
     port: 1234
+  apiSecret: ""  # shared secret for internal API (MCP → Hocuspocus document sync)
   resources:
     requests:
       cpu: 50m

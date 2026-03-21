@@ -13,6 +13,10 @@ export const metadata: Metadata = {
   title: "Colign - AI-powered Spec Writing",
   description:
     "Collaborative Spec-Driven Development platform where developers and non-developers write specs with AI.",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({

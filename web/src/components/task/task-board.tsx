@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { LayoutGrid, List } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { taskClient } from "@/lib/task";
+import { useEvents } from "@/lib/events";
 import { KanbanView } from "./kanban-view";
 import { ListView } from "./list-view";
 
@@ -39,6 +40,7 @@ function readStoredViewMode(): ViewMode {
 
 export function TaskBoard({ changeId, members }: TaskBoardProps) {
   const { t } = useI18n();
+  const { on } = useEvents();
   const [tasks, setTasks] = useState<TaskType[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [loading, setLoading] = useState(true);
@@ -52,14 +54,10 @@ export function TaskBoard({ changeId, members }: TaskBoardProps) {
     setViewMode(readStoredViewMode());
   }, []);
 
-  // Fetch tasks on mount
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
+  const fetchTasks = useCallback(() => {
     taskClient
       .listTasks({ changeId })
       .then((res) => {
-        if (cancelled) return;
         setTasks(
           res.tasks.map((t) => ({
             id: t.id,
@@ -76,16 +74,27 @@ export function TaskBoard({ changeId, members }: TaskBoardProps) {
           })),
         );
       })
-      .catch((err) => {
-        if (!cancelled) console.error("Failed to load tasks:", err);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .catch((err) => console.error("Failed to load tasks:", err))
+      .finally(() => setLoading(false));
   }, [changeId]);
+
+  // Fetch tasks on mount
+  useEffect(() => {
+    setLoading(true);
+    fetchTasks();
+  }, [fetchTasks]);
+
+  // Real-time: refetch on task events for this change
+  useEffect(() => {
+    return on((event) => {
+      if (
+        (event.type === "task_created" || event.type === "task_updated") &&
+        event.changeId === changeId
+      ) {
+        fetchTasks();
+      }
+    });
+  }, [on, fetchTasks, changeId]);
 
   function handleViewModeChange(mode: ViewMode) {
     setViewMode(mode);

@@ -35,6 +35,21 @@ func hashToken(raw string) string {
 }
 
 func (s *Service) Create(ctx context.Context, userID, orgID int64, name string) (*models.APIToken, string, error) {
+	return s.createWithType(ctx, userID, orgID, name, "personal")
+}
+
+func (s *Service) CreateOAuth(ctx context.Context, userID, orgID int64, name string) (*models.APIToken, string, error) {
+	// Remove existing OAuth tokens for this user+org to prevent accumulation
+	_, _ = s.db.NewDelete().Model((*models.APIToken)(nil)).
+		Where("user_id = ?", userID).
+		Where("org_id = ?", orgID).
+		Where("token_type = ?", "oauth").
+		Exec(ctx)
+
+	return s.createWithType(ctx, userID, orgID, name, "oauth")
+}
+
+func (s *Service) createWithType(ctx context.Context, userID, orgID int64, name, tokenType string) (*models.APIToken, string, error) {
 	raw, err := generateToken()
 	if err != nil {
 		return nil, "", err
@@ -44,6 +59,7 @@ func (s *Service) Create(ctx context.Context, userID, orgID int64, name string) 
 		UserID:    userID,
 		OrgID:     orgID,
 		Name:      name,
+		TokenType: tokenType,
 		TokenHash: hashToken(raw),
 		Prefix:    raw[:8],
 	}
@@ -60,6 +76,7 @@ func (s *Service) List(ctx context.Context, userID, orgID int64) ([]models.APITo
 	err := s.db.NewSelect().Model(&tokens).
 		Where("at.user_id = ?", userID).
 		Where("at.org_id = ?", orgID).
+		Where("at.token_type = ?", "personal").
 		OrderExpr("at.created_at DESC").
 		Scan(ctx)
 	return tokens, err

@@ -1,9 +1,13 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
+	"net/http"
 
 	"connectrpc.com/connect"
 
@@ -11,6 +15,7 @@ import (
 	documentv1 "github.com/gobenpark/colign/gen/proto/document/v1"
 	projectv1 "github.com/gobenpark/colign/gen/proto/project/v1"
 	taskv1 "github.com/gobenpark/colign/gen/proto/task/v1"
+	"github.com/gobenpark/colign/internal/events"
 )
 
 func (s *Server) callTool(ctx context.Context, name string, args json.RawMessage) (any, error) {
@@ -23,6 +28,8 @@ func (s *Server) callTool(ctx context.Context, name string, args json.RawMessage
 		return s.handleReadSpec(ctx, args)
 	case "write_spec":
 		return s.handleWriteSpec(ctx, args)
+	case "create_task":
+		return s.handleCreateTask(ctx, args)
 	case "list_tasks":
 		return s.handleListTasks(ctx, args)
 	case "update_task":
@@ -136,17 +143,48 @@ func (s *Server) handleWriteSpec(ctx context.Context, args json.RawMessage) (any
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
-	// For non-proposal doc types, convert markdown to simple HTML for TipTap editor
-	content := params.Content
+	// For non-proposal doc types, convert markdown to HTML and route through Hocuspocus
+	// for real-time sync with web editors via Y.js CRDT
 	if params.DocType != "proposal" {
-		content = markdownToHTML(content)
+		content := markdownToHTML(params.Content)
+
+		if s.clients.hocuspocusURL != "" {
+			if err := s.updateViaHocuspocus(params.ChangeID, params.DocType, content); err != nil {
+				log.Printf("hocuspocus update failed, falling back to direct save: %v", err)
+			} else {
+				return map[string]any{
+					"change_id": params.ChangeID,
+					"doc_type":  params.DocType,
+					"saved":     true,
+					"via":       "hocuspocus",
+				}, nil
+			}
+		}
+
+		// Fallback: direct DB save
+		resp, err := s.clients.document.SaveDocument(ctx, connect.NewRequest(&documentv1.SaveDocumentRequest{
+			ChangeId: params.ChangeID,
+			Type:     params.DocType,
+			Title:    params.DocType,
+			Content:  content,
+		}))
+		if err != nil {
+			return nil, err
+		}
+		d := resp.Msg.Document
+		return map[string]any{
+			"id":      d.Id,
+			"version": d.Version,
+			"saved":   true,
+		}, nil
 	}
 
+	// Proposal: direct DB save (JSON format, not TipTap)
 	resp, err := s.clients.document.SaveDocument(ctx, connect.NewRequest(&documentv1.SaveDocumentRequest{
 		ChangeId: params.ChangeID,
 		Type:     params.DocType,
 		Title:    params.DocType,
-		Content:  content,
+		Content:  params.Content,
 	}))
 	if err != nil {
 		return nil, err
@@ -158,6 +196,89 @@ func (s *Server) handleWriteSpec(ctx context.Context, args json.RawMessage) (any
 		"version": d.Version,
 		"saved":   true,
 	}, nil
+}
+
+// updateViaHocuspocus sends an HTML document update to the Hocuspocus REST API,
+// which applies it as a Y.js CRDT update for real-time sync with web editors.
+func (s *Server) updateViaHocuspocus(changeID int64, docType, htmlContent string) error {
+	documentName := fmt.Sprintf("change-%d-%s", changeID, docType)
+
+	body, err := json.Marshal(map[string]string{
+		"document_name": documentName,
+		"content":       htmlContent,
+	})
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", s.clients.hocuspocusURL+"/api/documents", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+s.clients.hocuspocusAPISecret)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("hocuspocus request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("hocuspocus returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	return nil
+}
+
+func (s *Server) publishEvent(eventType string, changeID int64, data any) {
+	if s.clients.eventHub == nil {
+		return
+	}
+	payload, _ := json.Marshal(data)
+	s.clients.eventHub.Publish(events.Event{
+		Type:     eventType,
+		ChangeID: changeID,
+		Payload:  string(payload),
+	})
+}
+
+func (s *Server) handleCreateTask(ctx context.Context, args json.RawMessage) (any, error) {
+	var params struct {
+		ChangeID    int64  `json:"change_id"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Status      string `json:"status"`
+	}
+	if err := json.Unmarshal(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
+	}
+
+	if params.Status == "" {
+		params.Status = "todo"
+	}
+
+	resp, err := s.clients.task.CreateTask(ctx, connect.NewRequest(&taskv1.CreateTaskRequest{
+		ChangeId:    params.ChangeID,
+		Title:       params.Title,
+		Description: params.Description,
+		Status:      params.Status,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	t := resp.Msg.Task
+	result := map[string]any{
+		"id":     t.Id,
+		"title":  t.Title,
+		"status": t.Status,
+	}
+
+	s.publishEvent("task_created", params.ChangeID, result)
+
+	return result, nil
 }
 
 func (s *Server) handleListTasks(ctx context.Context, args json.RawMessage) (any, error) {
@@ -221,11 +342,15 @@ func (s *Server) handleUpdateTask(ctx context.Context, args json.RawMessage) (an
 	}
 
 	t := resp.Msg.Task
-	return map[string]any{
+	result := map[string]any{
 		"id":     t.Id,
 		"title":  t.Title,
 		"status": t.Status,
-	}, nil
+	}
+
+	s.publishEvent("task_updated", t.ChangeId, result)
+
+	return result, nil
 }
 
 func (s *Server) handleSuggestSpec(ctx context.Context, args json.RawMessage) (any, error) {

@@ -28,7 +28,7 @@ func NewStreamableHandler(apiURL, apiToken string) http.Handler {
 
 // NewStreamableHandlerWithAuth creates an http.Handler that extracts the API token
 // from the Authorization header per-request, allowing multi-tenant usage.
-func NewStreamableHandlerWithAuth(apiURL string) http.Handler {
+func NewStreamableHandlerWithAuth(apiURL string, opts ...clientOption) http.Handler {
 	return sdkmcp.NewStreamableHTTPHandler(func(r *http.Request) *sdkmcp.Server {
 		token := r.Header.Get("Authorization")
 		if len(token) > 7 && token[:7] == "Bearer " {
@@ -38,7 +38,7 @@ func NewStreamableHandlerWithAuth(apiURL string) http.Handler {
 			return nil // results in 400
 		}
 
-		clients := newAPIClients(apiURL, token)
+		clients := newAPIClients(apiURL, token, opts...)
 
 		server := sdkmcp.NewServer(&sdkmcp.Implementation{
 			Name:    "colign-mcp",

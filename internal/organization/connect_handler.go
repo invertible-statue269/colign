@@ -113,6 +113,95 @@ func (h *ConnectHandler) UpdateOrganization(ctx context.Context, req *connect.Re
 	}), nil
 }
 
+func (h *ConnectHandler) ListMembers(ctx context.Context, req *connect.Request[organizationv1.ListMembersRequest]) (*connect.Response[organizationv1.ListMembersResponse], error) {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	members, err := h.service.ListMembers(ctx, claims.OrgID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	protoMembers := make([]*organizationv1.OrganizationMember, len(members))
+	for i, m := range members {
+		protoMembers[i] = memberToProto(&m)
+	}
+
+	return connect.NewResponse(&organizationv1.ListMembersResponse{
+		Members: protoMembers,
+	}), nil
+}
+
+func (h *ConnectHandler) InviteOrgMember(ctx context.Context, req *connect.Request[organizationv1.InviteOrgMemberRequest]) (*connect.Response[organizationv1.InviteOrgMemberResponse], error) {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	role := models.OrgRole(req.Msg.Role)
+	if role == "" {
+		role = "member"
+	}
+
+	member, err := h.service.InviteMember(ctx, claims.OrgID, req.Msg.Email, role)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	return connect.NewResponse(&organizationv1.InviteOrgMemberResponse{
+		Member: memberToProto(member),
+	}), nil
+}
+
+func (h *ConnectHandler) RemoveOrgMember(ctx context.Context, req *connect.Request[organizationv1.RemoveOrgMemberRequest]) (*connect.Response[organizationv1.RemoveOrgMemberResponse], error) {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	if req.Msg.UserId == claims.UserID {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("cannot remove yourself"))
+	}
+
+	if err := h.service.RemoveMember(ctx, claims.OrgID, req.Msg.UserId); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	return connect.NewResponse(&organizationv1.RemoveOrgMemberResponse{}), nil
+}
+
+func (h *ConnectHandler) UpdateOrgMemberRole(ctx context.Context, req *connect.Request[organizationv1.UpdateOrgMemberRoleRequest]) (*connect.Response[organizationv1.UpdateOrgMemberRoleResponse], error) {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	member, err := h.service.UpdateMemberRole(ctx, claims.OrgID, req.Msg.UserId, models.OrgRole(req.Msg.Role))
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	return connect.NewResponse(&organizationv1.UpdateOrgMemberRoleResponse{
+		Member: memberToProto(member),
+	}), nil
+}
+
+func memberToProto(m *models.OrganizationMember) *organizationv1.OrganizationMember {
+	proto := &organizationv1.OrganizationMember{
+		Id:             m.ID,
+		OrganizationId: m.OrganizationID,
+		UserId:         m.UserID,
+		Role:           string(m.Role),
+	}
+	if m.User != nil {
+		proto.UserName = m.User.Name
+		proto.UserEmail = m.User.Email
+	}
+	return proto
+}
+
 func orgToProto(o *models.Organization) *organizationv1.Organization {
 	return &organizationv1.Organization{
 		Id:        o.ID,

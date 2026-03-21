@@ -9,6 +9,7 @@ import (
 	notificationv1 "github.com/gobenpark/colign/gen/proto/notification/v1"
 	"github.com/gobenpark/colign/gen/proto/notification/v1/notificationv1connect"
 	"github.com/gobenpark/colign/internal/auth"
+	"github.com/gobenpark/colign/internal/events"
 	"github.com/gobenpark/colign/internal/models"
 )
 
@@ -16,12 +17,13 @@ type ConnectHandler struct {
 	service           *Service
 	jwtManager        *auth.JWTManager
 	apiTokenValidator auth.APITokenValidator
+	hub               *events.Hub
 }
 
 var _ notificationv1connect.NotificationServiceHandler = (*ConnectHandler)(nil)
 
-func NewConnectHandler(service *Service, jwtManager *auth.JWTManager, apiTokenValidator auth.APITokenValidator) *ConnectHandler {
-	return &ConnectHandler{service: service, jwtManager: jwtManager, apiTokenValidator: apiTokenValidator}
+func NewConnectHandler(service *Service, jwtManager *auth.JWTManager, apiTokenValidator auth.APITokenValidator, hub *events.Hub) *ConnectHandler {
+	return &ConnectHandler{service: service, jwtManager: jwtManager, apiTokenValidator: apiTokenValidator, hub: hub}
 }
 
 func (h *ConnectHandler) extractClaims(ctx context.Context, header string) (*auth.Claims, error) {
@@ -94,6 +96,34 @@ func (h *ConnectHandler) GetUnreadCount(ctx context.Context, req *connect.Reques
 	return connect.NewResponse(&notificationv1.GetUnreadCountResponse{
 		Count: int32(count),
 	}), nil
+}
+
+func (h *ConnectHandler) Subscribe(ctx context.Context, req *connect.Request[notificationv1.SubscribeRequest], stream *connect.ServerStream[notificationv1.Event]) error {
+	if _, err := h.extractClaims(ctx, req.Header().Get("Authorization")); err != nil {
+		return err
+	}
+
+	sub := h.hub.Subscribe(req.Msg.ChangeId)
+	defer h.hub.Unsubscribe(sub)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case evt, ok := <-sub.Events():
+			if !ok {
+				return nil
+			}
+			if err := stream.Send(&notificationv1.Event{
+				Type:      evt.Type,
+				ChangeId:  evt.ChangeID,
+				Payload:   evt.Payload,
+				Timestamp: timestamppb.Now(),
+			}); err != nil {
+				return err
+			}
+		}
+	}
 }
 
 func notificationToProto(n *models.Notification) *notificationv1.Notification {

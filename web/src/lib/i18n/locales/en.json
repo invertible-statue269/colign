@@ -223,6 +223,7 @@
     "title": "Settings",
     "profile": "Profile",
     "account": "Account",
+    "organization": "Organization",
     "aiApiKeys": "AI & API Keys",
     "appearance": "Appearance",
     "notifications": "Notifications",

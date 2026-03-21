@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { projectClient } from "@/lib/project";
+import { orgClient } from "@/lib/organization";
 import { memoryClient } from "@/lib/memory";
 import { useI18n } from "@/lib/i18n";
 import {
@@ -73,10 +74,12 @@ interface ProjectDetail {
 }
 
 type TabId = "overview" | "changes" | "members" | "memory";
+const validProjectTabs: TabId[] = ["overview", "changes", "members", "memory"];
 
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const slug = params.slug as string;
   const { t } = useI18n();
 
@@ -85,7 +88,19 @@ export default function ProjectDetailPage() {
   const [newChangeName, setNewChangeName] = useState("");
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const tabParam = searchParams.get("tab") as TabId | null;
+  const initialProjectTab = tabParam && validProjectTabs.includes(tabParam) ? tabParam : "overview";
+  const [activeTab, setActiveTabState] = useState<TabId>(initialProjectTab);
+
+  const setActiveTab = useCallback(
+    (tab: TabId) => {
+      setActiveTabState(tab);
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", tab);
+      router.replace(url.pathname + url.search, { scroll: false });
+    },
+    [router],
+  );
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -99,9 +114,14 @@ export default function ProjectDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState("member");
+  const [inviteRole, setInviteRole] = useState("editor");
   const [inviting, setInviting] = useState(false);
   const [inviteSuccess, setInviteSuccess] = useState("");
+  const [orgMembers, setOrgMembers] = useState<{ userId: bigint; name: string; email: string }[]>(
+    [],
+  );
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const [members, setMembers] = useState<{ name: string; email: string; role: string }[]>([]);
   const [memoryContent, setMemoryContent] = useState("");
 
@@ -211,6 +231,36 @@ export default function ProjectDetailPage() {
       setDeleting(false);
     }
   }
+
+  useEffect(() => {
+    if (!inviteOpen) return;
+    orgClient
+      .listMembers({})
+      .then((res) => {
+        setOrgMembers(
+          res.members.map((m) => ({ userId: m.userId, name: m.userName, email: m.userEmail })),
+        );
+      })
+      .catch(() => {});
+  }, [inviteOpen]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredOrgMembers = orgMembers
+    .filter((m) => {
+      if (!inviteEmail.trim()) return true;
+      const q = inviteEmail.toLowerCase();
+      return m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q);
+    })
+    .filter((m) => !members.some((pm) => pm.email === m.email));
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
@@ -500,20 +550,49 @@ export default function ProjectDetailPage() {
           </DialogHeader>
           <form onSubmit={handleInvite}>
             <div className="space-y-4 py-2">
-              <div className="space-y-2">
+              <div className="relative space-y-2" ref={dropdownRef}>
                 <Label htmlFor="invite-email">{t("auth.email")}</Label>
                 <Input
                   id="invite-email"
-                  type="email"
+                  type="text"
+                  placeholder="Search by name or email..."
                   value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
+                  onChange={(e) => {
+                    setInviteEmail(e.target.value);
+                    setShowDropdown(true);
+                  }}
+                  onFocus={() => setShowDropdown(true)}
+                  autoComplete="off"
                   required
                 />
+                {showDropdown && filteredOrgMembers.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-y-auto rounded-lg border border-border/50 bg-popover shadow-xl">
+                    {filteredOrgMembers.map((m) => (
+                      <button
+                        key={String(m.userId)}
+                        type="button"
+                        onClick={() => {
+                          setInviteEmail(m.email);
+                          setShowDropdown(false);
+                        }}
+                        className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-accent"
+                      >
+                        <div className="flex size-7 items-center justify-center rounded-full bg-accent text-xs font-medium">
+                          {m.name?.[0]?.toUpperCase() ?? m.email[0].toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{m.name || "—"}</p>
+                          <p className="text-xs text-muted-foreground">{m.email}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>{t("project.role")}</Label>
                 <div className="flex gap-2">
-                  {["member", "admin"].map((role) => (
+                  {["editor", "viewer"].map((role) => (
                     <button
                       key={role}
                       type="button"

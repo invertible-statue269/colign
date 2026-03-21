@@ -271,6 +271,19 @@ func (s *Service) InviteMember(ctx context.Context, input InviteMemberInput) (*m
 		return nil, err
 	}
 
+	// Also add to organization if not already a member
+	project := new(models.Project)
+	if err := s.db.NewSelect().Model(project).Where("id = ?", input.ProjectID).Scan(ctx); err == nil && project.OrganizationID > 0 {
+		orgMember := &models.OrganizationMember{
+			OrganizationID: project.OrganizationID,
+			UserID:         user.ID,
+			Role:           "member",
+		}
+		_, _ = s.db.NewInsert().Model(orgMember).
+			On("CONFLICT (organization_id, user_id) DO NOTHING").
+			Exec(ctx)
+	}
+
 	return member, nil
 }
 

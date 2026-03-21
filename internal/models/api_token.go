@@ -13,6 +13,7 @@ type APIToken struct {
 	UserID     int64      `bun:"user_id,notnull"`
 	OrgID      int64      `bun:"org_id,notnull"`
 	Name       string     `bun:"name,notnull"`
+	TokenType  string     `bun:"token_type,notnull,default:'personal'"`
 	TokenHash  string     `bun:"token_hash,notnull,unique"`
 	Prefix     string     `bun:"prefix,notnull"`
 	LastUsedAt *time.Time `bun:"last_used_at"`

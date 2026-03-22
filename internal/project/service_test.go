@@ -2,6 +2,8 @@ package project
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGenerateSlug(t *testing.T) {
@@ -18,9 +20,6 @@ func TestGenerateSlug(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := GenerateSlug(tt.input)
-		if got != tt.expected {
-			t.Errorf("GenerateSlug(%q) = %q, want %q", tt.input, got, tt.expected)
-		}
+		assert.Equal(t, tt.expected, GenerateSlug(tt.input), "GenerateSlug(%q)", tt.input)
 	}
 }

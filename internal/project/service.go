@@ -108,7 +108,7 @@ func (s *Service) Create(ctx context.Context, input CreateProjectInput) (*models
 	return project, nil
 }
 
-func (s *Service) GetBySlug(ctx context.Context, slug string, orgID int64) (*models.Project, []models.ProjectMember, error) {
+func (s *Service) GetBySlug(ctx context.Context, slug string, orgID int64) (*models.Project, []models.ProjectMember, []models.ProjectLabel, error) {
 	project := new(models.Project)
 	err := s.db.NewSelect().Model(project).
 		Where("slug = ?", slug).
@@ -116,9 +116,32 @@ func (s *Service) GetBySlug(ctx context.Context, slug string, orgID int64) (*mod
 		Scan(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil, ErrProjectNotFound
+			return nil, nil, nil, ErrProjectNotFound
 		}
-		return nil, nil, err
+		return nil, nil, nil, err
+	}
+
+	// Load Lead user
+	if project.LeadID != nil {
+		lead := new(models.User)
+		if err := s.db.NewSelect().Model(lead).Where("id = ?", *project.LeadID).Scan(ctx); err == nil {
+			project.Lead = lead
+		}
+	}
+
+	// Load Labels via junction table
+	var labels []models.ProjectLabel
+	var assignments []models.ProjectLabelAssignment
+	err = s.db.NewSelect().Model(&assignments).
+		Relation("Label").
+		Where("project_id = ?", project.ID).
+		Scan(ctx)
+	if err == nil {
+		for _, a := range assignments {
+			if a.Label != nil {
+				labels = append(labels, *a.Label)
+			}
+		}
 	}
 
 	var members []models.ProjectMember
@@ -127,10 +150,10 @@ func (s *Service) GetBySlug(ctx context.Context, slug string, orgID int64) (*mod
 		Where("pm.project_id = ?", project.ID).
 		Scan(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return project, members, nil
+	return project, members, labels, nil
 }
 
 func (s *Service) ListByUser(ctx context.Context, userID int64, orgID int64) ([]models.Project, error) {
@@ -151,6 +174,17 @@ type UpdateProjectInput struct {
 	ID          int64
 	Name        string
 	Description string
+	Status      *string
+	Priority    *string
+	Health      *string
+	LeadID      *int64
+	ClearLead   bool
+	StartDate   *time.Time
+	ClearStart  bool
+	TargetDate  *time.Time
+	ClearTarget bool
+	Icon        *string
+	Color       *string
 }
 
 func (s *Service) Update(ctx context.Context, input UpdateProjectInput) (*models.Project, error) {
@@ -163,14 +197,100 @@ func (s *Service) Update(ctx context.Context, input UpdateProjectInput) (*models
 		return nil, err
 	}
 
-	project.Name = input.Name
+	if input.Name != "" {
+		project.Name = input.Name
+	}
 	project.Description = input.Description
+	if input.Status != nil {
+		project.Status = models.ProjectStatus(*input.Status)
+	}
+	if input.Priority != nil {
+		project.Priority = models.ProjectPriority(*input.Priority)
+	}
+	if input.Health != nil {
+		project.Health = models.ProjectHealth(*input.Health)
+	}
+	if input.ClearLead {
+		project.LeadID = nil
+	} else if input.LeadID != nil {
+		project.LeadID = input.LeadID
+	}
+	if input.ClearStart {
+		project.StartDate = nil
+	} else if input.StartDate != nil {
+		project.StartDate = input.StartDate
+	}
+	if input.ClearTarget {
+		project.TargetDate = nil
+	} else if input.TargetDate != nil {
+		project.TargetDate = input.TargetDate
+	}
+	if input.Icon != nil {
+		project.Icon = *input.Icon
+	}
+	if input.Color != nil {
+		project.Color = *input.Color
+	}
 	project.UpdatedAt = time.Now()
 
 	if _, err := s.db.NewUpdate().Model(project).WherePK().Exec(ctx); err != nil {
 		return nil, err
 	}
+
+	// Reload with Lead relation
+	if project.LeadID != nil {
+		lead := new(models.User)
+		if err := s.db.NewSelect().Model(lead).Where("id = ?", *project.LeadID).Scan(ctx); err == nil {
+			project.Lead = lead
+		}
+	}
+
 	return project, nil
+}
+
+// Label management
+
+func (s *Service) CreateLabel(ctx context.Context, orgID int64, name, color string) (*models.ProjectLabel, error) {
+	label := &models.ProjectLabel{
+		OrganizationID: orgID,
+		Name:           name,
+		Color:          color,
+	}
+	if _, err := s.db.NewInsert().Model(label).Exec(ctx); err != nil {
+		return nil, err
+	}
+	return label, nil
+}
+
+func (s *Service) ListLabels(ctx context.Context, orgID int64) ([]models.ProjectLabel, error) {
+	var labels []models.ProjectLabel
+	err := s.db.NewSelect().Model(&labels).
+		Where("organization_id = ?", orgID).
+		OrderExpr("name ASC").
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return labels, nil
+}
+
+func (s *Service) AssignLabel(ctx context.Context, projectID, labelID int64) error {
+	assignment := &models.ProjectLabelAssignment{
+		ProjectID: projectID,
+		LabelID:   labelID,
+	}
+	_, err := s.db.NewInsert().Model(assignment).
+		On("CONFLICT (project_id, label_id) DO NOTHING").
+		Exec(ctx)
+	return err
+}
+
+func (s *Service) RemoveLabel(ctx context.Context, projectID, labelID int64) error {
+	_, err := s.db.NewDelete().Model((*models.ProjectLabelAssignment)(nil)).
+		Where("project_id = ?", projectID).
+		Where("label_id = ?", labelID).
+		Exec(ctx)
+	return err
 }
 
 func (s *Service) Delete(ctx context.Context, id int64) error {
@@ -320,4 +440,101 @@ func (s *Service) ProcessPendingInvitations(ctx context.Context, userID int64, e
 	}
 
 	return err
+}
+
+type SearchResult struct {
+	Type      string
+	ID        int64
+	Title     string
+	Subtitle  string
+	Slug      string
+	ProjectID int64
+}
+
+func (s *Service) Search(ctx context.Context, query string, userID, orgID int64) ([]SearchResult, error) {
+	if query == "" {
+		return nil, nil
+	}
+	like := "%" + query + "%"
+	var results []SearchResult
+
+	// Search projects
+	var projects []models.Project
+	if err := s.db.NewSelect().Model(&projects).
+		Join("JOIN project_members AS pm ON pm.project_id = p.id").
+		Where("pm.user_id = ?", userID).
+		Where("p.organization_id = ?", orgID).
+		Where("p.name ILIKE ?", like).
+		Limit(5).
+		Scan(ctx); err == nil {
+		for _, p := range projects {
+			results = append(results, SearchResult{
+				Type:      "project",
+				ID:        p.ID,
+				Title:     p.Name,
+				Subtitle:  string(p.Status),
+				Slug:      p.Slug,
+				ProjectID: p.ID,
+			})
+		}
+	}
+
+	// Search changes
+	var changes []models.Change
+	if err := s.db.NewSelect().Model(&changes).
+		Relation("Project").
+		Join("JOIN project_members AS pm ON pm.project_id = c.project_id").
+		Where("pm.user_id = ?", userID).
+		Where("c.name ILIKE ?", like).
+		Limit(10).
+		Scan(ctx); err == nil {
+		for _, c := range changes {
+			subtitle := string(c.Stage)
+			slug := ""
+			if c.Project != nil {
+				slug = c.Project.Slug
+			}
+			results = append(results, SearchResult{
+				Type:      "change",
+				ID:        c.ID,
+				Title:     c.Name,
+				Subtitle:  subtitle,
+				Slug:      slug,
+				ProjectID: c.ProjectID,
+			})
+		}
+	}
+
+	// Search tasks
+	var tasks []models.Task
+	if err := s.db.NewSelect().Model(&tasks).
+		Relation("Change").
+		Relation("Change.Project").
+		Join("JOIN changes AS ch ON ch.id = \"task\".change_id").
+		Join("JOIN project_members AS pm ON pm.project_id = ch.project_id").
+		Where("pm.user_id = ?", userID).
+		Where("\"task\".title ILIKE ?", like).
+		Limit(5).
+		Scan(ctx); err == nil {
+		for _, t := range tasks {
+			slug := ""
+			var projectID int64
+			if t.Change != nil {
+				projectID = t.Change.ProjectID
+				if t.Change.Project != nil {
+					slug = t.Change.Project.Slug
+				}
+			}
+			results = append(results, SearchResult{
+				Type:      "task",
+				ID:        t.ID,
+				Title:     t.Title,
+				Subtitle:  string(t.Status),
+				Slug:      slug,
+				ProjectID: projectID,
+			})
+		}
+	}
+
+	return results, nil
 }

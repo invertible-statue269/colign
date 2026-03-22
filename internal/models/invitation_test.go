@@ -3,6 +3,8 @@ package models
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPendingInvitationModel(t *testing.T) {
@@ -14,10 +16,6 @@ func TestPendingInvitationModel(t *testing.T) {
 		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
 	}
 
-	if inv.Email != "new@example.com" {
-		t.Errorf("expected email 'new@example.com', got '%s'", inv.Email)
-	}
-	if inv.Role != RoleEditor {
-		t.Errorf("expected role editor, got %s", inv.Role)
-	}
+	assert.Equal(t, "new@example.com", inv.Email)
+	assert.Equal(t, RoleEditor, inv.Role)
 }

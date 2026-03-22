@@ -130,7 +130,7 @@
   },
   "sidebar": {
     "dashboard": "대시보드",
-    "inbox": "받은함",
+    "inbox": "수신함",
     "search": "검색",
     "projects": "프로젝트",
     "newProject": "새 프로젝트",
@@ -160,8 +160,16 @@
     "viewAll": "전체 보기",
     "in": ""
   },
+  "search": {
+    "placeholder": "프로젝트, 변경, 작업 검색...",
+    "quickLinks": "바로가기",
+    "noResults": "검색 결과가 없습니다.",
+    "projects": "프로젝트",
+    "changes": "변경",
+    "tasks": "작업"
+  },
   "inbox": {
-    "title": "받은함",
+    "title": "수신함",
     "all": "전체",
     "unread": "읽지 않음",
     "reviewRequests": "리뷰 요청",

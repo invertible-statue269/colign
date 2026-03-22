@@ -3,6 +3,7 @@ package project
 import (
 	"context"
 	"errors"
+	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -60,7 +61,7 @@ func (h *ConnectHandler) GetProject(ctx context.Context, req *connect.Request[pr
 		return nil, err
 	}
 
-	project, members, err := h.service.GetBySlug(ctx, req.Msg.Slug, claims.OrgID)
+	project, members, labels, err := h.service.GetBySlug(ctx, req.Msg.Slug, claims.OrgID)
 	if err != nil {
 		if errors.Is(err, ErrProjectNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, err)
@@ -73,8 +74,13 @@ func (h *ConnectHandler) GetProject(ctx context.Context, req *connect.Request[pr
 		protoMembers[i] = memberToProto(&m)
 	}
 
+	pp := projectToProto(project)
+	for i := range labels {
+		pp.Labels = append(pp.Labels, labelToProto(&labels[i]))
+	}
+
 	return connect.NewResponse(&projectv1.GetProjectResponse{
-		Project: projectToProto(project),
+		Project: pp,
 		Members: protoMembers,
 	}), nil
 }
@@ -101,11 +107,61 @@ func (h *ConnectHandler) ListProjects(ctx context.Context, req *connect.Request[
 }
 
 func (h *ConnectHandler) UpdateProject(ctx context.Context, req *connect.Request[projectv1.UpdateProjectRequest]) (*connect.Response[projectv1.UpdateProjectResponse], error) {
-	project, err := h.service.Update(ctx, UpdateProjectInput{
+	input := UpdateProjectInput{
 		ID:          req.Msg.Id,
 		Name:        req.Msg.Name,
 		Description: req.Msg.Description,
-	})
+	}
+
+	if req.Msg.Status != nil {
+		input.Status = req.Msg.Status
+	}
+	if req.Msg.Priority != nil {
+		input.Priority = req.Msg.Priority
+	}
+	if req.Msg.Health != nil {
+		input.Health = req.Msg.Health
+	}
+	if req.Msg.LeadId != nil {
+		v := *req.Msg.LeadId
+		if v == 0 {
+			input.ClearLead = true
+		} else {
+			input.LeadID = &v
+		}
+	}
+	if req.Msg.StartDate != nil {
+		v := *req.Msg.StartDate
+		if v == "" {
+			input.ClearStart = true
+		} else {
+			t, err := time.Parse("2006-01-02", v)
+			if err != nil {
+				return nil, connect.NewError(connect.CodeInvalidArgument, err)
+			}
+			input.StartDate = &t
+		}
+	}
+	if req.Msg.TargetDate != nil {
+		v := *req.Msg.TargetDate
+		if v == "" {
+			input.ClearTarget = true
+		} else {
+			t, err := time.Parse("2006-01-02", v)
+			if err != nil {
+				return nil, connect.NewError(connect.CodeInvalidArgument, err)
+			}
+			input.TargetDate = &t
+		}
+	}
+	if req.Msg.Icon != nil {
+		input.Icon = req.Msg.Icon
+	}
+	if req.Msg.Color != nil {
+		input.Color = req.Msg.Color
+	}
+
+	project, err := h.service.Update(ctx, input)
 	if err != nil {
 		if errors.Is(err, ErrProjectNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, err)
@@ -138,6 +194,57 @@ func (h *ConnectHandler) InviteMember(ctx context.Context, req *connect.Request[
 	return connect.NewResponse(&projectv1.InviteMemberResponse{
 		Member: memberToProto(member),
 	}), nil
+}
+
+func (h *ConnectHandler) CreateLabel(ctx context.Context, req *connect.Request[projectv1.CreateLabelRequest]) (*connect.Response[projectv1.CreateLabelResponse], error) {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	label, err := h.service.CreateLabel(ctx, claims.OrgID, req.Msg.Name, req.Msg.Color)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	return connect.NewResponse(&projectv1.CreateLabelResponse{
+		Label: labelToProto(label),
+	}), nil
+}
+
+func (h *ConnectHandler) ListLabels(ctx context.Context, req *connect.Request[projectv1.ListLabelsRequest]) (*connect.Response[projectv1.ListLabelsResponse], error) {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	labels, err := h.service.ListLabels(ctx, claims.OrgID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	protoLabels := make([]*projectv1.ProjectLabel, len(labels))
+	for i, l := range labels {
+		protoLabels[i] = labelToProto(&l)
+	}
+
+	return connect.NewResponse(&projectv1.ListLabelsResponse{
+		Labels: protoLabels,
+	}), nil
+}
+
+func (h *ConnectHandler) AssignLabel(ctx context.Context, req *connect.Request[projectv1.AssignLabelRequest]) (*connect.Response[projectv1.AssignLabelResponse], error) {
+	if err := h.service.AssignLabel(ctx, req.Msg.ProjectId, req.Msg.LabelId); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&projectv1.AssignLabelResponse{}), nil
+}
+
+func (h *ConnectHandler) RemoveLabel(ctx context.Context, req *connect.Request[projectv1.RemoveLabelRequest]) (*connect.Response[projectv1.RemoveLabelResponse], error) {
+	if err := h.service.RemoveLabel(ctx, req.Msg.ProjectId, req.Msg.LabelId); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&projectv1.RemoveLabelResponse{}), nil
 }
 
 func (h *ConnectHandler) CreateChange(ctx context.Context, req *connect.Request[projectv1.CreateChangeRequest]) (*connect.Response[projectv1.CreateChangeResponse], error) {
@@ -189,14 +296,36 @@ func (h *ConnectHandler) DeleteChange(ctx context.Context, req *connect.Request[
 }
 
 func projectToProto(p *models.Project) *projectv1.Project {
-	return &projectv1.Project{
+	pp := &projectv1.Project{
 		Id:          p.ID,
 		Name:        p.Name,
 		Slug:        p.Slug,
 		Description: p.Description,
+		Status:      string(p.Status),
+		Priority:    string(p.Priority),
+		Health:      string(p.Health),
+		Icon:        p.Icon,
+		Color:       p.Color,
 		CreatedAt:   timestamppb.New(p.CreatedAt),
 		UpdatedAt:   timestamppb.New(p.UpdatedAt),
 	}
+
+	if p.LeadID != nil {
+		pp.LeadId = p.LeadID
+	}
+	if p.Lead != nil {
+		pp.LeadName = p.Lead.Name
+	}
+	if p.StartDate != nil {
+		s := p.StartDate.Format("2006-01-02")
+		pp.StartDate = &s
+	}
+	if p.TargetDate != nil {
+		s := p.TargetDate.Format("2006-01-02")
+		pp.TargetDate = &s
+	}
+
+	return pp
 }
 
 func memberToProto(m *models.ProjectMember) *projectv1.ProjectMember {
@@ -222,4 +351,40 @@ func changeToProto(c *models.Change) *projectv1.Change {
 		CreatedAt: timestamppb.New(c.CreatedAt),
 		UpdatedAt: timestamppb.New(c.UpdatedAt),
 	}
+}
+
+func labelToProto(l *models.ProjectLabel) *projectv1.ProjectLabel {
+	return &projectv1.ProjectLabel{
+		Id:    l.ID,
+		Name:  l.Name,
+		Color: l.Color,
+	}
+}
+
+func (h *ConnectHandler) Search(ctx context.Context, req *connect.Request[projectv1.SearchRequest]) (*connect.Response[projectv1.SearchResponse], error) {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	results, err := h.service.Search(ctx, req.Msg.Query, claims.UserID, claims.OrgID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	protoResults := make([]*projectv1.SearchResult, len(results))
+	for i, r := range results {
+		protoResults[i] = &projectv1.SearchResult{
+			Type:      r.Type,
+			Id:        r.ID,
+			Title:     r.Title,
+			Subtitle:  r.Subtitle,
+			Slug:      r.Slug,
+			ProjectId: r.ProjectID,
+		}
+	}
+
+	return connect.NewResponse(&projectv1.SearchResponse{
+		Results: protoResults,
+	}), nil
 }

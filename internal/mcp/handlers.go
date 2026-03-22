@@ -12,9 +12,12 @@ import (
 	"connectrpc.com/connect"
 
 	acceptancev1 "github.com/gobenpark/colign/gen/proto/acceptance/v1"
+	commentv1 "github.com/gobenpark/colign/gen/proto/comment/v1"
 	documentv1 "github.com/gobenpark/colign/gen/proto/document/v1"
+	memoryv1 "github.com/gobenpark/colign/gen/proto/memory/v1"
 	projectv1 "github.com/gobenpark/colign/gen/proto/project/v1"
 	taskv1 "github.com/gobenpark/colign/gen/proto/task/v1"
+	workflowv1 "github.com/gobenpark/colign/gen/proto/workflow/v1"
 	"github.com/gobenpark/colign/internal/events"
 )
 
@@ -40,6 +43,24 @@ func (s *Server) callTool(ctx context.Context, name string, args json.RawMessage
 		return s.handleListAC(ctx, args)
 	case "create_acceptance_criteria":
 		return s.handleCreateAC(ctx, args)
+	case "update_project":
+		return s.handleUpdateProject(ctx, args)
+	case "create_change":
+		return s.handleCreateChange(ctx, args)
+	case "list_changes":
+		return s.handleListChanges(ctx, args)
+	case "advance_stage":
+		return s.handleAdvanceStage(ctx, args)
+	case "list_comments":
+		return s.handleListComments(ctx, args)
+	case "create_comment":
+		return s.handleCreateComment(ctx, args)
+	case "delete_task":
+		return s.handleDeleteTask(ctx, args)
+	case "get_memory":
+		return s.handleGetMemory(ctx, args)
+	case "save_memory":
+		return s.handleSaveMemory(ctx, args)
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", name)
 	}
@@ -469,5 +490,242 @@ func (s *Server) handleCreateAC(ctx context.Context, args json.RawMessage) (any,
 		"id":       ac.Id,
 		"scenario": ac.Scenario,
 		"created":  true,
+	}, nil
+}
+
+func (s *Server) handleUpdateProject(ctx context.Context, args json.RawMessage) (any, error) {
+	var params struct {
+		ProjectID   int64  `json:"project_id"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	if err := json.Unmarshal(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
+	}
+
+	resp, err := s.clients.project.UpdateProject(ctx, connect.NewRequest(&projectv1.UpdateProjectRequest{
+		Id:          params.ProjectID,
+		Name:        params.Name,
+		Description: params.Description,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	p := resp.Msg.Project
+	return map[string]any{
+		"id":          p.Id,
+		"name":        p.Name,
+		"description": p.Description,
+		"updated":     true,
+	}, nil
+}
+
+func (s *Server) handleCreateChange(ctx context.Context, args json.RawMessage) (any, error) {
+	var params struct {
+		ProjectID int64  `json:"project_id"`
+		Name      string `json:"name"`
+	}
+	if err := json.Unmarshal(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
+	}
+
+	resp, err := s.clients.project.CreateChange(ctx, connect.NewRequest(&projectv1.CreateChangeRequest{
+		ProjectId: params.ProjectID,
+		Name:      params.Name,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	c := resp.Msg.Change
+	return map[string]any{
+		"id":   c.Id,
+		"name": c.Name,
+	}, nil
+}
+
+func (s *Server) handleListChanges(ctx context.Context, args json.RawMessage) (any, error) {
+	var params struct {
+		ProjectID int64 `json:"project_id"`
+	}
+	if err := json.Unmarshal(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
+	}
+
+	resp, err := s.clients.project.ListChanges(ctx, connect.NewRequest(&projectv1.ListChangesRequest{
+		ProjectId: params.ProjectID,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	type changeInfo struct {
+		ID    int64  `json:"id"`
+		Name  string `json:"name"`
+		Stage string `json:"stage"`
+	}
+	changes := make([]changeInfo, len(resp.Msg.Changes))
+	for i, c := range resp.Msg.Changes {
+		changes[i] = changeInfo{ID: c.Id, Name: c.Name, Stage: c.Stage}
+	}
+
+	return map[string]any{
+		"project_id": params.ProjectID,
+		"changes":    changes,
+		"total":      len(changes),
+	}, nil
+}
+
+func (s *Server) handleAdvanceStage(ctx context.Context, args json.RawMessage) (any, error) {
+	var params struct {
+		ChangeID int64 `json:"change_id"`
+	}
+	if err := json.Unmarshal(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
+	}
+
+	resp, err := s.clients.workflow.Advance(ctx, connect.NewRequest(&workflowv1.AdvanceRequest{
+		ChangeId: params.ChangeID,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]any{
+		"change_id": params.ChangeID,
+		"new_stage": resp.Msg.NewStage,
+		"advanced":  true,
+	}, nil
+}
+
+func (s *Server) handleListComments(ctx context.Context, args json.RawMessage) (any, error) {
+	var params struct {
+		ChangeID int64 `json:"change_id"`
+	}
+	if err := json.Unmarshal(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
+	}
+
+	resp, err := s.clients.comment.ListComments(ctx, connect.NewRequest(&commentv1.ListCommentsRequest{
+		ChangeId: params.ChangeID,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	type commentInfo struct {
+		ID         int64  `json:"id"`
+		Content    string `json:"content"`
+		AuthorName string `json:"author_name"`
+	}
+	comments := make([]commentInfo, len(resp.Msg.Comments))
+	for i, c := range resp.Msg.Comments {
+		comments[i] = commentInfo{ID: c.Id, Content: c.Body, AuthorName: c.UserName}
+	}
+
+	return map[string]any{
+		"change_id": params.ChangeID,
+		"comments":  comments,
+		"total":     len(comments),
+	}, nil
+}
+
+func (s *Server) handleCreateComment(ctx context.Context, args json.RawMessage) (any, error) {
+	var params struct {
+		ChangeID int64  `json:"change_id"`
+		Content  string `json:"content"`
+	}
+	if err := json.Unmarshal(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
+	}
+
+	resp, err := s.clients.comment.CreateComment(ctx, connect.NewRequest(&commentv1.CreateCommentRequest{
+		ChangeId: params.ChangeID,
+		Body:     params.Content,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	c := resp.Msg.Comment
+	return map[string]any{
+		"id":      c.Id,
+		"content": c.Body,
+		"created": true,
+	}, nil
+}
+
+func (s *Server) handleDeleteTask(ctx context.Context, args json.RawMessage) (any, error) {
+	var params struct {
+		TaskID int64 `json:"task_id"`
+	}
+	if err := json.Unmarshal(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
+	}
+
+	_, err := s.clients.task.DeleteTask(ctx, connect.NewRequest(&taskv1.DeleteTaskRequest{
+		Id: params.TaskID,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]any{
+		"task_id": params.TaskID,
+		"deleted": true,
+	}, nil
+}
+
+func (s *Server) handleGetMemory(ctx context.Context, args json.RawMessage) (any, error) {
+	var params struct {
+		ProjectID int64 `json:"project_id"`
+	}
+	if err := json.Unmarshal(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
+	}
+
+	resp, err := s.clients.memory.GetMemory(ctx, connect.NewRequest(&memoryv1.GetMemoryRequest{
+		ProjectId: params.ProjectID,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.Msg.Memory == nil {
+		return map[string]any{
+			"project_id": params.ProjectID,
+			"content":    "",
+			"exists":     false,
+		}, nil
+	}
+
+	return map[string]any{
+		"project_id": params.ProjectID,
+		"content":    resp.Msg.Memory.Content,
+		"exists":     true,
+	}, nil
+}
+
+func (s *Server) handleSaveMemory(ctx context.Context, args json.RawMessage) (any, error) {
+	var params struct {
+		ProjectID int64  `json:"project_id"`
+		Content   string `json:"content"`
+	}
+	if err := json.Unmarshal(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
+	}
+
+	_, err := s.clients.memory.SaveMemory(ctx, connect.NewRequest(&memoryv1.SaveMemoryRequest{
+		ProjectId: params.ProjectID,
+		Content:   params.Content,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]any{
+		"project_id": params.ProjectID,
+		"saved":      true,
 	}, nil
 }

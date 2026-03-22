@@ -3,6 +3,8 @@ package models
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestProjectModel(t *testing.T) {
@@ -15,12 +17,8 @@ func TestProjectModel(t *testing.T) {
 		UpdatedAt:   time.Now(),
 	}
 
-	if p.Name != "My App" {
-		t.Errorf("expected name 'My App', got '%s'", p.Name)
-	}
-	if p.Slug != "my-app" {
-		t.Errorf("expected slug 'my-app', got '%s'", p.Slug)
-	}
+	assert.Equal(t, "My App", p.Name)
+	assert.Equal(t, "my-app", p.Slug)
 }
 
 func TestProjectMemberModel(t *testing.T) {
@@ -31,9 +29,7 @@ func TestProjectMemberModel(t *testing.T) {
 		Role:      RoleOwner,
 	}
 
-	if pm.Role != RoleOwner {
-		t.Errorf("expected role '%s', got '%s'", RoleOwner, pm.Role)
-	}
+	assert.Equal(t, RoleOwner, pm.Role)
 }
 
 func TestProjectMemberRoles(t *testing.T) {
@@ -41,8 +37,6 @@ func TestProjectMemberRoles(t *testing.T) {
 	expected := []string{"owner", "editor", "viewer"}
 
 	for i, role := range roles {
-		if string(role) != expected[i] {
-			t.Errorf("expected role '%s', got '%s'", expected[i], role)
-		}
+		assert.Equal(t, expected[i], string(role))
 	}
 }

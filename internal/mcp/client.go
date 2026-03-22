@@ -4,9 +4,12 @@ import (
 	"net/http"
 
 	"github.com/gobenpark/colign/gen/proto/acceptance/v1/acceptancev1connect"
+	"github.com/gobenpark/colign/gen/proto/comment/v1/commentv1connect"
 	"github.com/gobenpark/colign/gen/proto/document/v1/documentv1connect"
+	"github.com/gobenpark/colign/gen/proto/memory/v1/memoryv1connect"
 	"github.com/gobenpark/colign/gen/proto/project/v1/projectv1connect"
 	"github.com/gobenpark/colign/gen/proto/task/v1/taskv1connect"
+	"github.com/gobenpark/colign/gen/proto/workflow/v1/workflowv1connect"
 	"github.com/gobenpark/colign/internal/events"
 )
 
@@ -15,6 +18,9 @@ type apiClients struct {
 	document            documentv1connect.DocumentServiceClient
 	task                taskv1connect.TaskServiceClient
 	acceptance          acceptancev1connect.AcceptanceCriteriaServiceClient
+	comment             commentv1connect.CommentServiceClient
+	workflow            workflowv1connect.WorkflowServiceClient
+	memory              memoryv1connect.MemoryServiceClient
 	hocuspocusURL       string
 	hocuspocusAPISecret string
 	eventHub            *events.Hub
@@ -44,6 +50,9 @@ func newAPIClients(apiURL, apiToken string, opts ...clientOption) *apiClients {
 		document:   documentv1connect.NewDocumentServiceClient(httpClient, apiURL),
 		task:       taskv1connect.NewTaskServiceClient(httpClient, apiURL),
 		acceptance: acceptancev1connect.NewAcceptanceCriteriaServiceClient(httpClient, apiURL),
+		comment:    commentv1connect.NewCommentServiceClient(httpClient, apiURL),
+		workflow:   workflowv1connect.NewWorkflowServiceClient(httpClient, apiURL),
+		memory:     memoryv1connect.NewMemoryServiceClient(httpClient, apiURL),
 	}
 	for _, opt := range opts {
 		opt(c)

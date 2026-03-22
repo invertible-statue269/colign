@@ -1,6 +1,10 @@
 package models
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestCommentModel(t *testing.T) {
 	c := &Comment{
@@ -12,9 +16,7 @@ func TestCommentModel(t *testing.T) {
 		Resolved:     false,
 	}
 
-	if c.Resolved {
-		t.Error("new comment should not be resolved")
-	}
+	assert.False(t, c.Resolved, "new comment should not be resolved")
 }
 
 func TestCommentReplyModel(t *testing.T) {
@@ -24,7 +26,5 @@ func TestCommentReplyModel(t *testing.T) {
 		Body:      "Fixed it",
 	}
 
-	if r.CommentID != 1 {
-		t.Errorf("expected comment_id 1, got %d", r.CommentID)
-	}
+	assert.Equal(t, int64(1), r.CommentID)
 }

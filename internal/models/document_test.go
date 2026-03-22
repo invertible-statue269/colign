@@ -1,15 +1,17 @@
 package models
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestDocumentTypes(t *testing.T) {
 	types := []DocumentType{DocProposal, DocDesign, DocTasks}
 	expected := []string{"proposal", "design", "tasks"}
 
 	for i, dt := range types {
-		if string(dt) != expected[i] {
-			t.Errorf("expected %s, got %s", expected[i], dt)
-		}
+		assert.Equal(t, expected[i], string(dt))
 	}
 }
 
@@ -20,7 +22,5 @@ func TestDocumentModel(t *testing.T) {
 		Content:  "## Why\n\nTest content",
 	}
 
-	if doc.Type != DocProposal {
-		t.Errorf("expected DocProposal, got %s", doc.Type)
-	}
+	assert.Equal(t, DocProposal, doc.Type)
 }

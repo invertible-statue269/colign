@@ -160,6 +160,14 @@
     "viewAll": "View all",
     "in": "in"
   },
+  "search": {
+    "placeholder": "Search projects, changes, tasks...",
+    "quickLinks": "Quick Links",
+    "noResults": "No results found.",
+    "projects": "Projects",
+    "changes": "Changes",
+    "tasks": "Tasks"
+  },
   "inbox": {
     "title": "Inbox",
     "all": "All",

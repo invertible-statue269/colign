@@ -1,6 +1,11 @@
 package chat
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
 func TestBuildMessages(t *testing.T) {
 	history := []Message{
@@ -9,20 +14,12 @@ func TestBuildMessages(t *testing.T) {
 	}
 
 	messages := BuildMessages("You are a spec assistant", history, "Add OAuth support")
-	if len(messages) != 5 {
-		t.Fatalf("expected 5 messages (system context pair + 2 history + 1 new), got %d", len(messages))
-	}
-	if messages[0].Role != "user" {
-		t.Error("first message should be system context as user role")
-	}
-	if messages[len(messages)-1].Content != "Add OAuth support" {
-		t.Error("last message should be the new user message")
-	}
+	require.Len(t, messages, 5, "expected 5 messages (system context pair + 2 history + 1 new)")
+	assert.Equal(t, "user", messages[0].Role, "first message should be system context as user role")
+	assert.Equal(t, "Add OAuth support", messages[len(messages)-1].Content, "last message should be the new user message")
 }
 
 func TestMessage(t *testing.T) {
 	m := Message{Role: "user", Content: "hello"}
-	if m.Role != "user" {
-		t.Errorf("expected role 'user', got '%s'", m.Role)
-	}
+	assert.Equal(t, "user", m.Role)
 }

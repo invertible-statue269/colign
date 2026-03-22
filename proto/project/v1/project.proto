@@ -15,6 +15,16 @@ message Project {
   string description = 4;
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp updated_at = 6;
+  string status = 7;
+  string priority = 8;
+  string health = 9;
+  optional int64 lead_id = 10;
+  string lead_name = 11;
+  optional string start_date = 12;
+  optional string target_date = 13;
+  string icon = 14;
+  string color = 15;
+  repeated ProjectLabel labels = 16;
 }
 
 message ProjectMember {
@@ -24,6 +34,12 @@ message ProjectMember {
   string role = 4;
   string user_name = 5;
   string user_email = 6;
+}
+
+message ProjectLabel {
+  int64 id = 1;
+  string name = 2;
+  string color = 3;
 }
 
 message Change {
@@ -65,6 +81,14 @@ message UpdateProjectRequest {
   int64 id = 1;
   string name = 2;
   string description = 3;
+  optional string status = 4;
+  optional string priority = 5;
+  optional string health = 6;
+  optional int64 lead_id = 7;
+  optional string start_date = 8;
+  optional string target_date = 9;
+  optional string icon = 10;
+  optional string color = 11;
 }
 
 message UpdateProjectResponse {
@@ -88,6 +112,37 @@ message InviteMemberRequest {
 message InviteMemberResponse {
   ProjectMember member = 1;
 }
+
+// Label management
+
+message CreateLabelRequest {
+  string name = 1;
+  string color = 2;
+}
+
+message CreateLabelResponse {
+  ProjectLabel label = 1;
+}
+
+message ListLabelsRequest {}
+
+message ListLabelsResponse {
+  repeated ProjectLabel labels = 1;
+}
+
+message AssignLabelRequest {
+  int64 project_id = 1;
+  int64 label_id = 2;
+}
+
+message AssignLabelResponse {}
+
+message RemoveLabelRequest {
+  int64 project_id = 1;
+  int64 label_id = 2;
+}
+
+message RemoveLabelResponse {}
 
 // Change CRUD
 
@@ -122,6 +177,24 @@ message DeleteChangeRequest {
 
 message DeleteChangeResponse {}
 
+// Search
+message SearchRequest {
+  string query = 1;
+}
+
+message SearchResult {
+  string type = 1;       // "change", "task", "project"
+  int64 id = 2;
+  string title = 3;
+  string subtitle = 4;   // stage, status, project name
+  string slug = 5;       // for navigation
+  int64 project_id = 6;
+}
+
+message SearchResponse {
+  repeated SearchResult results = 1;
+}
+
 service ProjectService {
   rpc CreateProject(CreateProjectRequest) returns (CreateProjectResponse) {}
   rpc GetProject(GetProjectRequest) returns (GetProjectResponse) {}
@@ -129,8 +202,13 @@ service ProjectService {
   rpc UpdateProject(UpdateProjectRequest) returns (UpdateProjectResponse) {}
   rpc DeleteProject(DeleteProjectRequest) returns (DeleteProjectResponse) {}
   rpc InviteMember(InviteMemberRequest) returns (InviteMemberResponse) {}
+  rpc CreateLabel(CreateLabelRequest) returns (CreateLabelResponse) {}
+  rpc ListLabels(ListLabelsRequest) returns (ListLabelsResponse) {}
+  rpc AssignLabel(AssignLabelRequest) returns (AssignLabelResponse) {}
+  rpc RemoveLabel(RemoveLabelRequest) returns (RemoveLabelResponse) {}
   rpc CreateChange(CreateChangeRequest) returns (CreateChangeResponse) {}
   rpc ListChanges(ListChangesRequest) returns (ListChangesResponse) {}
   rpc GetChange(GetChangeRequest) returns (GetChangeResponse) {}
   rpc DeleteChange(DeleteChangeRequest) returns (DeleteChangeResponse) {}
+  rpc Search(SearchRequest) returns (SearchResponse) {}
 }

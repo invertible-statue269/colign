@@ -1,15 +1,18 @@
 package models
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
 func TestChangeStages(t *testing.T) {
 	stages := []ChangeStage{StageDraft, StageDesign, StageReview, StageReady}
 	expected := []string{"draft", "design", "review", "ready"}
 
 	for i, stage := range stages {
-		if string(stage) != expected[i] {
-			t.Errorf("expected stage '%s', got '%s'", expected[i], stage)
-		}
+		assert.Equal(t, expected[i], string(stage))
 	}
 }
 
@@ -20,23 +23,13 @@ func TestChangeModel(t *testing.T) {
 		Stage:     StageDraft,
 	}
 
-	if c.Stage != StageDraft {
-		t.Errorf("expected stage '%s', got '%s'", StageDraft, c.Stage)
-	}
-	if c.Name != "add-user-auth" {
-		t.Errorf("expected name 'add-user-auth', got '%s'", c.Name)
-	}
+	assert.Equal(t, StageDraft, c.Stage)
+	assert.Equal(t, "add-user-auth", c.Name)
 }
 
 func TestChangeStageOrder(t *testing.T) {
 	order := StageOrder()
-	if len(order) != 4 {
-		t.Fatalf("expected 4 stages, got %d", len(order))
-	}
-	if order[0] != StageDraft {
-		t.Errorf("first stage should be Draft")
-	}
-	if order[3] != StageReady {
-		t.Errorf("last stage should be Ready")
-	}
+	require.Len(t, order, 4)
+	assert.Equal(t, StageDraft, order[0])
+	assert.Equal(t, StageReady, order[3])
 }

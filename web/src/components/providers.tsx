@@ -5,6 +5,7 @@ import { OrgProvider } from "@/lib/org-context";
 import { EventProvider } from "@/lib/events";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarLayout } from "@/components/layout/sidebar-layout";
+import { CommandPalette } from "@/components/command-palette";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -13,6 +14,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <EventProvider>
           <TooltipProvider>
             <SidebarLayout>{children}</SidebarLayout>
+            <CommandPalette />
           </TooltipProvider>
         </EventProvider>
       </OrgProvider>

@@ -154,5 +154,109 @@ func ListTools() []Tool {
 				Required: []string{"change_id", "scenario", "steps"},
 			},
 		},
+		{
+			Name:        "update_project",
+			Description: "Update a project's name or description (README)",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"project_id":  {Type: "integer", Description: "Project ID"},
+					"name":        {Type: "string", Description: "New project name (optional, omit to keep current)"},
+					"description": {Type: "string", Description: "New project description/README in markdown"},
+				},
+				Required: []string{"project_id"},
+			},
+		},
+		{
+			Name:        "create_change",
+			Description: "Create a new change (feature/initiative) in a project",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"project_id": {Type: "integer", Description: "Project ID"},
+					"name":       {Type: "string", Description: "Change name"},
+				},
+				Required: []string{"project_id", "name"},
+			},
+		},
+		{
+			Name:        "list_changes",
+			Description: "List all changes in a project",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"project_id": {Type: "integer", Description: "Project ID"},
+				},
+				Required: []string{"project_id"},
+			},
+		},
+		{
+			Name:        "advance_stage",
+			Description: "Advance a change to the next workflow stage (draft -> design -> review -> ready)",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"change_id": {Type: "integer", Description: "Change ID"},
+				},
+				Required: []string{"change_id"},
+			},
+		},
+		{
+			Name:        "list_comments",
+			Description: "List comments on a change",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"change_id": {Type: "integer", Description: "Change ID"},
+				},
+				Required: []string{"change_id"},
+			},
+		},
+		{
+			Name:        "create_comment",
+			Description: "Add a comment to a change",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"change_id": {Type: "integer", Description: "Change ID"},
+					"content":   {Type: "string", Description: "Comment text"},
+				},
+				Required: []string{"change_id", "content"},
+			},
+		},
+		{
+			Name:        "delete_task",
+			Description: "Delete a task",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"task_id": {Type: "integer", Description: "Task ID"},
+				},
+				Required: []string{"task_id"},
+			},
+		},
+		{
+			Name:        "get_memory",
+			Description: "Get the project memory (shared context like CLAUDE.md). Contains conventions, decisions, and context that AI should know about this project.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"project_id": {Type: "integer", Description: "Project ID"},
+				},
+				Required: []string{"project_id"},
+			},
+		},
+		{
+			Name:        "save_memory",
+			Description: "Save or update the project memory (shared context). Use this to persist important conventions, decisions, and context about the project.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"project_id": {Type: "integer", Description: "Project ID"},
+					"content":    {Type: "string", Description: "Memory content in markdown"},
+				},
+				Required: []string{"project_id", "content"},
+			},
+		},
 	}
 }

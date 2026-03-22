@@ -29,6 +29,10 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
     async function subscribe() {
       while (!cancelled) {
         try {
+          if (!notificationClient?.subscribe) {
+            await new Promise((r) => setTimeout(r, 5000));
+            continue;
+          }
           const stream = notificationClient.subscribe({ changeId: BigInt(0) });
           for await (const event of stream) {
             if (cancelled) break;

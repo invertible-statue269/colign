@@ -66,10 +66,13 @@ export function AppSidebar() {
     loadProjects();
   }, [currentOrg, pathname]);
 
+  const openSearch = () => {
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
+  };
+
   const navItems = [
     { label: t("sidebar.dashboard"), href: "/dashboard", icon: LayoutDashboard },
     { label: t("sidebar.inbox"), href: "/inbox", icon: Inbox },
-    { label: t("sidebar.search"), href: "/search", icon: Search },
   ];
 
   return (
@@ -109,6 +112,15 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton tooltip={`${t("sidebar.search")} (⌘K)`} onClick={openSearch}>
+                  <Search className="size-4" />
+                  <span>{t("sidebar.search")}</span>
+                  <kbd className="ml-auto text-[10px] text-muted-foreground tracking-widest">
+                    ⌘K
+                  </kbd>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

@@ -25,6 +25,7 @@ message Project {
   string icon = 14;
   string color = 15;
   repeated ProjectLabel labels = 16;
+  string lead_avatar_url = 17;
 }
 
 message ProjectMember {

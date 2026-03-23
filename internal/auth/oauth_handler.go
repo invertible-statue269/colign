@@ -9,10 +9,11 @@ import (
 type OAuthHandler struct {
 	service     *OAuthService
 	frontendURL string
+	cookieOpts  BrowserSessionOptions
 }
 
-func NewOAuthHandler(service *OAuthService, frontendURL string) *OAuthHandler {
-	return &OAuthHandler{service: service, frontendURL: frontendURL}
+func NewOAuthHandler(service *OAuthService, frontendURL string, cookieOpts BrowserSessionOptions) *OAuthHandler {
+	return &OAuthHandler{service: service, frontendURL: frontendURL, cookieOpts: cookieOpts}
 }
 
 func (h *OAuthHandler) Redirect(w http.ResponseWriter, r *http.Request) {
@@ -56,5 +57,6 @@ func (h *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	SetBrowserSessionCookies(w, tokenPair, h.cookieOpts)
 	http.Redirect(w, r, h.frontendURL+"/auth/callback?access_token="+tokenPair.AccessToken+"&refresh_token="+tokenPair.RefreshToken, http.StatusTemporaryRedirect)
 }

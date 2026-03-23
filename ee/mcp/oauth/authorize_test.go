@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,7 +35,7 @@ func TestAuthorizeHandlerRefreshesOAuthSessionFromRefreshCookie(t *testing.T) {
 	}
 	handler.newAuthService = func() oauthSessionService { return stub }
 
-	req := httptest.NewRequest(http.MethodGet, authorizeURL(), nil)
+	req := httptest.NewRequest(http.MethodGet, authorizeCookieURL(), nil)
 	req.AddCookie(&http.Cookie{Name: oauthAccessCookieName, Value: expiredToken(t, "test-secret", 1, "user@example.com", "User", 42)})
 	req.AddCookie(&http.Cookie{Name: oauthRefreshCookieName, Value: "refresh-token"})
 
@@ -70,7 +71,7 @@ func TestAuthorizeHandlerUsesValidAccessCookieWithoutRefresh(t *testing.T) {
 	}
 	handler.newAuthService = func() oauthSessionService { return stub }
 
-	req := httptest.NewRequest(http.MethodGet, authorizeURL(), nil)
+	req := httptest.NewRequest(http.MethodGet, authorizeCookieURL(), nil)
 	req.AddCookie(&http.Cookie{Name: oauthAccessCookieName, Value: accessToken})
 
 	rec := httptest.NewRecorder()
@@ -85,6 +86,73 @@ func TestAuthorizeHandlerUsesValidAccessCookieWithoutRefresh(t *testing.T) {
 	assert.Empty(t, res.Cookies())
 }
 
+func TestAuthorizeHandlerBridgesExistingWebSessionFromPostedAccessToken(t *testing.T) {
+	jwtManager := auth.NewJWTManager("test-secret")
+	accessToken, err := jwtManager.GenerateAccessToken(7, "bridge@example.com", "Bridge User", 99)
+	require.NoError(t, err)
+
+	handler := NewAuthorizeHandler(nil, jwtManager, "http://localhost:8080")
+
+	values := url.Values{}
+	values.Set("action", "bridge_session")
+	values.Set("access_token", accessToken)
+	values.Set("refresh_token", "refresh-token")
+
+	req := httptest.NewRequest(http.MethodPost, authorizeURL(), strings.NewReader(values.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	res := rec.Result()
+	defer func() { _ = res.Body.Close() }()
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Contains(t, rec.Body.String(), "bridge@example.com")
+
+	accessCookie := findCookie(t, res.Cookies(), oauthAccessCookieName)
+	refreshCookie := findCookie(t, res.Cookies(), oauthRefreshCookieName)
+	assert.Equal(t, accessToken, accessCookie.Value)
+	assert.Equal(t, "refresh-token", refreshCookie.Value)
+}
+
+func TestAuthorizeHandlerBridgesExistingWebSessionByRefreshingPostedRefreshToken(t *testing.T) {
+	jwtManager := auth.NewJWTManager("test-secret")
+	refreshedAccessToken, err := jwtManager.GenerateAccessToken(8, "refresh@example.com", "Refresh User", 77)
+	require.NoError(t, err)
+
+	handler := NewAuthorizeHandler(nil, jwtManager, "http://localhost:8080")
+	stub := &stubOAuthSessionService{
+		refreshFn: func(_ context.Context, refreshToken string) (*auth.TokenPair, error) {
+			assert.Equal(t, "posted-refresh-token", refreshToken)
+			return &auth.TokenPair{
+				AccessToken:  refreshedAccessToken,
+				RefreshToken: "rotated-refresh-token",
+				ExpiresAt:    time.Now().Add(auth.AccessTokenDuration).Unix(),
+			}, nil
+		},
+	}
+	handler.newAuthService = func() oauthSessionService { return stub }
+
+	values := url.Values{}
+	values.Set("action", "bridge_session")
+	values.Set("access_token", "invalid-token")
+	values.Set("refresh_token", "posted-refresh-token")
+
+	req := httptest.NewRequest(http.MethodPost, authorizeURL(), strings.NewReader(values.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	res := rec.Result()
+	defer func() { _ = res.Body.Close() }()
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Contains(t, rec.Body.String(), "refresh@example.com")
+	assert.Equal(t, 1, stub.refreshCalls)
+}
+
 func authorizeURL() string {
 	values := url.Values{}
 	values.Set("client_id", "client-123")
@@ -93,6 +161,10 @@ func authorizeURL() string {
 	values.Set("code_challenge", "challenge")
 	values.Set("code_challenge_method", "S256")
 	return "/oauth/authorize?" + values.Encode()
+}
+
+func authorizeCookieURL() string {
+	return authorizeURL() + "&session_source=cookie"
 }
 
 func expiredToken(t *testing.T, secret string, userID int64, email, name string, orgID int64) string {

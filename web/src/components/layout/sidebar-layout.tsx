@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./app-sidebar";
@@ -57,7 +58,18 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
 
   // Verify on mount and pathname change
   useEffect(() => {
-    verifySession();
+    let cancelled = false;
+
+    const run = async () => {
+      if (cancelled) return;
+      await verifySession();
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
   }, [verifySession]);
 
   // Verify on window focus (tab switch back)
@@ -87,7 +99,7 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
         {/* Mobile hamburger */}
         <div className="flex items-center gap-2 border-b border-border/50 px-4 py-2 md:hidden">
           <SidebarTrigger />
-          <img src="/logo.png" alt="Colign" className="h-5" />
+          <Image src="/logo.png" alt="Colign" width={80} height={20} className="h-5 w-auto" />
         </div>
         {children}
       </SidebarInset>

@@ -73,6 +73,20 @@ message MeResponse {
   string email = 2;
   string name = 3;
   int64 org_id = 4;
+  string avatar_url = 5;
+}
+
+message UpdateProfileRequest {
+  string name = 1;
+  string avatar_url = 2;
+}
+
+message UpdateProfileResponse {
+  int64 user_id = 1;
+  string email = 2;
+  string name = 3;
+  int64 org_id = 4;
+  string avatar_url = 5;
 }
 
 service AuthService {
@@ -83,4 +97,5 @@ service AuthService {
   rpc GetOAuthURL(GetOAuthURLRequest) returns (GetOAuthURLResponse) {}
   rpc OAuthCallback(OAuthCallbackRequest) returns (OAuthCallbackResponse) {}
   rpc Me(MeRequest) returns (MeResponse) {}
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse) {}
 }

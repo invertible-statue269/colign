@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"net/http"
 
 	"connectrpc.com/connect"
 
@@ -13,12 +14,13 @@ import (
 type ConnectHandler struct {
 	service      *Service
 	oauthService *OAuthService
+	cookieOpts   BrowserSessionOptions
 }
 
 var _ authv1connect.AuthServiceHandler = (*ConnectHandler)(nil)
 
-func NewConnectHandler(service *Service, oauthService *OAuthService) *ConnectHandler {
-	return &ConnectHandler{service: service, oauthService: oauthService}
+func NewConnectHandler(service *Service, oauthService *OAuthService, cookieOpts BrowserSessionOptions) *ConnectHandler {
+	return &ConnectHandler{service: service, oauthService: oauthService, cookieOpts: cookieOpts}
 }
 
 func (h *ConnectHandler) Register(ctx context.Context, req *connect.Request[authv1.RegisterRequest]) (*connect.Response[authv1.RegisterResponse], error) {
@@ -35,11 +37,13 @@ func (h *ConnectHandler) Register(ctx context.Context, req *connect.Request[auth
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
-	return connect.NewResponse(&authv1.RegisterResponse{
+	res := connect.NewResponse(&authv1.RegisterResponse{
 		AccessToken:  tokenPair.AccessToken,
 		RefreshToken: tokenPair.RefreshToken,
 		ExpiresAt:    tokenPair.ExpiresAt,
-	}), nil
+	})
+	AppendBrowserSessionCookies(res.Header(), tokenPair, h.cookieOpts)
+	return res, nil
 }
 
 func (h *ConnectHandler) Login(ctx context.Context, req *connect.Request[authv1.LoginRequest]) (*connect.Response[authv1.LoginResponse], error) {
@@ -54,15 +58,23 @@ func (h *ConnectHandler) Login(ctx context.Context, req *connect.Request[authv1.
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
-	return connect.NewResponse(&authv1.LoginResponse{
+	res := connect.NewResponse(&authv1.LoginResponse{
 		AccessToken:  tokenPair.AccessToken,
 		RefreshToken: tokenPair.RefreshToken,
 		ExpiresAt:    tokenPair.ExpiresAt,
-	}), nil
+	})
+	AppendBrowserSessionCookies(res.Header(), tokenPair, h.cookieOpts)
+	return res, nil
 }
 
 func (h *ConnectHandler) RefreshToken(ctx context.Context, req *connect.Request[authv1.RefreshTokenRequest]) (*connect.Response[authv1.RefreshTokenResponse], error) {
-	tokenPair, err := h.service.RefreshToken(ctx, req.Msg.RefreshToken)
+	refreshToken := req.Msg.GetRefreshToken()
+	if refreshToken == "" {
+		cookieReq := &http.Request{Header: http.Header{"Cookie": req.Header().Values("Cookie")}}
+		_, refreshToken = BrowserSessionFromRequest(cookieReq)
+	}
+
+	tokenPair, err := h.service.RefreshToken(ctx, refreshToken)
 	if err != nil {
 		if errors.Is(err, ErrInvalidRefreshToken) {
 			return nil, connect.NewError(connect.CodeUnauthenticated, err)
@@ -70,11 +82,13 @@ func (h *ConnectHandler) RefreshToken(ctx context.Context, req *connect.Request[
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
-	return connect.NewResponse(&authv1.RefreshTokenResponse{
+	res := connect.NewResponse(&authv1.RefreshTokenResponse{
 		AccessToken:  tokenPair.AccessToken,
 		RefreshToken: tokenPair.RefreshToken,
 		ExpiresAt:    tokenPair.ExpiresAt,
-	}), nil
+	})
+	AppendBrowserSessionCookies(res.Header(), tokenPair, h.cookieOpts)
+	return res, nil
 }
 
 func (h *ConnectHandler) VerifyEmail(ctx context.Context, req *connect.Request[authv1.VerifyEmailRequest]) (*connect.Response[authv1.VerifyEmailResponse], error) {
@@ -104,11 +118,13 @@ func (h *ConnectHandler) OAuthCallback(ctx context.Context, req *connect.Request
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
-	return connect.NewResponse(&authv1.OAuthCallbackResponse{
+	res := connect.NewResponse(&authv1.OAuthCallbackResponse{
 		AccessToken:  tokenPair.AccessToken,
 		RefreshToken: tokenPair.RefreshToken,
 		ExpiresAt:    tokenPair.ExpiresAt,
-	}), nil
+	})
+	AppendBrowserSessionCookies(res.Header(), tokenPair, h.cookieOpts)
+	return res, nil
 }
 
 func (h *ConnectHandler) Me(ctx context.Context, req *connect.Request[authv1.MeRequest]) (*connect.Response[authv1.MeResponse], error) {
@@ -121,9 +137,33 @@ func (h *ConnectHandler) Me(ctx context.Context, req *connect.Request[authv1.MeR
 	}
 
 	return connect.NewResponse(&authv1.MeResponse{
-		UserId: user.ID,
-		Email:  user.Email,
-		Name:   user.Name,
-		OrgId:  orgID,
+		UserId:    user.ID,
+		Email:     user.Email,
+		Name:      user.Name,
+		OrgId:     orgID,
+		AvatarUrl: user.AvatarURL,
+	}), nil
+}
+
+func (h *ConnectHandler) UpdateProfile(ctx context.Context, req *connect.Request[authv1.UpdateProfileRequest]) (*connect.Response[authv1.UpdateProfileResponse], error) {
+	msg := req.Msg
+	if msg == nil {
+		msg = &authv1.UpdateProfileRequest{}
+	}
+
+	user, orgID, err := h.service.UpdateProfile(ctx, req.Header().Get("Authorization"), msg.GetName(), msg.GetAvatarUrl())
+	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+
+	return connect.NewResponse(&authv1.UpdateProfileResponse{
+		UserId:    user.ID,
+		Email:     user.Email,
+		Name:      user.Name,
+		OrgId:     orgID,
+		AvatarUrl: user.AvatarURL,
 	}), nil
 }

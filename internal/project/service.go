@@ -167,6 +167,17 @@ func (s *Service) ListByUser(ctx context.Context, userID int64, orgID int64) ([]
 	if err != nil {
 		return nil, err
 	}
+
+	for i := range projects {
+		if projects[i].LeadID == nil {
+			continue
+		}
+		lead := new(models.User)
+		if err := s.db.NewSelect().Model(lead).Where("id = ?", *projects[i].LeadID).Scan(ctx); err == nil {
+			projects[i].Lead = lead
+		}
+	}
+
 	return projects, nil
 }
 

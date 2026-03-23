@@ -108,6 +108,24 @@ interface ProjectDetail {
   color: string;
 }
 
+function mapProjectDetail(project: NonNullable<Awaited<ReturnType<typeof projectClient.getProject>>["project"]>): ProjectDetail {
+  return {
+    id: project.id,
+    name: project.name,
+    slug: project.slug,
+    description: project.description,
+    status: project.status,
+    priority: project.priority,
+    health: project.health,
+    leadId: project.leadId,
+    leadName: project.leadName,
+    startDate: project.startDate,
+    targetDate: project.targetDate,
+    icon: project.icon,
+    color: project.color,
+  };
+}
+
 type TabId = "overview" | "changes" | "members" | "memory";
 const validProjectTabs: TabId[] = ["overview", "changes", "members", "memory"];
 
@@ -180,21 +198,7 @@ export default function ProjectDetailPage() {
       try {
         const projectRes = await projectClient.getProject({ slug });
         if (projectRes.project) {
-          setProject({
-            id: projectRes.project.id,
-            name: projectRes.project.name,
-            slug: projectRes.project.slug,
-            description: projectRes.project.description,
-            status: projectRes.project.status,
-            priority: projectRes.project.priority,
-            health: projectRes.project.health,
-            leadId: projectRes.project.leadId,
-            leadName: projectRes.project.leadName,
-            startDate: projectRes.project.startDate,
-            targetDate: projectRes.project.targetDate,
-            icon: projectRes.project.icon,
-            color: projectRes.project.color,
-          });
+          setProject(mapProjectDetail(projectRes.project));
           // Members from API
           setMembers(
             (projectRes.members || []).map((m) => ({
@@ -254,21 +258,7 @@ export default function ProjectDetailPage() {
         description: renameDesc,
       });
       if (res.project) {
-        setProject({
-          id: res.project.id,
-          name: res.project.name,
-          slug: res.project.slug,
-          description: res.project.description,
-          status: res.project.status,
-          priority: res.project.priority,
-          health: res.project.health,
-          leadId: res.project.leadId,
-          leadName: res.project.leadName,
-          startDate: res.project.startDate,
-          targetDate: res.project.targetDate,
-          icon: res.project.icon,
-          color: res.project.color,
-        });
+        setProject(mapProjectDetail(res.project));
         setRenameOpen(false);
         if (res.project.slug !== slug) router.replace(`/projects/${res.project.slug}`);
       }
@@ -283,7 +273,19 @@ export default function ProjectDetailPage() {
     if (!project) return;
     const prev = { ...project };
     // Optimistic update
-    setProject({ ...project, [field]: value } as ProjectDetail);
+    setProject({
+      ...project,
+      [field]: value,
+      ...(field === "leadId"
+        ? {
+            leadId: value === BigInt(0) ? undefined : (value as bigint),
+            leadName:
+              value === BigInt(0)
+                ? ""
+                : orgMembers.find((member) => member.userId === value)?.name ?? project.leadName,
+          }
+        : {}),
+    } as ProjectDetail);
     setActiveProperty(null);
     try {
       const updatePayload: Record<string, unknown> = { id: project.id };
@@ -294,9 +296,12 @@ export default function ProjectDetailPage() {
         updatePayload.leadId = value as bigint;
       } else if (field === "startDate") updatePayload.startDate = value as string;
       else if (field === "targetDate") updatePayload.targetDate = value as string;
-      await projectClient.updateProject(
+      const res = await projectClient.updateProject(
         updatePayload as Parameters<typeof projectClient.updateProject>[0],
       );
+      if (res.project) {
+        setProject(mapProjectDetail(res.project));
+      }
     } catch {
       setProject(prev); // rollback
     }

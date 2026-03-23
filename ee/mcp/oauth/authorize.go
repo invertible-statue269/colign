@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -24,8 +26,8 @@ type AuthorizeHandler struct {
 }
 
 const (
-	oauthAccessCookieName  = "colign_token"
-	oauthRefreshCookieName = "colign_refresh_token"
+	oauthAccessCookieName  = auth.BrowserAccessCookieName
+	oauthRefreshCookieName = auth.BrowserRefreshCookieName
 )
 
 type oauthSessionService interface {
@@ -70,19 +72,34 @@ func (h *AuthorizeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.handleConsent(w, r, claims, clientID, redirectURI, state, codeChallenge)
 			return
 		}
-		// Auto-approve if the user has previously authorized this client for a specific org
-		if grantOrgID := h.findExistingGrantOrg(r.Context(), claims.UserID, clientID); grantOrgID != 0 {
-			claims.OrgID = grantOrgID
-			h.handleConsent(w, r, claims, clientID, redirectURI, state, codeChallenge)
-			return
+		// Auto-approve only when the user belongs to a single org. For multi-org users,
+		// always force org selection to avoid reusing a stale grant for the wrong org.
+		if h.userOrgCount(r.Context(), claims.UserID) <= 1 {
+			if grantOrgID := h.findExistingGrantOrg(r.Context(), claims.UserID, clientID); grantOrgID != 0 {
+				claims.OrgID = grantOrgID
+				h.handleConsent(w, r, claims, clientID, redirectURI, state, codeChallenge)
+				return
+			}
 		}
 		h.showConsentPage(w, claims, clientID, redirectURI, state, codeChallenge)
+		return
+	}
+
+	// If shared cookies are unavailable, try synchronizing from the web app's browser storage.
+	if r.Method == http.MethodGet && r.URL.Query().Get("session_source") != "cookie" {
+		h.showSessionSyncPage(w, clientID, redirectURI, state, codeChallenge)
 		return
 	}
 
 	// Handle login form submission
 	if r.Method == http.MethodPost && r.FormValue("action") == "login" {
 		h.handleLogin(w, r, clientID, redirectURI, state, codeChallenge)
+		return
+	}
+
+	// Reuse an existing web session stored in localStorage by bridging it into /oauth cookies.
+	if r.Method == http.MethodPost && r.FormValue("action") == "bridge_session" {
+		h.handleSessionBridge(w, r, clientID, redirectURI, state, codeChallenge)
 		return
 	}
 
@@ -107,6 +124,38 @@ func (h *AuthorizeHandler) handleLogin(w http.ResponseWriter, r *http.Request, c
 
 	claims, _ := h.jwtManager.ValidateAccessToken(tokenPair.AccessToken)
 	h.showConsentPage(w, claims, clientID, redirectURI, state, codeChallenge)
+}
+
+func (h *AuthorizeHandler) handleSessionBridge(w http.ResponseWriter, r *http.Request, clientID, redirectURI, state, codeChallenge string) {
+	accessToken := r.FormValue("access_token")
+	refreshToken := r.FormValue("refresh_token")
+
+	if accessToken != "" {
+		claims, err := h.jwtManager.ValidateAccessToken(accessToken)
+		if err == nil {
+			h.setOAuthSessionCookies(w, &auth.TokenPair{
+				AccessToken:  accessToken,
+				RefreshToken: refreshToken,
+			})
+			h.showConsentPage(w, claims, clientID, redirectURI, state, codeChallenge)
+			return
+		}
+	}
+
+	if refreshToken != "" {
+		tokenPair, err := h.newAuthService().RefreshToken(r.Context(), refreshToken)
+		if err == nil {
+			h.setOAuthSessionCookies(w, tokenPair)
+			claims, claimsErr := h.jwtManager.ValidateAccessToken(tokenPair.AccessToken)
+			if claimsErr == nil {
+				h.showConsentPage(w, claims, clientID, redirectURI, state, codeChallenge)
+				return
+			}
+		}
+	}
+
+	h.clearOAuthSessionCookies(w)
+	h.showLoginPage(w, clientID, redirectURI, state, codeChallenge)
 }
 
 func (h *AuthorizeHandler) authenticateOAuthSession(w http.ResponseWriter, r *http.Request) *auth.Claims {
@@ -139,39 +188,11 @@ func (h *AuthorizeHandler) authenticateOAuthSession(w http.ResponseWriter, r *ht
 }
 
 func (h *AuthorizeHandler) setOAuthSessionCookies(w http.ResponseWriter, tokenPair *auth.TokenPair) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     oauthAccessCookieName,
-		Value:    tokenPair.AccessToken,
-		Path:     "/oauth",
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   int(auth.AccessTokenDuration / time.Second),
-	})
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     oauthRefreshCookieName,
-		Value:    tokenPair.RefreshToken,
-		Path:     "/oauth",
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   int(auth.RefreshTokenDuration / time.Second),
-	})
+	auth.SetBrowserSessionCookies(w, tokenPair, h.browserCookieOptions())
 }
 
 func (h *AuthorizeHandler) clearOAuthSessionCookies(w http.ResponseWriter) {
-	for _, name := range []string{oauthAccessCookieName, oauthRefreshCookieName} {
-		http.SetCookie(w, &http.Cookie{
-			Name:     name,
-			Value:    "",
-			Path:     "/oauth",
-			HttpOnly: true,
-			Secure:   true,
-			SameSite: http.SameSiteLaxMode,
-			MaxAge:   -1,
-		})
-	}
+	auth.ClearBrowserSessionCookies(w, h.browserCookieOptions())
 }
 
 func (h *AuthorizeHandler) handleConsent(w http.ResponseWriter, r *http.Request, claims *auth.Claims, clientID, redirectURI, state, codeChallenge string) {
@@ -222,6 +243,9 @@ func (h *AuthorizeHandler) handleConsent(w http.ResponseWriter, r *http.Request,
 // or 0 if none exists. When the user belongs to multiple orgs, this enables auto-approve
 // for the previously selected org.
 func (h *AuthorizeHandler) findExistingGrantOrg(ctx context.Context, userID int64, clientID string) int64 {
+	if h.db == nil {
+		return 0
+	}
 	var orgID int64
 	err := h.db.NewSelect().TableExpr("api_tokens").
 		Column("org_id").
@@ -235,6 +259,20 @@ func (h *AuthorizeHandler) findExistingGrantOrg(ctx context.Context, userID int6
 		return 0
 	}
 	return orgID
+}
+
+func (h *AuthorizeHandler) userOrgCount(ctx context.Context, userID int64) int {
+	if h.db == nil {
+		return 0
+	}
+	count, err := h.db.NewSelect().
+		Model((*models.OrganizationMember)(nil)).
+		Where("user_id = ?", userID).
+		Count(ctx)
+	if err != nil {
+		return 0
+	}
+	return count
 }
 
 func generateAuthCode() (string, error) {
@@ -261,6 +299,16 @@ button:hover { background: #d4d4d4; }
 <div class="card">
 <h1>Sign in to Colign</h1>
 <p>Authorize access for {{.ClientID}}</p>
+<form id="bridge-form" method="POST" style="display:none">
+<input type="hidden" name="action" value="bridge_session">
+<input type="hidden" name="client_id" value="{{.ClientID}}">
+<input type="hidden" name="redirect_uri" value="{{.RedirectURI}}">
+<input type="hidden" name="state" value="{{.State}}">
+<input type="hidden" name="code_challenge" value="{{.CodeChallenge}}">
+<input type="hidden" name="code_challenge_method" value="S256">
+<input type="hidden" name="access_token" id="bridge-access-token">
+<input type="hidden" name="refresh_token" id="bridge-refresh-token">
+</form>
 <form method="POST">
 <input type="hidden" name="action" value="login">
 <input type="hidden" name="client_id" value="{{.ClientID}}">
@@ -271,7 +319,64 @@ button:hover { background: #d4d4d4; }
 <label>Email</label><input type="email" name="email" required autofocus>
 <label>Password</label><input type="password" name="password" required>
 <button type="submit">Sign In</button>
-</form></div></body></html>`))
+</form></div>
+<script>
+(() => {
+  try {
+    const accessToken = window.localStorage.getItem("colign_access_token");
+    const refreshToken = window.localStorage.getItem("colign_refresh_token");
+    if (!accessToken && !refreshToken) return;
+    const accessInput = document.getElementById("bridge-access-token");
+    const refreshInput = document.getElementById("bridge-refresh-token");
+    const form = document.getElementById("bridge-form");
+    if (!accessInput || !refreshInput || !form) return;
+    accessInput.value = accessToken || "";
+    refreshInput.value = refreshToken || "";
+    form.submit();
+  } catch (_) {}
+})();
+</script>
+</body></html>`))
+
+var sessionSyncPageTmpl = template.Must(template.New("session-sync").Parse(`<!DOCTYPE html>
+<html><head><title>Colign - Sync Session</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head><body style="background:#0a0a0a;color:#e5e5e5;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;font-family:-apple-system,sans-serif">
+<form id="bridge-form" method="POST" style="display:none">
+<input type="hidden" name="action" value="bridge_session">
+<input type="hidden" name="client_id" value="{{.ClientID}}">
+<input type="hidden" name="redirect_uri" value="{{.RedirectURI}}">
+<input type="hidden" name="state" value="{{.State}}">
+<input type="hidden" name="code_challenge" value="{{.CodeChallenge}}">
+<input type="hidden" name="code_challenge_method" value="S256">
+<input type="hidden" name="access_token" id="bridge-access-token">
+<input type="hidden" name="refresh_token" id="bridge-refresh-token">
+</form>
+<div style="font-size:14px;color:#a3a3a3">Syncing your Colign session…</div>
+<script>
+(() => {
+  try {
+    const accessToken = window.localStorage.getItem("colign_access_token");
+    const refreshToken = window.localStorage.getItem("colign_refresh_token");
+    if (accessToken || refreshToken) {
+      const accessInput = document.getElementById("bridge-access-token");
+      const refreshInput = document.getElementById("bridge-refresh-token");
+      const form = document.getElementById("bridge-form");
+      if (accessInput && refreshInput && form) {
+        accessInput.value = accessToken || "";
+        refreshInput.value = refreshToken || "";
+        form.submit();
+        return;
+      }
+    }
+  } catch (_) {}
+
+  const url = new URL(window.location.href);
+  url.searchParams.set("session_source", "cookie");
+  window.location.replace(url.toString());
+})();
+</script>
+</body></html>`))
 
 var consentPageTmpl = template.Must(template.New("consent").Parse(`<!DOCTYPE html>
 <html><head><title>Colign - Authorize</title>
@@ -322,6 +427,26 @@ func (h *AuthorizeHandler) showLoginPage(w http.ResponseWriter, clientID, redire
 	})
 }
 
+func (h *AuthorizeHandler) showSessionSyncPage(w http.ResponseWriter, clientID, redirectURI, state, codeChallenge string) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = sessionSyncPageTmpl.Execute(w, map[string]string{
+		"ClientID":      clientID,
+		"RedirectURI":   redirectURI,
+		"State":         state,
+		"CodeChallenge": codeChallenge,
+	})
+}
+
+func (h *AuthorizeHandler) browserCookieOptions() auth.BrowserSessionOptions {
+	opts := auth.BrowserSessionOptions{
+		Secure: strings.HasPrefix(h.baseURL, "https://"),
+	}
+	if parsed, err := url.Parse(h.baseURL); err == nil {
+		opts.Domain = auth.DeriveCookieDomain(parsed.Hostname())
+	}
+	return opts
+}
+
 type orgOption struct {
 	ID       int64
 	Name     string
@@ -331,11 +456,13 @@ type orgOption struct {
 func (h *AuthorizeHandler) showConsentPage(w http.ResponseWriter, claims *auth.Claims, clientID, redirectURI, state, codeChallenge string) {
 	// Query user's organizations
 	var orgs []models.Organization
-	_ = h.db.NewSelect().Model(&orgs).
-		Join("JOIN organization_members AS om ON om.organization_id = o.id").
-		Where("om.user_id = ?", claims.UserID).
-		OrderExpr("o.created_at ASC").
-		Scan(context.Background())
+	if h.db != nil {
+		_ = h.db.NewSelect().Model(&orgs).
+			Join("JOIN organization_members AS om ON om.organization_id = o.id").
+			Where("om.user_id = ?", claims.UserID).
+			OrderExpr("o.created_at ASC").
+			Scan(context.Background())
+	}
 
 	orgOptions := make([]orgOption, len(orgs))
 	for i, o := range orgs {

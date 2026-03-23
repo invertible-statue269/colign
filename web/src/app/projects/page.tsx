@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useI18n } from "@/lib/i18n";
 import { projectClient } from "@/lib/project";
-import { Plus, Folder, User, Calendar, icons, type LucideIcon } from "lucide-react";
+import { Plus, Folder, Calendar, icons, type LucideIcon } from "lucide-react";
 
 const statusConfig: Record<string, { label: string; dotColor: string }> = {
   backlog: { label: "Backlog", dotColor: "bg-muted-foreground" },
@@ -38,6 +39,7 @@ interface Project {
   priority: string;
   health: string;
   leadName: string;
+  leadAvatarUrl: string;
   targetDate?: string;
   icon: string;
   color: string;
@@ -62,6 +64,7 @@ export default function ProjectsPage() {
             priority: p.priority || "none",
             health: p.health || "",
             leadName: p.leadName || "",
+            leadAvatarUrl: p.leadAvatarUrl || "",
             targetDate: p.targetDate || "",
             icon: p.icon || "",
             color: p.color || "",
@@ -170,7 +173,12 @@ export default function ProjectsPage() {
                       {/* Lead */}
                       {project.leadName && (
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <User className="h-3 w-3" />
+                          <Avatar size="sm" className="size-4">
+                            <AvatarImage src={project.leadAvatarUrl} alt={project.leadName} />
+                            <AvatarFallback className="bg-primary/10 text-[9px] font-medium text-primary">
+                              {project.leadName.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
                           <span className="max-w-[60px] truncate">{project.leadName}</span>
                         </div>
                       )}

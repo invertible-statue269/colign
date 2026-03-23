@@ -315,6 +315,7 @@ func projectToProto(p *models.Project) *projectv1.Project {
 	}
 	if p.Lead != nil {
 		pp.LeadName = p.Lead.Name
+		pp.LeadAvatarUrl = p.Lead.AvatarURL
 	}
 	if p.StartDate != nil {
 		s := p.StartDate.Format("2006-01-02")

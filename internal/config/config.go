@@ -1,6 +1,11 @@
 package config
 
-import "os"
+import (
+	"net/url"
+	"os"
+
+	"github.com/gobenpark/colign/internal/auth"
+)
 
 type Config struct {
 	Port                string
@@ -19,9 +24,13 @@ type Config struct {
 	Edition             string // "ce" (Community) or "ee" (Enterprise)
 	HocuspocusURL       string
 	HocuspocusAPISecret string
+	CookieDomain        string
+	CookieSecure        bool
 }
 
 func Load() (*Config, error) {
+	frontendURL := getEnv("FRONTEND_URL", "http://localhost:3000")
+	redirectBaseURL := getEnv("REDIRECT_BASE_URL", "http://localhost:8080")
 	return &Config{
 		Port:                getEnv("PORT", "8080"),
 		Debug:               getEnv("DEBUG", "") != "",
@@ -33,12 +42,14 @@ func Load() (*Config, error) {
 		GitHubClientSecret:  getEnv("GITHUB_CLIENT_SECRET", ""),
 		GoogleClientID:      getEnv("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret:  getEnv("GOOGLE_CLIENT_SECRET", ""),
-		RedirectBaseURL:     getEnv("REDIRECT_BASE_URL", "http://localhost:8080"),
-		FrontendURL:         getEnv("FRONTEND_URL", "http://localhost:3000"),
+		RedirectBaseURL:     redirectBaseURL,
+		FrontendURL:         frontendURL,
 		MigrationsPath:      getEnv("MIGRATIONS_PATH", "migrations"),
 		Edition:             getEnv("COLIGN_EDITION", "ce"),
 		HocuspocusURL:       getEnv("HOCUSPOCUS_URL", ""),
 		HocuspocusAPISecret: getEnv("HOCUSPOCUS_API_SECRET", ""),
+		CookieDomain:        getEnv("AUTH_COOKIE_DOMAIN", deriveCookieDomain(frontendURL, redirectBaseURL)),
+		CookieSecure:        deriveCookieSecure(frontendURL, redirectBaseURL),
 	}, nil
 }
 
@@ -47,4 +58,30 @@ func getEnv(key, fallback string) string {
 		return val
 	}
 	return fallback
+}
+
+func deriveCookieDomain(urls ...string) string {
+	for _, raw := range urls {
+		parsed, err := url.Parse(raw)
+		if err != nil || parsed.Hostname() == "" {
+			continue
+		}
+		if domain := auth.DeriveCookieDomain(parsed.Hostname()); domain != "" {
+			return domain
+		}
+	}
+	return ""
+}
+
+func deriveCookieSecure(urls ...string) bool {
+	for _, raw := range urls {
+		parsed, err := url.Parse(raw)
+		if err != nil {
+			continue
+		}
+		if parsed.Scheme == "https" {
+			return true
+		}
+	}
+	return false
 }

@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@connectrpc/connect";
 import { useI18n } from "@/lib/i18n";
 import { apiTokenClient } from "@/lib/apitoken";
 import type { ApiToken } from "@/gen/proto/apitoken/v1/apitoken_pb";
+import { AuthService } from "@/gen/proto/auth/v1/auth_pb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -20,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Header } from "@/components/layout/header";
 import { clearTokens } from "@/lib/auth";
+import { transport } from "@/lib/connect";
 import { OrgMembers } from "@/components/settings/org-members";
 
 type SettingsTab = "profile" | "account" | "organization" | "ai" | "appearance" | "notifications";
@@ -47,14 +51,20 @@ const tabI18nKeys: Record<SettingsTab, string> = {
   notifications: "settings.notifications",
 };
 
+const meClient = createClient(AuthService, transport);
+
 export default function SettingsPage() {
   const router = useRouter();
   const { locale, setLocale, t } = useI18n();
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
 
   // Profile state
-  const [name, setName] = useState("Ben Park");
-  const [email] = useState("ben@example.com");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarError, setAvatarError] = useState("");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Account state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -102,6 +112,17 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
+    meClient
+      .me({})
+      .then((res) => {
+        setName(res.name);
+        setEmail(res.email);
+        setAvatarUrl(res.avatarUrl || "");
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (activeTab === "ai") {
       loadTokens();
     }
@@ -142,10 +163,49 @@ export default function SettingsPage() {
 
   async function handleSave(section: string) {
     setSaving(true);
-    // TODO: API call
+    if (section === "profile") {
+      try {
+        const res = await meClient.updateProfile({ name, avatarUrl });
+        setName(res.name);
+        setEmail(res.email);
+        setAvatarUrl(res.avatarUrl || "");
+        window.dispatchEvent(
+          new CustomEvent("colign:profile-updated", {
+            detail: {
+              name: res.name,
+              email: res.email,
+              avatarUrl: res.avatarUrl || "",
+            },
+          }),
+        );
+      } finally {
+        setSaving(false);
+      }
+      showSaved(section);
+      return;
+    }
+
     await new Promise((r) => setTimeout(r, 300));
     setSaving(false);
     showSaved(section);
+  }
+
+  async function handleAvatarFile(file: File) {
+    if (!file.type.startsWith("image/")) {
+      setAvatarError("Please select an image file.");
+      return;
+    }
+
+    setAvatarError("");
+    setUploadingAvatar(true);
+    try {
+      const compressed = await fileToAvatarDataUrl(file);
+      setAvatarUrl(compressed);
+    } catch {
+      setAvatarError("Could not process that image.");
+    } finally {
+      setUploadingAvatar(false);
+    }
   }
 
   return (
@@ -211,6 +271,58 @@ export default function SettingsPage() {
                 <CardDescription>{t("settings.profileDesc")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <Avatar size="lg" className="size-16">
+                    <AvatarImage src={avatarUrl} alt={name || email} />
+                    <AvatarFallback className="bg-primary/10 text-lg font-semibold text-primary">
+                      {(name || email || "?").charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Label>Profile Photo</Label>
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          void handleAvatarFile(file);
+                        }
+                        e.target.value = "";
+                      }}
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="cursor-pointer"
+                        onClick={() => avatarInputRef.current?.click()}
+                        disabled={uploadingAvatar}
+                      >
+                        {uploadingAvatar ? "Uploading..." : avatarUrl ? "Change photo" : "Upload photo"}
+                      </Button>
+                      {avatarUrl && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="cursor-pointer text-muted-foreground"
+                          onClick={() => {
+                            setAvatarUrl("");
+                            setAvatarError("");
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      PNG, JPG, GIF, or WebP. The image is resized automatically.
+                    </p>
+                    {avatarError && <p className="text-xs text-destructive">{avatarError}</p>}
+                  </div>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="name">{t("auth.name")}</Label>
                   <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
@@ -651,4 +763,39 @@ export default function SettingsPage() {
       </div>
     </div>
   );
+}
+
+async function fileToAvatarDataUrl(file: File): Promise<string> {
+  const imageUrl = URL.createObjectURL(file);
+
+  try {
+    const img = await loadImage(imageUrl);
+    const maxSize = 256;
+    const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+    const width = Math.max(1, Math.round(img.width * scale));
+    const height = Math.max(1, Math.round(img.height * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("Canvas unavailable");
+    }
+
+    ctx.drawImage(img, 0, 0, width, height);
+    return canvas.toDataURL("image/webp", 0.9);
+  } finally {
+    URL.revokeObjectURL(imageUrl);
+  }
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Image load failed"));
+    img.src = src;
+  });
 }

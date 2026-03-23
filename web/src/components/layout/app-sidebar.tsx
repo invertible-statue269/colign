@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { createClient } from "@connectrpc/connect";
 import {
   LayoutDashboard,
   Inbox,
@@ -31,16 +32,21 @@ import {
   SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useOrg } from "@/lib/org-context";
 import { projectClient } from "@/lib/project";
 import { useI18n } from "@/lib/i18n";
 import { clearTokens, getTokenPayload } from "@/lib/auth";
+import { transport } from "@/lib/connect";
+import { AuthService } from "@/gen/proto/auth/v1/auth_pb";
 
 interface Project {
   id: bigint;
   name: string;
   slug: string;
 }
+
+const meClient = createClient(AuthService, transport);
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -52,7 +58,35 @@ export function AppSidebar() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const payload = typeof window !== "undefined" ? getTokenPayload() : null;
   const userEmail = payload?.email ?? "";
-  const userName = payload?.name || userEmail.split("@")[0];
+  const [profile, setProfile] = useState<{ name: string; email: string; avatarUrl: string }>({
+    name: payload?.name || userEmail.split("@")[0],
+    email: userEmail,
+    avatarUrl: "",
+  });
+  const userName = profile.name || userEmail.split("@")[0];
+
+  useEffect(() => {
+    meClient
+      .me({})
+      .then((res) => {
+        setProfile({
+          name: res.name || payload?.name || userEmail.split("@")[0],
+          email: res.email || userEmail,
+          avatarUrl: res.avatarUrl || "",
+        });
+      })
+      .catch(() => {});
+  }, [payload?.name, userEmail]);
+
+  useEffect(() => {
+    const handleProfileUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ name: string; email: string; avatarUrl: string }>).detail;
+      if (!detail) return;
+      setProfile(detail);
+    };
+    window.addEventListener("colign:profile-updated", handleProfileUpdated);
+    return () => window.removeEventListener("colign:profile-updated", handleProfileUpdated);
+  }, []);
 
   useEffect(() => {
     async function loadProjects() {
@@ -221,12 +255,15 @@ export function AppSidebar() {
                 tooltip={t("sidebar.profile")}
                 onClick={() => setProfileMenuOpen(!profileMenuOpen)}
               >
-                <div className="flex aspect-square size-8 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold uppercase">
-                  {userName.charAt(0) || "?"}
-                </div>
+                <Avatar>
+                  <AvatarImage src={profile.avatarUrl} alt={userName} />
+                  <AvatarFallback className="bg-emerald-600 text-xs font-bold uppercase text-white">
+                    {userName.charAt(0) || "?"}
+                  </AvatarFallback>
+                </Avatar>
                 <div className="flex min-w-0 flex-col gap-0.5 leading-none">
                   <span className="truncate text-sm font-medium">{userName}</span>
-                  <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
+                  <span className="truncate text-xs text-muted-foreground">{profile.email}</span>
                 </div>
               </SidebarMenuButton>
               {profileMenuOpen && (

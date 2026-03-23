@@ -43,6 +43,8 @@ func (s *Server) callTool(ctx context.Context, name string, args json.RawMessage
 		return s.handleListAC(ctx, args)
 	case "create_acceptance_criteria":
 		return s.handleCreateAC(ctx, args)
+	case "toggle_acceptance_criteria":
+		return s.handleToggleAC(ctx, args)
 	case "update_project":
 		return s.handleUpdateProject(ctx, args)
 	case "create_change":
@@ -490,6 +492,32 @@ func (s *Server) handleCreateAC(ctx context.Context, args json.RawMessage) (any,
 		"id":       ac.Id,
 		"scenario": ac.Scenario,
 		"created":  true,
+	}, nil
+}
+
+func (s *Server) handleToggleAC(ctx context.Context, args json.RawMessage) (any, error) {
+	var params struct {
+		ID  int64 `json:"id"`
+		Met bool  `json:"met"`
+	}
+	if err := json.Unmarshal(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
+	}
+
+	resp, err := s.clients.acceptance.ToggleAC(ctx, connect.NewRequest(&acceptancev1.ToggleACRequest{
+		Id:  params.ID,
+		Met: params.Met,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	ac := resp.Msg.Criteria
+	return map[string]any{
+		"id":       ac.Id,
+		"scenario": ac.Scenario,
+		"met":      ac.Met,
+		"toggled":  true,
 	}, nil
 }
 

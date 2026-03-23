@@ -155,6 +155,18 @@ func ListTools() []Tool {
 			},
 		},
 		{
+			Name:        "toggle_acceptance_criteria",
+			Description: "Toggle an acceptance criteria's met/unmet status",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"id":  {Type: "integer", Description: "Acceptance criteria ID"},
+					"met": {Type: "boolean", Description: "Whether the criteria is met (true) or unmet (false)"},
+				},
+				Required: []string{"id", "met"},
+			},
+		},
+		{
 			Name:        "update_project",
 			Description: "Update a project's name or description (README)",
 			InputSchema: InputSchema{

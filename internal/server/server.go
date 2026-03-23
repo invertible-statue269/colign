@@ -65,6 +65,10 @@ func New(cfg *config.Config) (*Server, error) {
 }
 
 func (s *Server) setupRoutes(cfg *config.Config) {
+	cookieOpts := auth.BrowserSessionOptions{
+		Domain: cfg.CookieDomain,
+		Secure: cfg.CookieSecure,
+	}
 	// Liveness — process alive
 	s.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -96,12 +100,12 @@ func (s *Server) setupRoutes(cfg *config.Config) {
 		RedirectBaseURL:    cfg.RedirectBaseURL,
 	}, orgService)
 
-	authConnectHandler := auth.NewConnectHandler(authService, oauthService)
+	authConnectHandler := auth.NewConnectHandler(authService, oauthService, cookieOpts)
 	authPath, authHandler := authv1connect.NewAuthServiceHandler(authConnectHandler)
 	s.mux.Handle(authPath, authHandler)
 
 	// OAuth redirect routes (REST)
-	oauthHandler := auth.NewOAuthHandler(oauthService, cfg.FrontendURL)
+	oauthHandler := auth.NewOAuthHandler(oauthService, cfg.FrontendURL, cookieOpts)
 	s.mux.HandleFunc("GET /api/auth/{provider}", oauthHandler.Redirect)
 	s.mux.HandleFunc("GET /api/auth/{provider}/callback", oauthHandler.Callback)
 
@@ -184,7 +188,7 @@ func (s *Server) setupRoutes(cfg *config.Config) {
 }
 
 func (s *Server) Handler() http.Handler {
-	return corsMiddleware(s.mux, s.cfg.FrontendURL)
+	return corsMiddleware(browserCookieAuthMiddleware(s.mux), s.cfg.FrontendURL)
 }
 
 func (s *Server) Close() error {
@@ -211,6 +215,17 @@ func corsMiddleware(next http.Handler, allowOrigin string) http.Handler {
 			return
 		}
 
+		next.ServeHTTP(w, r)
+	})
+}
+
+func browserCookieAuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") == "" {
+			if accessToken, _ := auth.BrowserSessionFromRequest(r); accessToken != "" {
+				r.Header.Set("Authorization", "Bearer "+accessToken)
+			}
+		}
 		next.ServeHTTP(w, r)
 	})
 }

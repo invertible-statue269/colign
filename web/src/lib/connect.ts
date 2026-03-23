@@ -7,7 +7,10 @@ import { createClient } from "@connectrpc/connect";
 const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 // Transport without interceptor for refresh calls (avoid infinite loop)
-const plainTransport = createConnectTransport({ baseUrl });
+const plainTransport = createConnectTransport({
+  baseUrl,
+  fetch: (input, init) => fetch(input, { ...init, credentials: "include" }),
+});
 
 let refreshPromise: Promise<string | null> | null = null;
 
@@ -75,5 +78,6 @@ const authInterceptor: Interceptor = (next) => async (req) => {
 
 export const transport = createConnectTransport({
   baseUrl,
+  fetch: (input, init) => fetch(input, { ...init, credentials: "include" }),
   interceptors: [authInterceptor],
 });

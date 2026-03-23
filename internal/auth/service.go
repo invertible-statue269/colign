@@ -340,3 +340,28 @@ func (s *Service) Me(ctx context.Context, authHeader string) (*models.User, int6
 
 	return user, claims.OrgID, nil
 }
+
+func (s *Service) UpdateProfile(ctx context.Context, authHeader, name, avatarURL string) (*models.User, int64, error) {
+	claims, err := ExtractClaims(s.jwtManager, authHeader)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	user := new(models.User)
+	if err := s.db.NewSelect().Model(user).Where("id = ?", claims.UserID).Scan(ctx); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, 0, ErrUserNotFound
+		}
+		return nil, 0, err
+	}
+
+	user.Name = name
+	user.AvatarURL = avatarURL
+	user.UpdatedAt = time.Now()
+
+	if _, err := s.db.NewUpdate().Model(user).WherePK().Exec(ctx); err != nil {
+		return nil, 0, err
+	}
+
+	return user, claims.OrgID, nil
+}

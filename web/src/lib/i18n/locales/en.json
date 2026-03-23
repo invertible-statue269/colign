@@ -118,7 +118,12 @@
     "required": "Required",
     "optional": "Optional",
     "collapse": "Collapse",
-    "expand": "Expand"
+    "expand": "Expand",
+    "designLinks": "Design References",
+    "designLinkPlaceholder": "Paste Figma or design URL...",
+    "showPreview": "Preview",
+    "hidePreview": "Hide",
+    "noDesignLinks": "No design links added"
   },
   "tasks": {
     "addTask": "Add task...",

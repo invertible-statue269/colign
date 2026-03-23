@@ -6,6 +6,13 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Header } from "@/components/layout/header";
 import {
   Dialog,
@@ -166,6 +173,9 @@ export default function ProjectDetailPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [renameArchiveMode, setRenameArchiveMode] = useState("manual");
+  const [renameArchiveTrigger, setRenameArchiveTrigger] = useState("tasks_done");
+  const [renameArchiveDaysDelay, setRenameArchiveDaysDelay] = useState(0);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("editor");
@@ -253,11 +263,19 @@ export default function ProjectDetailPage() {
     if (!project || !renameName.trim()) return;
     setRenaming(true);
     try {
-      const res = await projectClient.updateProject({
-        id: project.id,
-        name: renameName.trim(),
-        description: renameDesc,
-      });
+      const [res] = await Promise.all([
+        projectClient.updateProject({
+          id: project.id,
+          name: renameName.trim(),
+          description: renameDesc,
+        }),
+        projectClient.updateArchivePolicy({
+          projectId: project.id,
+          mode: renameArchiveMode,
+          trigger: renameArchiveTrigger,
+          daysDelay: renameArchiveDaysDelay,
+        }),
+      ]);
       if (res.project) {
         setProject(mapProjectDetail(res.project));
         setRenameOpen(false);
@@ -422,6 +440,16 @@ export default function ProjectDetailPage() {
                   onClick={() => {
                     setRenameName(project.name);
                     setRenameDesc("");
+                    projectClient
+                      .getArchivePolicy({ projectId: project.id })
+                      .then((res) => {
+                        if (res.policy) {
+                          setRenameArchiveMode(res.policy.mode || "manual");
+                          setRenameArchiveTrigger(res.policy.trigger || "tasks_done");
+                          setRenameArchiveDaysDelay(res.policy.daysDelay ?? 0);
+                        }
+                      })
+                      .catch(() => {});
                     setRenameOpen(true);
                   }}
                 >
@@ -443,6 +471,16 @@ export default function ProjectDetailPage() {
                       setMenuOpen(false);
                       setRenameName(project.name);
                       setRenameDesc(project.description);
+                      projectClient
+                        .getArchivePolicy({ projectId: project.id })
+                        .then((res) => {
+                          if (res.policy) {
+                            setRenameArchiveMode(res.policy.mode || "manual");
+                            setRenameArchiveTrigger(res.policy.trigger || "tasks_done");
+                            setRenameArchiveDaysDelay(res.policy.daysDelay ?? 0);
+                          }
+                        })
+                        .catch(() => {});
                       setRenameOpen(true);
                     }}
                     className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-accent"
@@ -725,14 +763,14 @@ export default function ProjectDetailPage() {
         )}
       </main>
 
-      {/* Rename Dialog */}
+      {/* Edit Project Dialog */}
       <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{t("project.editProject")}</DialogTitle>
             <DialogDescription>{t("project.editProjectDesc")}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <div className="space-y-5 py-2">
             <div className="space-y-2">
               <Label htmlFor="rename-name">{t("projects.projectName")}</Label>
               <Input
@@ -748,6 +786,66 @@ export default function ProjectDetailPage() {
                 value={renameDesc}
                 onChange={(e) => setRenameDesc(e.target.value)}
               />
+            </div>
+
+            <div className="border-t border-border/50 pt-4">
+              <p className="mb-3 text-sm font-medium">{t("projectSettings.archivePolicy")}</p>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">{t("projectSettings.archiveMode")}</Label>
+                  <Select value={renameArchiveMode} onValueChange={(v) => v && setRenameArchiveMode(v)}>
+                    <SelectTrigger className="cursor-pointer">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="manual" className="cursor-pointer">
+                        {t("projectSettings.archiveModeManual")}
+                      </SelectItem>
+                      <SelectItem value="auto" className="cursor-pointer">
+                        {t("projectSettings.archiveModeAuto")}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {renameArchiveMode === "auto" && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">{t("projectSettings.archiveTrigger")}</Label>
+                    <Select value={renameArchiveTrigger} onValueChange={(v) => v && setRenameArchiveTrigger(v)}>
+                      <SelectTrigger className="w-full cursor-pointer">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="min-w-[280px]">
+                        <SelectItem value="tasks_done" className="cursor-pointer">
+                          {t("projectSettings.archiveTriggerTasksDone")}
+                        </SelectItem>
+                        <SelectItem value="days_after_ready" className="cursor-pointer">
+                          {t("projectSettings.archiveTriggerDaysAfterReady")}
+                        </SelectItem>
+                        <SelectItem value="tasks_done_and_days" className="cursor-pointer">
+                          {t("projectSettings.archiveTriggerTasksDoneAndDays")}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {renameArchiveMode === "auto" &&
+                  (renameArchiveTrigger === "days_after_ready" ||
+                    renameArchiveTrigger === "tasks_done_and_days") && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">{t("projectSettings.archiveDaysDelay")}</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={365}
+                      value={renameArchiveDaysDelay}
+                      onChange={(e) => setRenameArchiveDaysDelay(Number(e.target.value))}
+                      className="w-32"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -1439,3 +1537,4 @@ function MemoryTab({
     </div>
   );
 }
+

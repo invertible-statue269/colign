@@ -27,6 +27,7 @@ import (
 	"github.com/gobenpark/colign/gen/proto/workflow/v1/workflowv1connect"
 	"github.com/gobenpark/colign/internal/acceptance"
 	"github.com/gobenpark/colign/internal/apitoken"
+	"github.com/gobenpark/colign/internal/archive"
 	"github.com/gobenpark/colign/internal/comment"
 	"github.com/gobenpark/colign/internal/document"
 	"github.com/gobenpark/colign/internal/events"
@@ -106,6 +107,7 @@ func (s *Server) setupRoutes(cfg *config.Config) {
 
 	// OAuth redirect routes (REST)
 	oauthHandler := auth.NewOAuthHandler(oauthService, cfg.FrontendURL, cookieOpts)
+	s.mux.HandleFunc("GET /api/auth/providers", oauthHandler.Providers)
 	s.mux.HandleFunc("GET /api/auth/{provider}", oauthHandler.Redirect)
 	s.mux.HandleFunc("GET /api/auth/{provider}/callback", oauthHandler.Callback)
 
@@ -117,7 +119,8 @@ func (s *Server) setupRoutes(cfg *config.Config) {
 
 	// Project service (Connect)
 	projectService := project.NewService(s.db)
-	projectConnectHandler := project.NewConnectHandler(projectService, s.jwtManager, apiTokenService)
+	archiveService := archive.NewService(s.db)
+	projectConnectHandler := project.NewConnectHandler(projectService, archiveService, s.jwtManager, apiTokenService)
 	projectPath, projectHandler := projectv1connect.NewProjectServiceHandler(projectConnectHandler)
 	s.mux.Handle(projectPath, projectHandler)
 

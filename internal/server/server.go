@@ -118,7 +118,7 @@ func (s *Server) setupRoutes(cfg *config.Config) {
 	s.mux.Handle(projectPath, projectHandler)
 
 	// Organization service (Connect handler)
-	orgConnectHandler := organization.NewConnectHandler(orgService, s.jwtManager, apiTokenService)
+	orgConnectHandler := organization.NewConnectHandler(orgService, s.jwtManager, apiTokenService, authService)
 	orgPath, orgHandler := organizationv1connect.NewOrganizationServiceHandler(orgConnectHandler)
 	s.mux.Handle(orgPath, orgHandler)
 

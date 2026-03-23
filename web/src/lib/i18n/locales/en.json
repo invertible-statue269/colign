@@ -41,7 +41,9 @@
     "createFirst": "Create your first project to start writing specs with AI",
     "createProject": "Create Project",
     "projectName": "Project Name",
-    "description": "Description"
+    "description": "Description",
+    "noLead": "No lead",
+    "noPriority": "No priority"
   },
   "project": {
     "overview": "Overview",

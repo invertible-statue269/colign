@@ -13,16 +13,22 @@ import (
 	"github.com/gobenpark/colign/internal/models"
 )
 
+// OrgSwitcher generates a new session scoped to a different organization.
+type OrgSwitcher interface {
+	SwitchOrg(ctx context.Context, userID int64, email, name string, newOrgID int64) (*auth.TokenPair, error)
+}
+
 type ConnectHandler struct {
 	service           *Service
 	jwtManager        *auth.JWTManager
 	apiTokenValidator auth.APITokenValidator
+	orgSwitcher       OrgSwitcher
 }
 
 var _ organizationv1connect.OrganizationServiceHandler = (*ConnectHandler)(nil)
 
-func NewConnectHandler(service *Service, jwtManager *auth.JWTManager, apiTokenValidator auth.APITokenValidator) *ConnectHandler {
-	return &ConnectHandler{service: service, jwtManager: jwtManager, apiTokenValidator: apiTokenValidator}
+func NewConnectHandler(service *Service, jwtManager *auth.JWTManager, apiTokenValidator auth.APITokenValidator, orgSwitcher OrgSwitcher) *ConnectHandler {
+	return &ConnectHandler{service: service, jwtManager: jwtManager, apiTokenValidator: apiTokenValidator, orgSwitcher: orgSwitcher}
 }
 
 func (h *ConnectHandler) extractClaims(ctx context.Context, header string) (*auth.Claims, error) {
@@ -75,8 +81,8 @@ func (h *ConnectHandler) SwitchOrganization(ctx context.Context, req *connect.Re
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
 
-	// Generate new token pair with new org_id
-	tokenPair, err := h.jwtManager.GenerateTokenPair(claims.UserID, claims.Email, claims.Name, req.Msg.OrganizationId)
+	// Create new session scoped to the target org
+	tokenPair, err := h.orgSwitcher.SwitchOrg(ctx, claims.UserID, claims.Email, claims.Name, req.Msg.OrganizationId)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}

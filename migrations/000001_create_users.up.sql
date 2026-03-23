@@ -28,6 +28,7 @@ CREATE INDEX idx_accounts_user_id ON accounts(user_id);
 CREATE TABLE sessions (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    org_id BIGINT REFERENCES organizations(id) ON DELETE SET NULL,
     refresh_token TEXT NOT NULL UNIQUE,
     user_agent TEXT,
     ip TEXT,

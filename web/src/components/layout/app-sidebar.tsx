@@ -84,10 +84,10 @@ export function AppSidebar() {
               <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                 <span className="text-sm font-bold">C</span>
               </div>
-              <div className="flex flex-col gap-0.5 leading-none">
-                <span className="font-semibold">Colign</span>
+              <div className="flex min-w-0 flex-col gap-0.5 leading-none">
+                <span className="truncate font-semibold">Colign</span>
                 {currentOrg && (
-                  <span className="text-xs text-muted-foreground">{currentOrg.name}</span>
+                  <span className="truncate text-xs text-muted-foreground">{currentOrg.name}</span>
                 )}
               </div>
             </SidebarMenuButton>
@@ -140,7 +140,7 @@ export function AppSidebar() {
                     render={<Link href={`/projects/${project.slug}`} />}
                   >
                     <FolderKanban className="size-4" />
-                    <span>{project.name}</span>
+                    <span className="truncate">{project.name}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -191,7 +191,7 @@ export function AppSidebar() {
                   onClick={() => setOrgMenuOpen(!orgMenuOpen)}
                 >
                   <ArrowLeftRight className="size-4" />
-                  <span>{currentOrg.name}</span>
+                  <span className="truncate">{currentOrg.name}</span>
                 </SidebarMenuButton>
                 {orgMenuOpen && (
                   <div className="absolute bottom-full left-0 z-50 mb-1 w-full rounded-md border border-border bg-popover p-1 shadow-md">
@@ -224,9 +224,9 @@ export function AppSidebar() {
                 <div className="flex aspect-square size-8 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold uppercase">
                   {userName.charAt(0) || "?"}
                 </div>
-                <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="text-sm font-medium">{userName}</span>
-                  <span className="text-xs text-muted-foreground">{userEmail}</span>
+                <div className="flex min-w-0 flex-col gap-0.5 leading-none">
+                  <span className="truncate text-sm font-medium">{userName}</span>
+                  <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
                 </div>
               </SidebarMenuButton>
               {profileMenuOpen && (

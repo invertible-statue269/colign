@@ -41,7 +41,9 @@
     "createFirst": "AI와 함께 스펙을 작성할 첫 프로젝트를 만드세요",
     "createProject": "프로젝트 만들기",
     "projectName": "프로젝트 이름",
-    "description": "설명"
+    "description": "설명",
+    "noLead": "담당자 없음",
+    "noPriority": "우선순위 없음"
   },
   "project": {
     "overview": "개요",

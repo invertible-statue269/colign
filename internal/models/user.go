@@ -41,6 +41,7 @@ type Session struct {
 
 	ID           int64     `bun:"id,pk,autoincrement"`
 	UserID       int64     `bun:"user_id,notnull"`
+	OrgID        int64     `bun:"org_id"`
 	RefreshToken string    `bun:"refresh_token,notnull,unique"`
 	UserAgent    string    `bun:"user_agent"`
 	IP           string    `bun:"ip"`

@@ -83,7 +83,7 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="overflow-x-hidden">
         {/* Mobile hamburger */}
         <div className="flex items-center gap-2 border-b border-border/50 px-4 py-2 md:hidden">
           <SidebarTrigger />

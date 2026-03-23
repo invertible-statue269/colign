@@ -188,7 +188,7 @@ export default function ChangeDetailPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col overflow-x-hidden">
       {/* Breadcrumb Header */}
       <header className="border-b border-border/50 bg-background/80 backdrop-blur-md">
         <div className="flex items-center gap-2 px-6 py-2.5">
@@ -216,8 +216,8 @@ export default function ChangeDetailPage() {
       </header>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-5xl px-6 py-6">
+      <div className="relative isolate flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="mx-auto max-w-5xl overflow-hidden px-6 py-6">
           {/* Stage Progress — Desktop */}
           <div className="mb-4 hidden md:block">
             <div className="flex items-start">
@@ -228,7 +228,7 @@ export default function ChangeDetailPage() {
                 return (
                   <div key={s} className="contents">
                     {/* Stage icon */}
-                    <div className="relative z-10 flex shrink-0 flex-col items-center">
+                    <div className="relative flex shrink-0 flex-col items-center">
                       <div className="relative flex items-center justify-center">
                         {isActive && (
                           <>
@@ -239,7 +239,7 @@ export default function ChangeDetailPage() {
                                   "radial-gradient(circle, transparent 40%, var(--color-primary) 60%, transparent 75%)",
                               }}
                             />
-                            <div className="animate-stepper-glow absolute h-16 w-16 rounded-full bg-primary/30 blur-xl" />
+                            <div className="animate-stepper-glow absolute h-10 w-10 rounded-full bg-primary/20 blur-md" />
                           </>
                         )}
                         <div
@@ -330,7 +330,7 @@ export default function ChangeDetailPage() {
                                 "radial-gradient(circle, transparent 40%, var(--color-primary) 60%, transparent 75%)",
                             }}
                           />
-                          <div className="animate-stepper-glow absolute h-16 w-16 rounded-full bg-primary/30 blur-xl" />
+                          <div className="animate-stepper-glow absolute h-10 w-10 rounded-full bg-primary/20 blur-md" />
                         </>
                       )}
                       <div
@@ -474,7 +474,11 @@ export default function ChangeDetailPage() {
             <StructuredProposal changeId={changeId} currentStage={stage} />
           )}
           {activeTab === "design" && <DocumentTab changeId={changeId} docType="design" />}
-          {activeTab === "tasks" && <TaskBoard changeId={changeId} members={members} />}
+          {activeTab === "tasks" && (
+            <div className="min-h-0 max-h-[calc(100svh-20rem)] overflow-y-auto pr-1 md:max-h-[calc(100svh-18rem)]">
+              <TaskBoard changeId={changeId} members={members} />
+            </div>
+          )}
           {activeTab === "history" && (
             <div className="space-y-4">
               {history.length === 0 ? (

@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/uptrace/bun"
 
 	"github.com/gobenpark/colign/internal/auth"
+	"github.com/gobenpark/colign/internal/models"
 )
 
 type AuthorizeHandler struct {
@@ -65,6 +67,12 @@ func (h *AuthorizeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if claims := h.authenticateOAuthSession(w, r); claims != nil {
 		// User is authenticated — handle consent
 		if r.Method == http.MethodPost {
+			h.handleConsent(w, r, claims, clientID, redirectURI, state, codeChallenge)
+			return
+		}
+		// Auto-approve if the user has previously authorized this client for a specific org
+		if grantOrgID := h.findExistingGrantOrg(r.Context(), claims.UserID, clientID); grantOrgID != 0 {
+			claims.OrgID = grantOrgID
 			h.handleConsent(w, r, claims, clientID, redirectURI, state, codeChallenge)
 			return
 		}
@@ -167,6 +175,21 @@ func (h *AuthorizeHandler) clearOAuthSessionCookies(w http.ResponseWriter) {
 }
 
 func (h *AuthorizeHandler) handleConsent(w http.ResponseWriter, r *http.Request, claims *auth.Claims, clientID, redirectURI, state, codeChallenge string) {
+	// Use selected org from form, falling back to claims
+	orgID := claims.OrgID
+	if v := r.FormValue("org_id"); v != "" {
+		if parsed, err := strconv.ParseInt(v, 10, 64); err == nil {
+			// Verify user is a member of the selected org
+			isMember, _ := h.db.NewSelect().Model((*models.OrganizationMember)(nil)).
+				Where("organization_id = ?", parsed).
+				Where("user_id = ?", claims.UserID).
+				Exists(r.Context())
+			if isMember {
+				orgID = parsed
+			}
+		}
+	}
+
 	code, err := generateAuthCode()
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -175,7 +198,7 @@ func (h *AuthorizeHandler) handleConsent(w http.ResponseWriter, r *http.Request,
 
 	authCode := &OAuthAuthorizationCode{
 		UserID:        claims.UserID,
-		OrgID:         claims.OrgID,
+		OrgID:         orgID,
 		ClientID:      clientID,
 		Code:          code,
 		CodeChallenge: codeChallenge,
@@ -193,6 +216,25 @@ func (h *AuthorizeHandler) handleConsent(w http.ResponseWriter, r *http.Request,
 		redirect += "&state=" + state
 	}
 	http.Redirect(w, r, redirect, http.StatusFound)
+}
+
+// findExistingGrantOrg returns the org_id of an existing OAuth grant for this client,
+// or 0 if none exists. When the user belongs to multiple orgs, this enables auto-approve
+// for the previously selected org.
+func (h *AuthorizeHandler) findExistingGrantOrg(ctx context.Context, userID int64, clientID string) int64 {
+	var orgID int64
+	err := h.db.NewSelect().TableExpr("api_tokens").
+		Column("org_id").
+		Where("user_id = ?", userID).
+		Where("token_type = ?", "oauth").
+		Where("oauth_client_id = ?", clientID).
+		OrderExpr("created_at DESC").
+		Limit(1).
+		Scan(ctx, &orgID)
+	if err != nil {
+		return 0
+	}
+	return orgID
 }
 
 func generateAuthCode() (string, error) {
@@ -242,6 +284,8 @@ p { color: #a3a3a3; font-size: 0.875rem; margin: 0 0 1rem; }
 .user { color: #10b981; font-weight: 500; }
 .perms { background: #0a0a0a; border: 1px solid #262626; border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem; font-size: 0.875rem; }
 .perms li { margin-bottom: 0.5rem; }
+label { display: block; font-size: 0.875rem; margin-bottom: 0.25rem; color: #a3a3a3; }
+select { width: 100%; padding: 0.5rem; background: #0a0a0a; border: 1px solid #262626; border-radius: 6px; color: #e5e5e5; font-size: 0.875rem; margin-bottom: 1.5rem; box-sizing: border-box; }
 button { width: 100%; padding: 0.625rem; background: #10b981; color: #fff; border: none; border-radius: 6px; font-size: 0.875rem; font-weight: 500; cursor: pointer; }
 button:hover { background: #059669; }
 </style></head><body>
@@ -261,7 +305,11 @@ button:hover { background: #059669; }
 <input type="hidden" name="state" value="{{.State}}">
 <input type="hidden" name="code_challenge" value="{{.CodeChallenge}}">
 <input type="hidden" name="code_challenge_method" value="S256">
-<button type="submit">Authorize</button>
+{{if .ShowOrgSelect}}<label>Organization</label>
+<select name="org_id">
+{{range .Orgs}}<option value="{{.ID}}"{{if .Selected}} selected{{end}}>{{.Name}}</option>
+{{end}}</select>
+{{end}}<button type="submit">Authorize</button>
 </form></div></body></html>`))
 
 func (h *AuthorizeHandler) showLoginPage(w http.ResponseWriter, clientID, redirectURI, state, codeChallenge string) {
@@ -274,13 +322,34 @@ func (h *AuthorizeHandler) showLoginPage(w http.ResponseWriter, clientID, redire
 	})
 }
 
+type orgOption struct {
+	ID       int64
+	Name     string
+	Selected bool
+}
+
 func (h *AuthorizeHandler) showConsentPage(w http.ResponseWriter, claims *auth.Claims, clientID, redirectURI, state, codeChallenge string) {
+	// Query user's organizations
+	var orgs []models.Organization
+	_ = h.db.NewSelect().Model(&orgs).
+		Join("JOIN organization_members AS om ON om.organization_id = o.id").
+		Where("om.user_id = ?", claims.UserID).
+		OrderExpr("o.created_at ASC").
+		Scan(context.Background())
+
+	orgOptions := make([]orgOption, len(orgs))
+	for i, o := range orgs {
+		orgOptions[i] = orgOption{ID: o.ID, Name: o.Name, Selected: o.ID == claims.OrgID}
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = consentPageTmpl.Execute(w, map[string]string{
+	_ = consentPageTmpl.Execute(w, map[string]any{
 		"Email":         claims.Email,
 		"ClientID":      clientID,
 		"RedirectURI":   redirectURI,
 		"State":         state,
 		"CodeChallenge": codeChallenge,
+		"Orgs":          orgOptions,
+		"ShowOrgSelect": len(orgs) > 1,
 	})
 }

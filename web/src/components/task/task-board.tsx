@@ -270,7 +270,7 @@ export function TaskBoard({ changeId, members }: TaskBoardProps) {
   );
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex min-h-0 flex-col gap-4">
       {/* Toolbar */}
       <div className="flex items-center gap-1">
         <button
@@ -306,23 +306,27 @@ export function TaskBoard({ changeId, members }: TaskBoardProps) {
             <div key={i} className="h-16 animate-pulse rounded-md bg-muted" />
           ))}
         </div>
-      ) : viewMode === "kanban" ? (
-        <KanbanView
-          tasks={tasks}
-          members={members}
-          onCreateTask={handleCreate}
-          onUpdateTask={handleUpdate}
-          onDeleteTask={handleDelete}
-          onReorder={handleReorder}
-        />
       ) : (
-        <ListView
-          tasks={tasks}
-          members={members}
-          onCreateTask={handleCreate}
-          onUpdateTask={handleUpdate}
-          onDeleteTask={handleDelete}
-        />
+        <div className="min-h-0">
+          {viewMode === "kanban" ? (
+            <KanbanView
+              tasks={tasks}
+              members={members}
+              onCreateTask={handleCreate}
+              onUpdateTask={handleUpdate}
+              onDeleteTask={handleDelete}
+              onReorder={handleReorder}
+            />
+          ) : (
+            <ListView
+              tasks={tasks}
+              members={members}
+              onCreateTask={handleCreate}
+              onUpdateTask={handleUpdate}
+              onDeleteTask={handleDelete}
+            />
+          )}
+        </div>
       )}
 
       {/* Delete undo toast */}

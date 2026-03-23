@@ -298,6 +298,7 @@ func (s *OAuthService) createSession(ctx context.Context, user *models.User, org
 
 	session := &models.Session{
 		UserID:       user.ID,
+		OrgID:        orgID,
 		RefreshToken: tokenPair.RefreshToken,
 		ExpiresAt:    time.Now().Add(RefreshTokenDuration),
 	}

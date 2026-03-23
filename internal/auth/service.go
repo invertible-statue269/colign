@@ -255,9 +255,13 @@ func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (*Token
 		return nil, err
 	}
 
-	orgID, err := s.getOrCreateDefaultOrg(ctx, user)
-	if err != nil {
-		return nil, err
+	// Use the org stored in session; fall back to default if unset
+	orgID := session.OrgID
+	if orgID == 0 {
+		orgID, err = s.getOrCreateDefaultOrg(ctx, user)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return s.createSession(ctx, user, orgID)
@@ -294,6 +298,7 @@ func (s *Service) createSession(ctx context.Context, user *models.User, orgID in
 
 	session := &models.Session{
 		UserID:       user.ID,
+		OrgID:        orgID,
 		RefreshToken: tokenPair.RefreshToken,
 		ExpiresAt:    time.Now().Add(RefreshTokenDuration),
 	}
@@ -303,6 +308,19 @@ func (s *Service) createSession(ctx context.Context, user *models.User, orgID in
 	}
 
 	return tokenPair, nil
+}
+
+// SwitchOrg updates the current session's org and returns a new token pair.
+func (s *Service) SwitchOrg(ctx context.Context, userID int64, email, name string, newOrgID int64) (*TokenPair, error) {
+	// Delete all existing sessions for this user (they'll get a fresh one)
+	if _, err := s.db.NewDelete().Model((*models.Session)(nil)).
+		Where("user_id = ?", userID).
+		Exec(ctx); err != nil {
+		return nil, err
+	}
+
+	user := &models.User{ID: userID, Email: email, Name: name}
+	return s.createSession(ctx, user, newOrgID)
 }
 
 func (s *Service) Me(ctx context.Context, authHeader string) (*models.User, int64, error) {

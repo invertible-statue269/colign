@@ -153,18 +153,20 @@ export function StructuredProposal({ changeId, currentStage }: StructuredProposa
   function addDesignLink(url: string) {
     const trimmed = url.trim();
     if (!trimmed) return;
-    setSections((prev) => ({
-      ...prev,
-      designLinks: [...(prev.designLinks || []), trimmed],
-    }));
+    setSections((prev) => {
+      const updated = { ...prev, designLinks: [...(prev.designLinks || []), trimmed] };
+      sectionsRef.current = updated;
+      return updated;
+    });
     save();
   }
 
   function removeDesignLink(index: number) {
-    setSections((prev) => ({
-      ...prev,
-      designLinks: (prev.designLinks || []).filter((_, i) => i !== index),
-    }));
+    setSections((prev) => {
+      const updated = { ...prev, designLinks: (prev.designLinks || []).filter((_, i) => i !== index) };
+      sectionsRef.current = updated;
+      return updated;
+    });
     save();
   }
 
@@ -274,6 +276,29 @@ function getLinkType(url: string): "figma" | "generic" {
   return /figma\.com/.test(url) ? "figma" : "generic";
 }
 
+function extractLinkTitle(url: string): string {
+  try {
+    const parsed = new URL(url);
+    // Figma URLs: /design/{fileKey}/{file-name-slug} or /file/{fileKey}/{file-name-slug}
+    if (/figma\.com/.test(parsed.hostname)) {
+      const segments = parsed.pathname.split("/").filter(Boolean);
+      // segments: ["design", "fileKey", "file-name-slug"] or ["file", "fileKey", "file-name-slug"]
+      const nameSlug = segments[2];
+      if (nameSlug) {
+        return decodeURIComponent(nameSlug)
+          .replace(/-+/g, " ")
+          .replace(/^\s+|\s+$/g, "")
+          .trim();
+      }
+      return "Figma";
+    }
+    // Generic URLs: use hostname + pathname
+    return parsed.hostname.replace("www.", "") + parsed.pathname;
+  } catch {
+    return url;
+  }
+}
+
 interface DesignLinksSectionProps {
   links: string[];
   onAdd: (url: string) => void;
@@ -334,8 +359,9 @@ function DesignLinksSection({ links, onAdd, onRemove, readOnly, t }: DesignLinks
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 truncate text-sm text-primary hover:underline"
+                  title={link}
                 >
-                  {link}
+                  {extractLinkTitle(link)}
                 </a>
                 {embedUrl && (
                   <button

@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -16,29 +15,34 @@ import {
 } from "@/components/ui/select";
 import { Header } from "@/components/layout/header";
 import { workflowClient } from "@/lib/workflow";
+import { projectClient } from "@/lib/project";
+import { useI18n } from "@/lib/i18n";
 
-type SettingsTab = "general" | "members" | "approval" | "danger";
+type SettingsTab = "general" | "members" | "approval" | "archive" | "danger";
 
-const tabs: { id: SettingsTab; label: string }[] = [
-  { id: "general", label: "General" },
-  { id: "members", label: "Members" },
-  { id: "approval", label: "Approval Policy" },
-  { id: "danger", label: "Danger Zone" },
+const tabs: { id: SettingsTab; labelKey: string }[] = [
+  { id: "general", labelKey: "projectSettings.general" },
+  { id: "members", labelKey: "projectSettings.members" },
+  { id: "approval", labelKey: "projectSettings.approvalPolicy" },
+  { id: "archive", labelKey: "projectSettings.archivePolicy" },
+  { id: "danger", labelKey: "projectSettings.dangerZone" },
 ];
 
 const policyOptions = [
-  { value: "owner_one", label: "Owner 1 approval" },
-  { value: "editor_two", label: "2+ Editor approvals" },
-  { value: "all", label: "All members approve" },
-  { value: "auto_pass", label: "Auto-pass (no approval)" },
+  { value: "owner_one", labelKey: "projectSettings.ownerOne" },
+  { value: "editor_two", labelKey: "projectSettings.editorTwo" },
+  { value: "all", labelKey: "projectSettings.all" },
+  { value: "auto_pass", labelKey: "projectSettings.autoPass" },
 ];
 
 export default function ProjectSettingsPage() {
   const params = useParams();
   const slug = params.slug as string;
   const router = useRouter();
+  const { t } = useI18n();
 
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
+  const [projectId, setProjectId] = useState<bigint | null>(null);
 
   // General
   const [projectName, setProjectName] = useState("");
@@ -52,8 +56,53 @@ export default function ProjectSettingsPage() {
   const [policy, setPolicy] = useState("owner_one");
   const [minCount, setMinCount] = useState(1);
 
+  // Archive Policy
+  const [archiveMode, setArchiveMode] = useState("manual");
+  const [archiveTrigger, setArchiveTrigger] = useState("tasks_done");
+  const [archiveDaysDelay, setArchiveDaysDelay] = useState(0);
+  const [loadingArchivePolicy, setLoadingArchivePolicy] = useState(false);
+  const [savingArchive, setSavingArchive] = useState(false);
+  const [savedArchive, setSavedArchive] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState("");
+
+  // Load project ID on mount
+  useEffect(() => {
+    projectClient
+      .getProject({ slug })
+      .then((res) => {
+        if (res.project) {
+          setProjectId(res.project.id);
+          setProjectName(res.project.name);
+          setProjectDescription(res.project.description);
+        }
+      })
+      .catch(() => {
+        // handle error
+      });
+  }, [slug]);
+
+  // Load archive policy when archive tab becomes active
+  useEffect(() => {
+    if (activeTab !== "archive" || !projectId) return;
+    setLoadingArchivePolicy(true);
+    projectClient
+      .getArchivePolicy({ projectId })
+      .then((res) => {
+        if (res.policy) {
+          setArchiveMode(res.policy.mode || "manual");
+          setArchiveTrigger(res.policy.trigger || "tasks_done");
+          setArchiveDaysDelay(res.policy.daysDelay ?? 0);
+        }
+      })
+      .catch(() => {
+        // handle error
+      })
+      .finally(() => {
+        setLoadingArchivePolicy(false);
+      });
+  }, [activeTab, projectId]);
 
   function showSaved(section: string) {
     setSaved(section);
@@ -65,7 +114,7 @@ export default function ProjectSettingsPage() {
     if (section === "approval") {
       try {
         await workflowClient.setApprovalPolicy({
-          projectId: BigInt(1), // TODO: from context
+          projectId: projectId ?? BigInt(1),
           policy,
           minCount,
         });
@@ -78,6 +127,28 @@ export default function ProjectSettingsPage() {
     setSaving(false);
     showSaved(section);
   }
+
+  async function handleSaveArchivePolicy() {
+    if (!projectId) return;
+    setSavingArchive(true);
+    try {
+      await projectClient.updateArchivePolicy({
+        projectId,
+        mode: archiveMode,
+        trigger: archiveTrigger,
+        daysDelay: archiveDaysDelay,
+      });
+      setSavedArchive(true);
+      setTimeout(() => setSavedArchive(false), 2000);
+    } catch {
+      // handle error
+    } finally {
+      setSavingArchive(false);
+    }
+  }
+
+  const showDaysInput =
+    archiveTrigger === "days_after_ready" || archiveTrigger === "tasks_done_and_days";
 
   return (
     <div className="min-h-screen">
@@ -99,7 +170,7 @@ export default function ProjectSettingsPage() {
                       : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
                   } ${tab.id === "danger" ? "text-destructive" : ""}`}
                 >
-                  {tab.label}
+                  {t(tab.labelKey)}
                 </button>
               </li>
             ))}
@@ -112,12 +183,12 @@ export default function ProjectSettingsPage() {
           {activeTab === "general" && (
             <Card className="border-border/50">
               <CardHeader>
-                <CardTitle>General</CardTitle>
-                <CardDescription>Project name and description</CardDescription>
+                <CardTitle>{t("projectSettings.general")}</CardTitle>
+                <CardDescription>{t("projectSettings.projectNameDesc")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="project-name">Project Name</Label>
+                  <Label htmlFor="project-name">{t("projects.projectName")}</Label>
                   <Input
                     id="project-name"
                     value={projectName}
@@ -126,7 +197,7 @@ export default function ProjectSettingsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="project-desc">Description</Label>
+                  <Label htmlFor="project-desc">{t("projects.description")}</Label>
                   <Input
                     id="project-desc"
                     value={projectDescription}
@@ -140,9 +211,11 @@ export default function ProjectSettingsPage() {
                     disabled={saving}
                     className="cursor-pointer"
                   >
-                    {saving ? "Saving..." : "Save"}
+                    {saving ? t("common.saving") : t("common.save")}
                   </Button>
-                  {saved === "general" && <span className="text-sm text-emerald-400">Saved</span>}
+                  {saved === "general" && (
+                    <span className="text-sm text-emerald-400">{t("common.saved")}</span>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -153,8 +226,8 @@ export default function ProjectSettingsPage() {
             <>
               <Card className="border-border/50">
                 <CardHeader>
-                  <CardTitle>Invite Member</CardTitle>
-                  <CardDescription>Add team members by email</CardDescription>
+                  <CardTitle>{t("projectSettings.inviteMember")}</CardTitle>
+                  <CardDescription>{t("projectSettings.inviteMemberDesc")}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex gap-2">
@@ -165,7 +238,7 @@ export default function ProjectSettingsPage() {
                       type="email"
                       className="flex-1"
                     />
-                    <Select value={inviteRole} onValueChange={setInviteRole}>
+                    <Select value={inviteRole} onValueChange={(v) => v && setInviteRole(v)}>
                       <SelectTrigger className="w-32 cursor-pointer">
                         <SelectValue />
                       </SelectTrigger>
@@ -183,19 +256,21 @@ export default function ProjectSettingsPage() {
                       disabled={saving || !inviteEmail}
                       className="cursor-pointer"
                     >
-                      Invite
+                      {t("common.invite")}
                     </Button>
                   </div>
                   {saved === "invite" && (
-                    <p className="mt-2 text-sm text-emerald-400">Invitation sent</p>
+                    <p className="mt-2 text-sm text-emerald-400">
+                      {t("projectSettings.invitationSent")}
+                    </p>
                   )}
                 </CardContent>
               </Card>
 
               <Card className="border-border/50">
                 <CardHeader>
-                  <CardTitle>Members</CardTitle>
-                  <CardDescription>People with access to this project</CardDescription>
+                  <CardTitle>{t("projectSettings.members")}</CardTitle>
+                  <CardDescription>{t("projectSettings.membersDesc")}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
@@ -224,22 +299,20 @@ export default function ProjectSettingsPage() {
           {activeTab === "approval" && (
             <Card className="border-border/50">
               <CardHeader>
-                <CardTitle>Approval Policy</CardTitle>
-                <CardDescription>
-                  Configure how changes are approved before implementation
-                </CardDescription>
+                <CardTitle>{t("projectSettings.approvalPolicy")}</CardTitle>
+                <CardDescription>{t("projectSettings.approvalPolicyDesc")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
                 <div className="space-y-2">
-                  <Label>Policy Type</Label>
-                  <Select value={policy} onValueChange={setPolicy}>
+                  <Label>{t("projectSettings.policyType")}</Label>
+                  <Select value={policy} onValueChange={(v) => v && setPolicy(v)}>
                     <SelectTrigger className="cursor-pointer">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {policyOptions.map((opt) => (
                         <SelectItem key={opt.value} value={opt.value} className="cursor-pointer">
-                          {opt.label}
+                          {t(opt.labelKey)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -247,7 +320,7 @@ export default function ProjectSettingsPage() {
                 </div>
                 {policy !== "auto_pass" && policy !== "all" && (
                   <div className="space-y-2">
-                    <Label>Minimum Approvals</Label>
+                    <Label>{t("projectSettings.minApprovals")}</Label>
                     <Input
                       type="number"
                       min={1}
@@ -263,10 +336,99 @@ export default function ProjectSettingsPage() {
                     disabled={saving}
                     className="cursor-pointer"
                   >
-                    {saving ? "Saving..." : "Save Policy"}
+                    {saving ? t("common.saving") : t("projectSettings.savePolicy")}
                   </Button>
-                  {saved === "approval" && <span className="text-sm text-emerald-400">Saved</span>}
+                  {saved === "approval" && (
+                    <span className="text-sm text-emerald-400">{t("common.saved")}</span>
+                  )}
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Archive Policy */}
+          {activeTab === "archive" && (
+            <Card className="border-border/50">
+              <CardHeader>
+                <CardTitle>{t("projectSettings.archivePolicy")}</CardTitle>
+                <CardDescription>{t("projectSettings.archivePolicyDesc")}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                {loadingArchivePolicy ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label>{t("projectSettings.archiveMode")}</Label>
+                      <Select value={archiveMode} onValueChange={(v) => v && setArchiveMode(v)}>
+                        <SelectTrigger className="cursor-pointer">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="manual" className="cursor-pointer">
+                            {t("projectSettings.archiveModeManual")}
+                          </SelectItem>
+                          <SelectItem value="auto" className="cursor-pointer">
+                            {t("projectSettings.archiveModeAuto")}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {archiveMode === "auto" && (
+                      <div className="space-y-2">
+                        <Label>{t("projectSettings.archiveTrigger")}</Label>
+                        <Select value={archiveTrigger} onValueChange={(v) => v && setArchiveTrigger(v)}>
+                          <SelectTrigger className="cursor-pointer">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="tasks_done" className="cursor-pointer">
+                              {t("projectSettings.archiveTriggerTasksDone")}
+                            </SelectItem>
+                            <SelectItem value="days_after_ready" className="cursor-pointer">
+                              {t("projectSettings.archiveTriggerDaysAfterReady")}
+                            </SelectItem>
+                            <SelectItem value="tasks_done_and_days" className="cursor-pointer">
+                              {t("projectSettings.archiveTriggerTasksDoneAndDays")}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {archiveMode === "auto" && showDaysInput && (
+                      <div className="space-y-2">
+                        <Label>{t("projectSettings.archiveDaysDelay")}</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={365}
+                          value={archiveDaysDelay}
+                          onChange={(e) => setArchiveDaysDelay(Number(e.target.value))}
+                          className="w-32"
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-3 pt-2">
+                      <Button
+                        onClick={handleSaveArchivePolicy}
+                        disabled={savingArchive || !projectId}
+                        className="cursor-pointer"
+                      >
+                        {savingArchive
+                          ? t("common.saving")
+                          : t("projectSettings.saveArchivePolicy")}
+                      </Button>
+                      {savedArchive && (
+                        <span className="text-sm text-emerald-400">{t("common.saved")}</span>
+                      )}
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           )}
@@ -275,28 +437,30 @@ export default function ProjectSettingsPage() {
           {activeTab === "danger" && (
             <Card className="border-destructive/30">
               <CardHeader>
-                <CardTitle className="text-destructive">Danger Zone</CardTitle>
-                <CardDescription>These actions are irreversible</CardDescription>
+                <CardTitle className="text-destructive">
+                  {t("projectSettings.dangerZone")}
+                </CardTitle>
+                <CardDescription>{t("projectSettings.deleteConfirm")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between rounded-lg border border-destructive/20 p-4">
                   <div>
-                    <p className="text-sm font-medium">Delete this project</p>
+                    <p className="text-sm font-medium">{t("projectSettings.deleteProject")}</p>
                     <p className="text-xs text-muted-foreground">
-                      All changes, specs, and data will be permanently deleted
+                      {t("projectSettings.deleteProjectDesc")}
                     </p>
                   </div>
                   <Button
                     variant="outline"
                     className="cursor-pointer border-destructive/50 text-destructive hover:bg-destructive/10"
                     onClick={() => {
-                      if (confirm("Are you sure? This cannot be undone.")) {
+                      if (confirm(t("projectSettings.deleteConfirm"))) {
                         // TODO: API call
                         router.push("/projects");
                       }
                     }}
                   >
-                    Delete Project
+                    {t("projectSettings.deleteProject")}
                   </Button>
                 </div>
               </CardContent>

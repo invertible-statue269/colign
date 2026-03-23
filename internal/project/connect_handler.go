@@ -10,20 +10,22 @@ import (
 
 	projectv1 "github.com/gobenpark/colign/gen/proto/project/v1"
 	"github.com/gobenpark/colign/gen/proto/project/v1/projectv1connect"
+	"github.com/gobenpark/colign/internal/archive"
 	"github.com/gobenpark/colign/internal/auth"
 	"github.com/gobenpark/colign/internal/models"
 )
 
 type ConnectHandler struct {
 	service           *Service
+	archiveService    *archive.Service
 	jwtManager        *auth.JWTManager
 	apiTokenValidator auth.APITokenValidator
 }
 
 var _ projectv1connect.ProjectServiceHandler = (*ConnectHandler)(nil)
 
-func NewConnectHandler(service *Service, jwtManager *auth.JWTManager, apiTokenValidator auth.APITokenValidator) *ConnectHandler {
-	return &ConnectHandler{service: service, jwtManager: jwtManager, apiTokenValidator: apiTokenValidator}
+func NewConnectHandler(service *Service, archiveService *archive.Service, jwtManager *auth.JWTManager, apiTokenValidator auth.APITokenValidator) *ConnectHandler {
+	return &ConnectHandler{service: service, archiveService: archiveService, jwtManager: jwtManager, apiTokenValidator: apiTokenValidator}
 }
 
 func (h *ConnectHandler) extractClaims(ctx context.Context, header string) (*auth.Claims, error) {
@@ -259,7 +261,11 @@ func (h *ConnectHandler) CreateChange(ctx context.Context, req *connect.Request[
 }
 
 func (h *ConnectHandler) ListChanges(ctx context.Context, req *connect.Request[projectv1.ListChangesRequest]) (*connect.Response[projectv1.ListChangesResponse], error) {
-	changes, err := h.service.ListChanges(ctx, req.Msg.ProjectId)
+	filter := "active"
+	if req.Msg.Filter != nil {
+		filter = *req.Msg.Filter
+	}
+	changes, err := h.service.ListChanges(ctx, req.Msg.ProjectId, filter)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -293,6 +299,140 @@ func (h *ConnectHandler) DeleteChange(ctx context.Context, req *connect.Request[
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&projectv1.DeleteChangeResponse{}), nil
+}
+
+func (h *ConnectHandler) checkChangeRole(ctx context.Context, changeID int64, userID int64, requiredRole string) error {
+	var role string
+	err := h.service.db.NewSelect().
+		TableExpr("project_members pm").
+		ColumnExpr("pm.role").
+		Join("JOIN changes ch ON ch.project_id = pm.project_id").
+		Where("ch.id = ?", changeID).
+		Where("pm.user_id = ?", userID).
+		Scan(ctx, &role)
+	if err != nil {
+		return connect.NewError(connect.CodePermissionDenied, errors.New("not a project member"))
+	}
+	if requiredRole == "owner" && role != "owner" {
+		return connect.NewError(connect.CodePermissionDenied, errors.New("owner access required"))
+	}
+	return nil
+}
+
+func (h *ConnectHandler) ArchiveChange(ctx context.Context, req *connect.Request[projectv1.ArchiveChangeRequest]) (*connect.Response[projectv1.ArchiveChangeResponse], error) {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.checkChangeRole(ctx, req.Msg.ChangeId, claims.UserID, "editor"); err != nil {
+		return nil, err
+	}
+
+	change, err := h.archiveService.Archive(ctx, req.Msg.ChangeId, claims.UserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, archive.ErrChangeNotFound):
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		case errors.Is(err, archive.ErrNotReady), errors.Is(err, archive.ErrAlreadyArchived):
+			return nil, connect.NewError(connect.CodeFailedPrecondition, err)
+		default:
+			return nil, connect.NewError(connect.CodeInternal, err)
+		}
+	}
+
+	return connect.NewResponse(&projectv1.ArchiveChangeResponse{
+		Change: changeToProto(change),
+	}), nil
+}
+
+func (h *ConnectHandler) UnarchiveChange(ctx context.Context, req *connect.Request[projectv1.UnarchiveChangeRequest]) (*connect.Response[projectv1.UnarchiveChangeResponse], error) {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.checkChangeRole(ctx, req.Msg.ChangeId, claims.UserID, "editor"); err != nil {
+		return nil, err
+	}
+
+	change, err := h.archiveService.Unarchive(ctx, req.Msg.ChangeId, claims.UserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, archive.ErrChangeNotFound):
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		case errors.Is(err, archive.ErrNotArchived):
+			return nil, connect.NewError(connect.CodeFailedPrecondition, err)
+		default:
+			return nil, connect.NewError(connect.CodeInternal, err)
+		}
+	}
+
+	return connect.NewResponse(&projectv1.UnarchiveChangeResponse{
+		Change: changeToProto(change),
+	}), nil
+}
+
+func (h *ConnectHandler) GetArchivePolicy(ctx context.Context, req *connect.Request[projectv1.GetArchivePolicyRequest]) (*connect.Response[projectv1.GetArchivePolicyResponse], error) {
+	_, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	policy, err := h.archiveService.GetPolicy(ctx, req.Msg.ProjectId)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	return connect.NewResponse(&projectv1.GetArchivePolicyResponse{
+		Policy: &projectv1.ArchivePolicyMsg{
+			ProjectId: policy.ProjectID,
+			Mode:      string(policy.Mode),
+			Trigger:   string(policy.TriggerType),
+			DaysDelay: int32(policy.DaysDelay),
+		},
+	}), nil
+}
+
+func (h *ConnectHandler) UpdateArchivePolicy(ctx context.Context, req *connect.Request[projectv1.UpdateArchivePolicyRequest]) (*connect.Response[projectv1.UpdateArchivePolicyResponse], error) {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	// Check that the user is an owner of the project
+	var role string
+	dbErr := h.service.db.NewSelect().
+		TableExpr("project_members").
+		ColumnExpr("role").
+		Where("project_id = ?", req.Msg.ProjectId).
+		Where("user_id = ?", claims.UserID).
+		Scan(ctx, &role)
+	if dbErr != nil {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("not a project member"))
+	}
+	if role != "owner" {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("owner access required"))
+	}
+
+	policy, err := h.archiveService.UpdatePolicy(ctx, &models.ArchivePolicy{
+		ProjectID:   req.Msg.ProjectId,
+		Mode:        models.ArchiveMode(req.Msg.Mode),
+		TriggerType: models.ArchiveTrigger(req.Msg.Trigger),
+		DaysDelay:   int(req.Msg.DaysDelay),
+	})
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	return connect.NewResponse(&projectv1.UpdateArchivePolicyResponse{
+		Policy: &projectv1.ArchivePolicyMsg{
+			ProjectId: policy.ProjectID,
+			Mode:      string(policy.Mode),
+			Trigger:   string(policy.TriggerType),
+			DaysDelay: int32(policy.DaysDelay),
+		},
+	}), nil
 }
 
 func projectToProto(p *models.Project) *projectv1.Project {
@@ -344,7 +484,7 @@ func memberToProto(m *models.ProjectMember) *projectv1.ProjectMember {
 }
 
 func changeToProto(c *models.Change) *projectv1.Change {
-	return &projectv1.Change{
+	pc := &projectv1.Change{
 		Id:        c.ID,
 		ProjectId: c.ProjectID,
 		Name:      c.Name,
@@ -352,6 +492,10 @@ func changeToProto(c *models.Change) *projectv1.Change {
 		CreatedAt: timestamppb.New(c.CreatedAt),
 		UpdatedAt: timestamppb.New(c.UpdatedAt),
 	}
+	if c.ArchivedAt != nil {
+		pc.ArchivedAt = timestamppb.New(*c.ArchivedAt)
+	}
+	return pc
 }
 
 func labelToProto(l *models.ProjectLabel) *projectv1.ProjectLabel {

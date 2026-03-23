@@ -37,6 +37,7 @@ type Change struct {
 	ChangeType ChangeType  `bun:"change_type,notnull,default:'feature'"`
 	CreatedAt  time.Time   `bun:"created_at,notnull,default:current_timestamp"`
 	UpdatedAt  time.Time   `bun:"updated_at,notnull,default:current_timestamp"`
+	ArchivedAt *time.Time  `bun:"archived_at"`
 
 	Project *Project `bun:"rel:belongs-to,join:project_id=id"`
 }

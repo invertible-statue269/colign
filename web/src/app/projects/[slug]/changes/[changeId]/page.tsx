@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { workflowClient } from "@/lib/workflow";
 import { projectClient } from "@/lib/project";
+import { Archive, ArchiveRestore } from "lucide-react";
 import { DocumentTab } from "@/components/change/document-tab";
 import { StructuredProposal } from "@/components/change/structured-proposal";
 import { TaskBoard } from "@/components/task/task-board";
@@ -97,6 +98,8 @@ export default function ChangeDetailPage() {
   const [animatingFrom, setAnimatingFrom] = useState<number | null>(null);
   const [showConfirmAdvance, setShowConfirmAdvance] = useState(false);
   const [members, setMembers] = useState<Array<{ userId: bigint; userName: string }>>([]);
+  const [archivedAt, setArchivedAt] = useState<{ seconds: bigint; nanos: number } | undefined>(undefined);
+  const [archiving, setArchiving] = useState(false);
 
   const prevStageRef = useRef(stage);
 
@@ -109,9 +112,10 @@ export default function ChangeDetailPage() {
           userName: m.userName,
         })),
       );
-      const [statusRes, historyRes] = await Promise.all([
+      const [statusRes, historyRes, changeRes] = await Promise.all([
         workflowClient.getStatus({ changeId }),
         workflowClient.getHistory({ changeId }),
+        projectClient.getChange({ id: changeId }),
       ]);
       setStage(statusRes.stage);
       setConditions(
@@ -127,10 +131,35 @@ export default function ChangeDetailPage() {
           userName: e.userName,
         })),
       );
+      setArchivedAt(changeRes.change?.archivedAt);
     } catch {
       // handle error
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleArchive() {
+    setArchiving(true);
+    try {
+      await projectClient.archiveChange({ changeId });
+      await loadAll();
+    } catch {
+      // handle error
+    } finally {
+      setArchiving(false);
+    }
+  }
+
+  async function handleUnarchive() {
+    setArchiving(true);
+    try {
+      await projectClient.unarchiveChange({ changeId });
+      await loadAll();
+    } catch {
+      // handle error
+    } finally {
+      setArchiving(false);
     }
   }
 
@@ -370,6 +399,13 @@ export default function ChangeDetailPage() {
 
           {/* Gate Conditions + Advance (always visible below stepper) */}
           <div className="mb-6 rounded-lg border border-border/50 p-4">
+            {/* Archived banner */}
+            {archivedAt && (
+              <div className="mb-3 flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+                <Archive className="h-4 w-4 text-amber-400 shrink-0" />
+                <span className="text-sm text-amber-400">{t("change.archived")}</span>
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex flex-1 flex-wrap items-center gap-2">
                 {conditions.map((c) => (
@@ -417,11 +453,37 @@ export default function ChangeDetailPage() {
                   <span className="text-xs text-muted-foreground">No gate conditions</span>
                 )}
               </div>
-              {stage !== "ready" && (
-                <Button onClick={handleAdvance} size="sm" className="cursor-pointer">
-                  Advance to {stageConfig[stages[currentIdx + 1]]?.label ?? "next"}
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                {stage !== "ready" && !archivedAt && (
+                  <Button onClick={handleAdvance} size="sm" className="cursor-pointer" disabled={!!archivedAt}>
+                    Advance to {stageConfig[stages[currentIdx + 1]]?.label ?? "next"}
+                  </Button>
+                )}
+                {stage === "ready" && !archivedAt && (
+                  <Button
+                    onClick={handleArchive}
+                    size="sm"
+                    variant="outline"
+                    className="cursor-pointer"
+                    disabled={archiving}
+                  >
+                    <Archive className="mr-1.5 h-3.5 w-3.5" />
+                    {t("change.archive")}
+                  </Button>
+                )}
+                {archivedAt && (
+                  <Button
+                    onClick={handleUnarchive}
+                    size="sm"
+                    variant="outline"
+                    className="cursor-pointer"
+                    disabled={archiving}
+                  >
+                    <ArchiveRestore className="mr-1.5 h-3.5 w-3.5" />
+                    {t("change.restore")}
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Confirm dialog for advancing with unmet gates */}

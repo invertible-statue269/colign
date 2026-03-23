@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -27,6 +28,7 @@ import (
 	"github.com/gobenpark/colign/gen/proto/workflow/v1/workflowv1connect"
 	"github.com/gobenpark/colign/internal/acceptance"
 	"github.com/gobenpark/colign/internal/apitoken"
+	"github.com/gobenpark/colign/internal/archive"
 	"github.com/gobenpark/colign/internal/comment"
 	"github.com/gobenpark/colign/internal/document"
 	"github.com/gobenpark/colign/internal/events"
@@ -106,6 +108,7 @@ func (s *Server) setupRoutes(cfg *config.Config) {
 
 	// OAuth redirect routes (REST)
 	oauthHandler := auth.NewOAuthHandler(oauthService, cfg.FrontendURL, cookieOpts)
+	s.mux.HandleFunc("GET /api/auth/providers", oauthHandler.Providers)
 	s.mux.HandleFunc("GET /api/auth/{provider}", oauthHandler.Redirect)
 	s.mux.HandleFunc("GET /api/auth/{provider}/callback", oauthHandler.Callback)
 
@@ -117,7 +120,11 @@ func (s *Server) setupRoutes(cfg *config.Config) {
 
 	// Project service (Connect)
 	projectService := project.NewService(s.db)
-	projectConnectHandler := project.NewConnectHandler(projectService, s.jwtManager, apiTokenService)
+	archiveService := archive.NewService(s.db)
+	cronCtx, cronCancel := context.WithCancel(context.Background())
+	_ = cronCancel // TODO: call on server shutdown
+	archiveService.StartCron(cronCtx)
+	projectConnectHandler := project.NewConnectHandler(projectService, archiveService, s.jwtManager, apiTokenService)
 	projectPath, projectHandler := projectv1connect.NewProjectServiceHandler(projectConnectHandler)
 	s.mux.Handle(projectPath, projectHandler)
 
@@ -145,7 +152,7 @@ func (s *Server) setupRoutes(cfg *config.Config) {
 	s.mux.Handle(documentPath, documentHandler)
 
 	// Task service (Connect)
-	taskService := task.NewService(s.db)
+	taskService := task.NewService(s.db, task.WithArchiveEvaluator(archiveService))
 	taskConnectHandler := task.NewConnectHandler(taskService, s.jwtManager, apiTokenService)
 	taskPath, taskHandler := taskv1connect.NewTaskServiceHandler(taskConnectHandler)
 	s.mux.Handle(taskPath, taskHandler)

@@ -90,6 +90,7 @@ interface Change {
   id: bigint;
   name: string;
   stage: string;
+  archivedAt?: { seconds: bigint; nanos: number };
 }
 
 interface ProjectDetail {
@@ -208,12 +209,12 @@ export default function ProjectDetailPage() {
             })),
           );
           const [changesRes, memoryRes] = await Promise.all([
-            projectClient.listChanges({ projectId: projectRes.project.id }),
+            projectClient.listChanges({ projectId: projectRes.project.id, filter: "active" }),
             memoryClient
               .getMemory({ projectId: projectRes.project.id })
               .catch(() => ({ memory: undefined })),
           ]);
-          setChanges(changesRes.changes.map((c) => ({ id: c.id, name: c.name, stage: c.stage })));
+          setChanges(changesRes.changes.map((c) => ({ id: c.id, name: c.name, stage: c.stage, archivedAt: c.archivedAt })));
           setMemoryContent(memoryRes.memory?.content ?? "");
         }
       } catch {
@@ -236,7 +237,7 @@ export default function ProjectDetailPage() {
       });
       if (res.change) {
         setChanges((prev) => [
-          { id: res.change!.id, name: res.change!.name, stage: res.change!.stage },
+          { id: res.change!.id, name: res.change!.name, stage: res.change!.stage, archivedAt: res.change!.archivedAt },
           ...prev,
         ]);
         setNewChangeName("");
@@ -704,7 +705,8 @@ export default function ProjectDetailPage() {
 
         {activeTab === "changes" && (
           <ChangesTab
-            changes={changes}
+            projectId={project.id}
+            initialChanges={changes}
             projectSlug={project.slug}
             newChangeName={newChangeName}
             setNewChangeName={setNewChangeName}
@@ -1068,7 +1070,8 @@ function OverviewTab({
 // ─── Changes Tab ────────────────────────────────────────
 
 function ChangesTab({
-  changes,
+  projectId,
+  initialChanges,
   projectSlug,
   newChangeName,
   setNewChangeName,
@@ -1076,7 +1079,8 @@ function ChangesTab({
   onCreateChange,
   t,
 }: {
-  changes: Change[];
+  projectId: bigint;
+  initialChanges: Change[];
   projectSlug: string;
   newChangeName: string;
   setNewChangeName: (v: string) => void;
@@ -1084,46 +1088,131 @@ function ChangesTab({
   onCreateChange: (e: React.FormEvent) => void;
   t: (key: string) => string;
 }) {
+  const [archiveFilter, setArchiveFilter] = useState<"active" | "archived">("active");
+  const [activeChanges, setActiveChanges] = useState<Change[]>(initialChanges);
+  const [archivedChanges, setArchivedChanges] = useState<Change[]>([]);
+  const [archivedCount, setArchivedCount] = useState<number | null>(null);
+  const [loadingArchived, setLoadingArchived] = useState(false);
+
+  // Fetch archived count once on mount
+  useEffect(() => {
+    projectClient
+      .listChanges({ projectId, filter: "archived" })
+      .then((res) => {
+        setArchivedCount(res.changes.length);
+        setArchivedChanges(res.changes.map((c) => ({ id: c.id, name: c.name, stage: c.stage, archivedAt: c.archivedAt })));
+      })
+      .catch(() => {
+        setArchivedCount(0);
+      });
+  }, [projectId]);
+
+  async function switchToFilter(filter: "active" | "archived") {
+    setArchiveFilter(filter);
+    if (filter === "archived" && archivedChanges.length === 0 && archivedCount !== 0) {
+      setLoadingArchived(true);
+      try {
+        const res = await projectClient.listChanges({ projectId, filter: "archived" });
+        setArchivedChanges(res.changes.map((c) => ({ id: c.id, name: c.name, stage: c.stage, archivedAt: c.archivedAt })));
+        setArchivedCount(res.changes.length);
+      } catch {
+        // handle error
+      } finally {
+        setLoadingArchived(false);
+      }
+    }
+    if (filter === "active") {
+      try {
+        const res = await projectClient.listChanges({ projectId, filter: "active" });
+        setActiveChanges(res.changes.map((c) => ({ id: c.id, name: c.name, stage: c.stage, archivedAt: c.archivedAt })));
+      } catch {
+        // handle error
+      }
+    }
+  }
+
+  const displayChanges = archiveFilter === "active" ? activeChanges : archivedChanges;
+
   return (
     <div>
-      {/* Create Change */}
-      <form onSubmit={onCreateChange} className="mb-6">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Plus className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/50" />
-            <Input
-              value={newChangeName}
-              onChange={(e) => setNewChangeName(e.target.value)}
-              placeholder={t("project.newChangePlaceholder")}
-              className="pl-9 bg-card/50 border-border/40 focus:border-primary/50 transition-colors"
-            />
+      {/* Archive Filter Tabs */}
+      <div className="mb-4 flex gap-1 border-b border-border/50">
+        <button
+          onClick={() => switchToFilter("active")}
+          className={`cursor-pointer whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors duration-200 ${
+            archiveFilter === "active"
+              ? "border-b-2 border-primary text-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {t("project.activeChanges")}
+          <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+            {activeChanges.length}
+          </span>
+        </button>
+        <button
+          onClick={() => switchToFilter("archived")}
+          className={`cursor-pointer whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors duration-200 ${
+            archiveFilter === "archived"
+              ? "border-b-2 border-primary text-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {t("project.archivedChanges")}
+          {archivedCount !== null && (
+            <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+              {archivedCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Create Change — only for active */}
+      {archiveFilter === "active" && (
+        <form onSubmit={onCreateChange} className="mb-6">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Plus className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/50" />
+              <Input
+                value={newChangeName}
+                onChange={(e) => setNewChangeName(e.target.value)}
+                placeholder={t("project.newChangePlaceholder")}
+                className="pl-9 bg-card/50 border-border/40 focus:border-primary/50 transition-colors"
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={creating || !newChangeName.trim()}
+              className="cursor-pointer px-5"
+            >
+              {creating ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+              ) : (
+                t("common.create")
+              )}
+            </Button>
           </div>
-          <Button
-            type="submit"
-            disabled={creating || !newChangeName.trim()}
-            className="cursor-pointer px-5"
-          >
-            {creating ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-            ) : (
-              t("common.create")
-            )}
-          </Button>
-        </div>
-      </form>
+        </form>
+      )}
 
       {/* Changes List */}
-      {changes.length === 0 ? (
+      {loadingArchived ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      ) : displayChanges.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/40 bg-card/30 py-20">
           <div className="mb-5 rounded-2xl bg-primary/5 p-5">
             <FileText className="size-10 text-primary/40" />
           </div>
           <p className="text-sm font-medium text-foreground/70">{t("project.noChanges")}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{t("project.createFirstChange")}</p>
+          {archiveFilter === "active" && (
+            <p className="mt-1 text-xs text-muted-foreground">{t("project.createFirstChange")}</p>
+          )}
         </div>
       ) : (
         <div className="space-y-2">
-          {changes.map((change) => {
+          {displayChanges.map((change) => {
             const config = stageConfig[change.stage] ?? stageConfig.draft;
             return (
               <Link key={String(change.id)} href={`/projects/${projectSlug}/changes/${change.id}`}>

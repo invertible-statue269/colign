@@ -322,13 +322,22 @@ func (s *Service) CreateChange(ctx context.Context, projectID int64, name string
 	return change, nil
 }
 
-func (s *Service) ListChanges(ctx context.Context, projectID int64) ([]models.Change, error) {
+func (s *Service) ListChanges(ctx context.Context, projectID int64, filter string) ([]models.Change, error) {
 	var changes []models.Change
-	err := s.db.NewSelect().Model(&changes).
+	q := s.db.NewSelect().Model(&changes).
 		Where("project_id = ?", projectID).
-		OrderExpr("created_at DESC").
-		Scan(ctx)
-	if err != nil {
+		OrderExpr("created_at DESC")
+
+	switch filter {
+	case "archived":
+		q = q.Where("archived_at IS NOT NULL")
+	case "all":
+		// no filter
+	default: // "active" or empty
+		q = q.Where("archived_at IS NULL")
+	}
+
+	if err := q.Scan(ctx); err != nil {
 		return nil, err
 	}
 	return changes, nil

@@ -26,6 +26,8 @@ func (s *Service) Get(ctx context.Context, changeID int64, docType models.Docume
 	err := s.db.NewSelect().Model(doc).
 		Where("change_id = ?", changeID).
 		Where("type = ?", docType).
+		OrderExpr("updated_at DESC").
+		Limit(1).
 		Scan(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

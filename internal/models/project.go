@@ -50,6 +50,7 @@ type Project struct {
 	Name           string          `bun:"name,notnull"`
 	Slug           string          `bun:"slug,notnull"`
 	Description    string          `bun:"description"`
+	Readme         string          `bun:"readme"`
 	Status         ProjectStatus   `bun:"status,notnull,default:'backlog'"`
 	Priority       ProjectPriority `bun:"priority,notnull,default:'none'"`
 	Health         ProjectHealth   `bun:"health,notnull,default:'on_track'"`

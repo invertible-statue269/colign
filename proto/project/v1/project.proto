@@ -26,6 +26,7 @@ message Project {
   string color = 15;
   repeated ProjectLabel labels = 16;
   string lead_avatar_url = 17;
+  string readme = 18;
 }
 
 message ProjectMember {
@@ -91,6 +92,7 @@ message UpdateProjectRequest {
   optional string target_date = 9;
   optional string icon = 10;
   optional string color = 11;
+  optional string readme = 12;
 }
 
 message UpdateProjectResponse {

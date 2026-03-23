@@ -17,7 +17,7 @@ func setupWorkflowTestDB(t *testing.T) (*bun.DB, sqlmock.Sqlmock) {
 	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 	require.NoError(t, err)
 	db := bun.NewDB(mockDB, pgdialect.New())
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { _ = db.Close() })
 	return db, mock
 }
 

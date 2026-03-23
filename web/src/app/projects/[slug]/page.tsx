@@ -3,8 +3,11 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -38,10 +41,8 @@ import {
   Layers,
   Brain,
   Save,
-  Calendar,
   User,
   Signal,
-  ChevronDown,
 } from "lucide-react";
 
 const stageConfig: Record<string, { label: string; color: string; icon: string; glow: string }> = {
@@ -105,6 +106,7 @@ interface ProjectDetail {
   name: string;
   slug: string;
   description: string;
+  readme: string;
   status: string;
   priority: string;
   health: string;
@@ -116,12 +118,15 @@ interface ProjectDetail {
   color: string;
 }
 
-function mapProjectDetail(project: NonNullable<Awaited<ReturnType<typeof projectClient.getProject>>["project"]>): ProjectDetail {
+function mapProjectDetail(
+  project: NonNullable<Awaited<ReturnType<typeof projectClient.getProject>>["project"]>,
+): ProjectDetail {
   return {
     id: project.id,
     name: project.name,
     slug: project.slug,
     description: project.description,
+    readme: project.readme,
     status: project.status,
     priority: project.priority,
     health: project.health,
@@ -224,7 +229,14 @@ export default function ProjectDetailPage() {
               .getMemory({ projectId: projectRes.project.id })
               .catch(() => ({ memory: undefined })),
           ]);
-          setChanges(changesRes.changes.map((c) => ({ id: c.id, name: c.name, stage: c.stage, archivedAt: c.archivedAt })));
+          setChanges(
+            changesRes.changes.map((c) => ({
+              id: c.id,
+              name: c.name,
+              stage: c.stage,
+              archivedAt: c.archivedAt,
+            })),
+          );
           setMemoryContent(memoryRes.memory?.content ?? "");
         }
       } catch {
@@ -247,7 +259,12 @@ export default function ProjectDetailPage() {
       });
       if (res.change) {
         setChanges((prev) => [
-          { id: res.change!.id, name: res.change!.name, stage: res.change!.stage, archivedAt: res.change!.archivedAt },
+          {
+            id: res.change!.id,
+            name: res.change!.name,
+            stage: res.change!.stage,
+            archivedAt: res.change!.archivedAt,
+          },
           ...prev,
         ]);
         setNewChangeName("");
@@ -301,7 +318,7 @@ export default function ProjectDetailPage() {
             leadName:
               value === BigInt(0)
                 ? ""
-                : orgMembers.find((member) => member.userId === value)?.name ?? project.leadName,
+                : (orgMembers.find((member) => member.userId === value)?.name ?? project.leadName),
           }
         : {}),
     } as ProjectDetail);
@@ -645,61 +662,17 @@ export default function ProjectDetailPage() {
               )}
             </div>
 
-            {/* Start Date */}
-            <div className="relative">
-              <button
-                onClick={() =>
-                  setActiveProperty(activeProperty === "startDate" ? null : "startDate")
-                }
-                className="flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-accent"
-              >
-                <Calendar className="size-3.5 text-muted-foreground/60" />
-                <span
-                  className={project.startDate ? "text-foreground/80" : "text-muted-foreground/40"}
-                >
-                  {project.startDate || "Start date"}
-                </span>
-              </button>
-              {activeProperty === "startDate" && (
-                <div className="absolute left-0 top-full z-50 mt-1 rounded-lg border border-border/50 bg-popover p-2 shadow-xl animate-in fade-in slide-in-from-top-1 duration-100">
-                  <input
-                    type="date"
-                    defaultValue={project.startDate ?? ""}
-                    onChange={(e) => handlePropertyUpdate("startDate", e.target.value || "")}
-                    className="rounded-md border border-border/50 bg-transparent px-2 py-1 text-sm text-foreground outline-none focus:border-primary"
-                    autoFocus
-                  />
-                </div>
-              )}
-            </div>
+            <DatePicker
+              value={project.startDate}
+              placeholder="Start date"
+              onChange={(value) => handlePropertyUpdate("startDate", value)}
+            />
 
-            {/* Target Date */}
-            <div className="relative">
-              <button
-                onClick={() =>
-                  setActiveProperty(activeProperty === "targetDate" ? null : "targetDate")
-                }
-                className="flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-accent"
-              >
-                <Calendar className="size-3.5 text-muted-foreground/60" />
-                <span
-                  className={project.targetDate ? "text-foreground/80" : "text-muted-foreground/40"}
-                >
-                  {project.targetDate || "Target date"}
-                </span>
-              </button>
-              {activeProperty === "targetDate" && (
-                <div className="absolute left-0 top-full z-50 mt-1 rounded-lg border border-border/50 bg-popover p-2 shadow-xl animate-in fade-in slide-in-from-top-1 duration-100">
-                  <input
-                    type="date"
-                    defaultValue={project.targetDate ?? ""}
-                    onChange={(e) => handlePropertyUpdate("targetDate", e.target.value || "")}
-                    className="rounded-md border border-border/50 bg-transparent px-2 py-1 text-sm text-foreground outline-none focus:border-primary"
-                    autoFocus
-                  />
-                </div>
-              )}
-            </div>
+            <DatePicker
+              value={project.targetDate}
+              placeholder="Target date"
+              onChange={(value) => handlePropertyUpdate("targetDate", value)}
+            />
 
             {/* Members count */}
             <div className="flex items-center gap-1.5 rounded-md px-2 py-1 text-foreground/80">
@@ -731,12 +704,12 @@ export default function ProjectDetailPage() {
         {/* Tab Content */}
         {activeTab === "overview" && (
           <OverviewTab
-            readme={project.description}
+            readme={project.readme}
             projectId={project.id}
             changes={changes}
             projectSlug={project.slug}
             onViewChanges={() => setActiveTab("changes")}
-            onReadmeUpdate={(desc) => setProject({ ...project, description: desc })}
+            onReadmeUpdate={(readme) => setProject({ ...project, readme })}
             t={t}
           />
         )}
@@ -792,8 +765,13 @@ export default function ProjectDetailPage() {
               <p className="mb-3 text-sm font-medium">{t("projectSettings.archivePolicy")}</p>
               <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">{t("projectSettings.archiveMode")}</Label>
-                  <Select value={renameArchiveMode} onValueChange={(v) => v && setRenameArchiveMode(v)}>
+                  <Label className="text-xs text-muted-foreground">
+                    {t("projectSettings.archiveMode")}
+                  </Label>
+                  <Select
+                    value={renameArchiveMode}
+                    onValueChange={(v) => v && setRenameArchiveMode(v)}
+                  >
                     <SelectTrigger className="cursor-pointer">
                       <SelectValue />
                     </SelectTrigger>
@@ -810,8 +788,13 @@ export default function ProjectDetailPage() {
 
                 {renameArchiveMode === "auto" && (
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">{t("projectSettings.archiveTrigger")}</Label>
-                    <Select value={renameArchiveTrigger} onValueChange={(v) => v && setRenameArchiveTrigger(v)}>
+                    <Label className="text-xs text-muted-foreground">
+                      {t("projectSettings.archiveTrigger")}
+                    </Label>
+                    <Select
+                      value={renameArchiveTrigger}
+                      onValueChange={(v) => v && setRenameArchiveTrigger(v)}
+                    >
                       <SelectTrigger className="w-full cursor-pointer">
                         <SelectValue />
                       </SelectTrigger>
@@ -833,18 +816,20 @@ export default function ProjectDetailPage() {
                 {renameArchiveMode === "auto" &&
                   (renameArchiveTrigger === "days_after_ready" ||
                     renameArchiveTrigger === "tasks_done_and_days") && (
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">{t("projectSettings.archiveDaysDelay")}</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={365}
-                      value={renameArchiveDaysDelay}
-                      onChange={(e) => setRenameArchiveDaysDelay(Number(e.target.value))}
-                      className="w-32"
-                    />
-                  </div>
-                )}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">
+                        {t("projectSettings.archiveDaysDelay")}
+                      </Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={365}
+                        value={renameArchiveDaysDelay}
+                        onChange={(e) => setRenameArchiveDaysDelay(Number(e.target.value))}
+                        className="w-32"
+                      />
+                    </div>
+                  )}
               </div>
             </div>
           </div>
@@ -1012,7 +997,7 @@ function OverviewTab({
   async function handleSave() {
     setSaving(true);
     try {
-      await projectClient.updateProject({ id: projectId, description: draft });
+      await projectClient.updateProject({ id: projectId, readme: draft });
       onReadmeUpdate(draft);
       setEditing(false);
     } catch (err) {
@@ -1072,29 +1057,9 @@ function OverviewTab({
           />
         ) : (
           <div className="prose prose-invert prose-sm max-w-none px-5 py-4">
-            {(readme || "").split("\n").map((line, i) => {
-              if (line.startsWith("## "))
-                return (
-                  <h2 key={i} className="mt-4 first:mt-0 text-base font-semibold">
-                    {line.slice(3)}
-                  </h2>
-                );
-              if (/^\d+\. /.test(line)) {
-                return (
-                  <p key={i} className="ml-4 text-sm text-foreground/70">
-                    {line}
-                  </p>
-                );
-              }
-              if (line.trim())
-                return (
-                  <p key={i} className="text-sm text-foreground/70">
-                    {line}
-                  </p>
-                );
-              return null;
-            })}
-            {!readme && (
+            {readme ? (
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{readme}</ReactMarkdown>
+            ) : (
               <p className="text-sm text-muted-foreground italic">
                 No description yet. Click Edit to add one.
               </p>
@@ -1198,7 +1163,14 @@ function ChangesTab({
       .listChanges({ projectId, filter: "archived" })
       .then((res) => {
         setArchivedCount(res.changes.length);
-        setArchivedChanges(res.changes.map((c) => ({ id: c.id, name: c.name, stage: c.stage, archivedAt: c.archivedAt })));
+        setArchivedChanges(
+          res.changes.map((c) => ({
+            id: c.id,
+            name: c.name,
+            stage: c.stage,
+            archivedAt: c.archivedAt,
+          })),
+        );
       })
       .catch(() => {
         setArchivedCount(0);
@@ -1211,7 +1183,14 @@ function ChangesTab({
       setLoadingArchived(true);
       try {
         const res = await projectClient.listChanges({ projectId, filter: "archived" });
-        setArchivedChanges(res.changes.map((c) => ({ id: c.id, name: c.name, stage: c.stage, archivedAt: c.archivedAt })));
+        setArchivedChanges(
+          res.changes.map((c) => ({
+            id: c.id,
+            name: c.name,
+            stage: c.stage,
+            archivedAt: c.archivedAt,
+          })),
+        );
         setArchivedCount(res.changes.length);
       } catch {
         // handle error
@@ -1222,7 +1201,14 @@ function ChangesTab({
     if (filter === "active") {
       try {
         const res = await projectClient.listChanges({ projectId, filter: "active" });
-        setActiveChanges(res.changes.map((c) => ({ id: c.id, name: c.name, stage: c.stage, archivedAt: c.archivedAt })));
+        setActiveChanges(
+          res.changes.map((c) => ({
+            id: c.id,
+            name: c.name,
+            stage: c.stage,
+            archivedAt: c.archivedAt,
+          })),
+        );
       } catch {
         // handle error
       }
@@ -1430,36 +1416,6 @@ function MemoryTab({
   const [editContent, setEditContent] = useState(content);
   const [currentContent, setCurrentContent] = useState(content);
 
-  function renderMarkdown(text: string) {
-    return text.split("\n").map((line, i) => {
-      if (line.startsWith("## ")) {
-        return (
-          <h2 key={i} className="mt-5 first:mt-0 mb-2 text-sm font-semibold text-foreground">
-            {line.slice(3)}
-          </h2>
-        );
-      }
-      if (line.startsWith("- ")) {
-        return (
-          <p
-            key={i}
-            className="ml-3 py-0.5 text-sm text-foreground/70 before:content-['•'] before:mr-2 before:text-muted-foreground/50"
-          >
-            {line.slice(2)}
-          </p>
-        );
-      }
-      if (line.trim()) {
-        return (
-          <p key={i} className="py-0.5 text-sm text-foreground/70">
-            {line}
-          </p>
-        );
-      }
-      return <div key={i} className="h-2" />;
-    });
-  }
-
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
@@ -1514,7 +1470,11 @@ function MemoryTab({
               autoFocus
             />
           ) : currentContent.trim() ? (
-            renderMarkdown(currentContent.replace(/\\n/g, "\n"))
+            <div className="prose prose-invert prose-sm max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {currentContent.replace(/\\n/g, "\n")}
+              </ReactMarkdown>
+            </div>
           ) : (
             <div className="py-8 text-center">
               <Brain className="mx-auto mb-3 size-8 text-muted-foreground/30" />
@@ -1537,4 +1497,3 @@ function MemoryTab({
     </div>
   );
 }
-

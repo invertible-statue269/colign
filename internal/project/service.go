@@ -196,6 +196,7 @@ type UpdateProjectInput struct {
 	ClearTarget bool
 	Icon        *string
 	Color       *string
+	Readme      *string
 }
 
 func (s *Service) Update(ctx context.Context, input UpdateProjectInput) (*models.Project, error) {
@@ -241,6 +242,9 @@ func (s *Service) Update(ctx context.Context, input UpdateProjectInput) (*models
 	}
 	if input.Color != nil {
 		project.Color = *input.Color
+	}
+	if input.Readme != nil {
+		project.Readme = *input.Readme
 	}
 	project.UpdatedAt = time.Now()
 

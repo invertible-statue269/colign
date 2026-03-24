@@ -58,7 +58,7 @@ export function TaskBoard({ changeId, projectId, members }: TaskBoardProps) {
 
   const fetchTasks = useCallback(() => {
     taskClient
-      .listTasks({ changeId })
+      .listTasks({ changeId, projectId })
       .then((res) => {
         setTasks(
           res.tasks.map((t) => ({
@@ -121,7 +121,7 @@ export function TaskBoard({ changeId, projectId, members }: TaskBoardProps) {
       setTasks((prev) => [...prev, tempTask]);
 
       try {
-        const res = await taskClient.createTask({ changeId, title, status });
+        const res = await taskClient.createTask({ changeId, projectId, title, status });
         if (!res.task) throw new Error("No task in response");
         const serverTask = res.task;
         setTasks((prev) =>
@@ -247,7 +247,7 @@ export function TaskBoard({ changeId, projectId, members }: TaskBoardProps) {
         showError(t("toast.taskReorderFailed"), err);
         // Re-fetch to reset state
         try {
-          const res = await taskClient.listTasks({ changeId });
+          const res = await taskClient.listTasks({ changeId, projectId });
           setTasks(
             res.tasks.map((t) => ({
               id: t.id,

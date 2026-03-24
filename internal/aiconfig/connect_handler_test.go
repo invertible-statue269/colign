@@ -57,7 +57,7 @@ func TestGetAIConfig_Unauthenticated(t *testing.T) {
 	db, _ := newHandlerTestDB(t)
 	svc := NewService(db, svcKey)
 	jwtManager := auth.NewJWTManager("test-secret")
-	h := NewConnectHandler(svc, jwtManager, nil)
+	h := NewConnectHandler(svc, jwtManager, nil, nil)
 
 	req := connect.NewRequest(&aiconfigv1.GetAIConfigRequest{ProjectId: 1})
 	// No Authorization header
@@ -73,7 +73,7 @@ func TestGetAIConfig_ProjectNotInOrg(t *testing.T) {
 	db, mock := newHandlerTestDB(t)
 	svc := NewService(db, svcKey)
 	jwtManager := auth.NewJWTManager("test-secret")
-	h := NewConnectHandler(svc, jwtManager, nil)
+	h := NewConnectHandler(svc, jwtManager, nil, nil)
 
 	authHeader := makeAuthHeader(t, jwtManager, testOrgID)
 	req := reqWithAuth(&aiconfigv1.GetAIConfigRequest{ProjectId: 1}, authHeader)
@@ -94,7 +94,7 @@ func TestGetAIConfig_NoConfig(t *testing.T) {
 	db, mock := newHandlerTestDB(t)
 	svc := NewService(db, svcKey)
 	jwtManager := auth.NewJWTManager("test-secret")
-	h := NewConnectHandler(svc, jwtManager, nil)
+	h := NewConnectHandler(svc, jwtManager, nil, nil)
 
 	authHeader := makeAuthHeader(t, jwtManager, testOrgID)
 	req := reqWithAuth(&aiconfigv1.GetAIConfigRequest{ProjectId: 1}, authHeader)
@@ -117,7 +117,7 @@ func TestGetAIConfig_Found(t *testing.T) {
 	db, mock := newHandlerTestDB(t)
 	svc := NewService(db, svcKey)
 	jwtManager := auth.NewJWTManager("test-secret")
-	h := NewConnectHandler(svc, jwtManager, nil)
+	h := NewConnectHandler(svc, jwtManager, nil, nil)
 
 	authHeader := makeAuthHeader(t, jwtManager, testOrgID)
 	req := reqWithAuth(&aiconfigv1.GetAIConfigRequest{ProjectId: 1}, authHeader)
@@ -159,7 +159,7 @@ func TestSaveAIConfig_Unauthenticated(t *testing.T) {
 	db, _ := newHandlerTestDB(t)
 	svc := NewService(db, svcKey)
 	jwtManager := auth.NewJWTManager("test-secret")
-	h := NewConnectHandler(svc, jwtManager, nil)
+	h := NewConnectHandler(svc, jwtManager, nil, nil)
 
 	req := connect.NewRequest(&aiconfigv1.SaveAIConfigRequest{ProjectId: 1})
 
@@ -174,7 +174,7 @@ func TestSaveAIConfig_ProjectNotInOrg(t *testing.T) {
 	db, mock := newHandlerTestDB(t)
 	svc := NewService(db, svcKey)
 	jwtManager := auth.NewJWTManager("test-secret")
-	h := NewConnectHandler(svc, jwtManager, nil)
+	h := NewConnectHandler(svc, jwtManager, nil, nil)
 
 	authHeader := makeAuthHeader(t, jwtManager, testOrgID)
 	req := reqWithAuth(&aiconfigv1.SaveAIConfigRequest{ProjectId: 1, Provider: "openai", Model: "gpt-4"}, authHeader)
@@ -194,7 +194,7 @@ func TestSaveAIConfig_Success(t *testing.T) {
 	db, mock := newHandlerTestDB(t)
 	svc := NewService(db, svcKey)
 	jwtManager := auth.NewJWTManager("test-secret")
-	h := NewConnectHandler(svc, jwtManager, nil)
+	h := NewConnectHandler(svc, jwtManager, nil, nil)
 
 	authHeader := makeAuthHeader(t, jwtManager, testOrgID)
 	req := reqWithAuth(&aiconfigv1.SaveAIConfigRequest{
@@ -232,11 +232,11 @@ func TestSaveAIConfig_Success(t *testing.T) {
 // TestConnection
 // ---------------------------------------------------------------------------
 
-func TestTestConnection_ReturnsUnimplemented(t *testing.T) {
+func TestTestConnection_NilFunc(t *testing.T) {
 	db, _ := newHandlerTestDB(t)
 	svc := NewService(db, svcKey)
 	jwtManager := auth.NewJWTManager("test-secret")
-	h := NewConnectHandler(svc, jwtManager, nil)
+	h := NewConnectHandler(svc, jwtManager, nil, nil)
 
 	req := connect.NewRequest(&aiconfigv1.TestConnectionRequest{
 		Provider: "anthropic",
@@ -252,6 +252,35 @@ func TestTestConnection_ReturnsUnimplemented(t *testing.T) {
 	assert.Equal(t, connect.CodeUnimplemented, connectErr.Code())
 }
 
+func TestTestConnection_Success(t *testing.T) {
+	db, _ := newHandlerTestDB(t)
+	svc := NewService(db, svcKey)
+	jwtManager := auth.NewJWTManager("test-secret")
+	h := NewConnectHandler(svc, jwtManager, nil, func(_ context.Context, _, _, _ string) error {
+		return nil
+	})
+
+	req := connect.NewRequest(&aiconfigv1.TestConnectionRequest{Provider: "openai", Model: "gpt-4o", ApiKey: "sk-test"})
+	resp, err := h.TestConnection(context.Background(), req)
+	require.NoError(t, err)
+	assert.True(t, resp.Msg.Success)
+}
+
+func TestTestConnection_Failure(t *testing.T) {
+	db, _ := newHandlerTestDB(t)
+	svc := NewService(db, svcKey)
+	jwtManager := auth.NewJWTManager("test-secret")
+	h := NewConnectHandler(svc, jwtManager, nil, func(_ context.Context, _, _, _ string) error {
+		return errors.New("invalid API key")
+	})
+
+	req := connect.NewRequest(&aiconfigv1.TestConnectionRequest{Provider: "openai", Model: "gpt-4o", ApiKey: "sk-bad"})
+	resp, err := h.TestConnection(context.Background(), req)
+	require.NoError(t, err)
+	assert.False(t, resp.Msg.Success)
+	assert.Contains(t, resp.Msg.Error, "invalid API key")
+}
+
 // ---------------------------------------------------------------------------
 // DeleteAIConfig
 // ---------------------------------------------------------------------------
@@ -260,7 +289,7 @@ func TestDeleteAIConfig_Unauthenticated(t *testing.T) {
 	db, _ := newHandlerTestDB(t)
 	svc := NewService(db, svcKey)
 	jwtManager := auth.NewJWTManager("test-secret")
-	h := NewConnectHandler(svc, jwtManager, nil)
+	h := NewConnectHandler(svc, jwtManager, nil, nil)
 
 	req := connect.NewRequest(&aiconfigv1.DeleteAIConfigRequest{ProjectId: 1})
 
@@ -275,7 +304,7 @@ func TestDeleteAIConfig_ProjectNotInOrg(t *testing.T) {
 	db, mock := newHandlerTestDB(t)
 	svc := NewService(db, svcKey)
 	jwtManager := auth.NewJWTManager("test-secret")
-	h := NewConnectHandler(svc, jwtManager, nil)
+	h := NewConnectHandler(svc, jwtManager, nil, nil)
 
 	authHeader := makeAuthHeader(t, jwtManager, testOrgID)
 	req := reqWithAuth(&aiconfigv1.DeleteAIConfigRequest{ProjectId: 1}, authHeader)
@@ -295,7 +324,7 @@ func TestDeleteAIConfig_Success(t *testing.T) {
 	db, mock := newHandlerTestDB(t)
 	svc := NewService(db, svcKey)
 	jwtManager := auth.NewJWTManager("test-secret")
-	h := NewConnectHandler(svc, jwtManager, nil)
+	h := NewConnectHandler(svc, jwtManager, nil, nil)
 
 	authHeader := makeAuthHeader(t, jwtManager, testOrgID)
 	req := reqWithAuth(&aiconfigv1.DeleteAIConfigRequest{ProjectId: 1}, authHeader)

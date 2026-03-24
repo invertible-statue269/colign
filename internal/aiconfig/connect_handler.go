@@ -19,16 +19,18 @@ type ConnectHandler struct {
 	service           *Service
 	jwtManager        *auth.JWTManager
 	apiTokenValidator auth.APITokenValidator
+	testConnFunc      func(ctx context.Context, provider, model, apiKey string) error
 }
 
 var _ aiconfigv1connect.AIConfigServiceHandler = (*ConnectHandler)(nil)
 
 // NewConnectHandler creates a new ConnectHandler.
-func NewConnectHandler(service *Service, jwtManager *auth.JWTManager, apiTokenValidator auth.APITokenValidator) *ConnectHandler {
+func NewConnectHandler(service *Service, jwtManager *auth.JWTManager, apiTokenValidator auth.APITokenValidator, testConnFunc func(ctx context.Context, provider, model, apiKey string) error) *ConnectHandler {
 	return &ConnectHandler{
 		service:           service,
 		jwtManager:        jwtManager,
 		apiTokenValidator: apiTokenValidator,
+		testConnFunc:      testConnFunc,
 	}
 }
 
@@ -107,9 +109,21 @@ func (h *ConnectHandler) SaveAIConfig(ctx context.Context, req *connect.Request[
 	}), nil
 }
 
-// TestConnection will be implemented in Task 5 when AI providers are wired in.
-func (h *ConnectHandler) TestConnection(_ context.Context, _ *connect.Request[aiconfigv1.TestConnectionRequest]) (*connect.Response[aiconfigv1.TestConnectionResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("not yet implemented"))
+// TestConnection verifies that the provided AI provider credentials are valid.
+func (h *ConnectHandler) TestConnection(ctx context.Context, req *connect.Request[aiconfigv1.TestConnectionRequest]) (*connect.Response[aiconfigv1.TestConnectionResponse], error) {
+	if h.testConnFunc == nil {
+		return nil, connect.NewError(connect.CodeUnimplemented, errors.New("test connection not configured"))
+	}
+	err := h.testConnFunc(ctx, req.Msg.Provider, req.Msg.Model, req.Msg.ApiKey)
+	if err != nil {
+		return connect.NewResponse(&aiconfigv1.TestConnectionResponse{
+			Success: false,
+			Error:   err.Error(),
+		}), nil
+	}
+	return connect.NewResponse(&aiconfigv1.TestConnectionResponse{
+		Success: true,
+	}), nil
 }
 
 // DeleteAIConfig removes the AI configuration for a project.

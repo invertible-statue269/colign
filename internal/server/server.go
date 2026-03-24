@@ -8,9 +8,11 @@ import (
 	"strings"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/uptrace/bun"
 
 	"github.com/gobenpark/colign/internal/auth"
+	"github.com/gobenpark/colign/internal/authz"
 	"github.com/gobenpark/colign/internal/config"
 	"github.com/gobenpark/colign/internal/database"
 
@@ -28,6 +30,7 @@ import (
 	taskv1connect "github.com/gobenpark/colign/gen/proto/task/v1/taskv1connect"
 	"github.com/gobenpark/colign/gen/proto/workflow/v1/workflowv1connect"
 	"github.com/gobenpark/colign/internal/acceptance"
+	"github.com/gobenpark/colign/internal/ai"
 	"github.com/gobenpark/colign/internal/aiconfig"
 	"github.com/gobenpark/colign/internal/apitoken"
 	"github.com/gobenpark/colign/internal/archive"
@@ -64,11 +67,13 @@ func New(cfg *config.Config) (*Server, error) {
 		EventHub:   hub,
 	}
 
-	s.setupRoutes(cfg)
+	if err := s.setupRoutes(cfg); err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
-func (s *Server) setupRoutes(cfg *config.Config) {
+func (s *Server) setupRoutes(cfg *config.Config) error {
 	cookieOpts := auth.BrowserSessionOptions{
 		Domain: cfg.CookieDomain,
 		Secure: cfg.CookieSecure,
@@ -120,6 +125,14 @@ func (s *Server) setupRoutes(cfg *config.Config) {
 	apiTokenPath, apiTokenHandler := apitokenv1connect.NewApiTokenServiceHandler(apiTokenConnectHandler)
 	s.mux.Handle(apiTokenPath, apiTokenHandler)
 
+	// RBAC interceptor
+	enforcer, err := authz.NewEnforcer()
+	if err != nil {
+		return fmt.Errorf("creating RBAC enforcer: %w", err)
+	}
+	rbacInterceptor := authz.NewRBACInterceptor(s.db, enforcer)
+	rbacOpts := connect.WithInterceptors(rbacInterceptor)
+
 	// Project service (Connect)
 	projectService := project.NewService(s.db)
 	archiveService := archive.NewService(s.db)
@@ -127,7 +140,7 @@ func (s *Server) setupRoutes(cfg *config.Config) {
 	_ = cronCancel // TODO: call on server shutdown
 	archiveService.StartCron(cronCtx)
 	projectConnectHandler := project.NewConnectHandler(projectService, archiveService, s.jwtManager, apiTokenService)
-	projectPath, projectHandler := projectv1connect.NewProjectServiceHandler(projectConnectHandler)
+	projectPath, projectHandler := projectv1connect.NewProjectServiceHandler(projectConnectHandler, rbacOpts)
 	s.mux.Handle(projectPath, projectHandler)
 
 	// Organization service (Connect handler)
@@ -138,48 +151,48 @@ func (s *Server) setupRoutes(cfg *config.Config) {
 	// Workflow service (Connect)
 	workflowService := workflow.NewService(s.db)
 	workflowConnectHandler := workflow.NewConnectHandler(workflowService, s.db, s.jwtManager, apiTokenService)
-	workflowPath, workflowHandler := workflowv1connect.NewWorkflowServiceHandler(workflowConnectHandler)
+	workflowPath, workflowHandler := workflowv1connect.NewWorkflowServiceHandler(workflowConnectHandler, rbacOpts)
 	s.mux.Handle(workflowPath, workflowHandler)
 
 	// Comment service (Connect)
 	commentService := comment.NewService(s.db)
 	commentConnectHandler := comment.NewConnectHandler(commentService, s.jwtManager, apiTokenService)
-	commentPath, commentHandler := commentv1connect.NewCommentServiceHandler(commentConnectHandler)
+	commentPath, commentHandler := commentv1connect.NewCommentServiceHandler(commentConnectHandler, rbacOpts)
 	s.mux.Handle(commentPath, commentHandler)
 
 	// Document service (Connect)
 	documentService := document.NewService(s.db)
 	documentConnectHandler := document.NewConnectHandler(documentService, s.jwtManager, apiTokenService)
-	documentPath, documentHandler := documentv1connect.NewDocumentServiceHandler(documentConnectHandler)
+	documentPath, documentHandler := documentv1connect.NewDocumentServiceHandler(documentConnectHandler, rbacOpts)
 	s.mux.Handle(documentPath, documentHandler)
 
 	// Task service (Connect)
 	taskService := task.NewService(s.db, task.WithArchiveEvaluator(archiveService))
 	taskConnectHandler := task.NewConnectHandler(taskService, s.jwtManager, apiTokenService)
-	taskPath, taskHandler := taskv1connect.NewTaskServiceHandler(taskConnectHandler)
+	taskPath, taskHandler := taskv1connect.NewTaskServiceHandler(taskConnectHandler, rbacOpts)
 	s.mux.Handle(taskPath, taskHandler)
 
 	// Acceptance Criteria service (Connect)
 	acService := acceptance.NewService(s.db)
 	acConnectHandler := acceptance.NewConnectHandler(acService, s.jwtManager, apiTokenService)
-	acPath, acHandler := acceptancev1connect.NewAcceptanceCriteriaServiceHandler(acConnectHandler)
+	acPath, acHandler := acceptancev1connect.NewAcceptanceCriteriaServiceHandler(acConnectHandler, rbacOpts)
 	s.mux.Handle(acPath, acHandler)
 
 	// Notification service (Connect)
 	notifService := notification.NewService(s.db)
 	notifConnectHandler := notification.NewConnectHandler(notifService, s.jwtManager, apiTokenService, s.EventHub)
-	notifPath, notifHandler := notificationv1connect.NewNotificationServiceHandler(notifConnectHandler)
+	notifPath, notifHandler := notificationv1connect.NewNotificationServiceHandler(notifConnectHandler, rbacOpts)
 	s.mux.Handle(notifPath, notifHandler)
 
 	// Memory service (Connect)
 	memoryService := memory.NewService(s.db)
 	memoryConnectHandler := memory.NewConnectHandler(memoryService, s.jwtManager, apiTokenService)
-	memoryPath, memoryHandler := memoryv1connect.NewMemoryServiceHandler(memoryConnectHandler)
+	memoryPath, memoryHandler := memoryv1connect.NewMemoryServiceHandler(memoryConnectHandler, rbacOpts)
 	s.mux.Handle(memoryPath, memoryHandler)
 
 	// AI Config service (Connect)
 	aiConfigService := aiconfig.NewService(s.db, []byte(cfg.AIEncryptionKey))
-	aiConfigConnectHandler := aiconfig.NewConnectHandler(aiConfigService, s.jwtManager, apiTokenService)
+	aiConfigConnectHandler := aiconfig.NewConnectHandler(aiConfigService, s.jwtManager, apiTokenService, ai.TestConnection)
 	aiConfigPath, aiConfigHandler := aiconfigv1connect.NewAIConfigServiceHandler(aiConfigConnectHandler)
 	s.mux.Handle(aiConfigPath, aiConfigHandler)
 
@@ -200,6 +213,7 @@ func (s *Server) setupRoutes(cfg *config.Config) {
 		// Community: Bearer token only
 		s.mux.Handle("/mcp", mcpHandler)
 	}
+	return nil
 }
 
 func (s *Server) Handler() http.Handler {

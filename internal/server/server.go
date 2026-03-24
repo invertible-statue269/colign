@@ -196,6 +196,12 @@ func (s *Server) setupRoutes(cfg *config.Config) error {
 	aiConfigPath, aiConfigHandler := aiconfigv1connect.NewAIConfigServiceHandler(aiConfigConnectHandler)
 	s.mux.Handle(aiConfigPath, aiConfigHandler)
 
+	// AI generation endpoints (REST)
+	aiService := ai.NewService(aiConfigService, s.db)
+	aiHandler := ai.NewHandler(aiService, aiService, s.jwtManager, aiConfigService, s.db)
+	s.mux.HandleFunc("POST /api/ai/generate-proposal", aiHandler.HandleGenerateProposal)
+	s.mux.HandleFunc("POST /api/ai/generate-ac", aiHandler.HandleGenerateAC)
+
 	// MCP Streamable HTTP endpoint
 	apiURL := fmt.Sprintf("http://localhost:%s", cfg.Port)
 	var mcpOpts []mcpserver.ClientOption

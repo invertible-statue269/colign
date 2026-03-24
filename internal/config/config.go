@@ -26,6 +26,7 @@ type Config struct {
 	HocuspocusAPISecret string
 	CookieDomain        string
 	CookieSecure        bool
+	AIEncryptionKey     string
 }
 
 func Load() (*Config, error) {
@@ -50,6 +51,7 @@ func Load() (*Config, error) {
 		HocuspocusAPISecret: getEnv("HOCUSPOCUS_API_SECRET", ""),
 		CookieDomain:        getEnv("AUTH_COOKIE_DOMAIN", deriveCookieDomain(frontendURL, redirectBaseURL)),
 		CookieSecure:        deriveCookieSecure(frontendURL, redirectBaseURL),
+		AIEncryptionKey:     getEnv("AI_ENCRYPTION_KEY", ""),
 	}, nil
 }
 

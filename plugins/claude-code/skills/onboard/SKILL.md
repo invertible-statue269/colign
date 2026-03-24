@@ -3,53 +3,58 @@ name: onboard
 description: Set up and verify the Colign MCP connection. Use when the user first installs the plugin, says "set up colign", "connect to colign", asks how to get started, or when any colign MCP tool call fails with a connection or authentication error.
 ---
 
-# Onboard to Colign
+# Get Started with Colign
 
-Guide the user through connecting to the Colign MCP server.
+Verify the connection and guide the user on what to do next based on their current project state.
 
-## Workflow
+---
 
-### Step 1: Check API token
+## Step 1: Verify Connection
 
-```bash
-echo $COLIGN_API_TOKEN
-```
+Call `mcp__colign__list_projects` to verify the MCP server is working.
 
-If `COLIGN_API_TOKEN` is not set:
-1. Tell the user to go to **Colign Settings > AI & API Keys**
-2. Click **Generate Token** and name it (e.g., "Claude Code")
-3. Copy the token (it's only shown once)
-4. Set it: `export COLIGN_API_TOKEN=col_...`
+- **Success**: Continue to Step 2
+- **Auth error**: Token is invalid or expired — guide the user to Colign Settings > AI & API Keys to regenerate
+- **Connection error**: Check if the MCP server URL is correct and reachable
 
-### Step 2: Check MCP URL (optional)
+## Step 2: Show Current State
 
-```bash
-echo $COLIGN_MCP_URL
-```
+Call `mcp__colign__list_projects` and for each project, optionally call `mcp__colign__get_project_dashboard` to understand what's in progress.
 
-- **SaaS (default)**: No action needed — defaults to `https://app.colign.dev/mcp`
-- **Self-hosted**: Set `export COLIGN_MCP_URL=https://your-instance.com/mcp`
-- **Local dev**: Set `export COLIGN_MCP_URL=http://localhost:8080/mcp`
-
-### Step 3: Verify the connection
-
-Try calling `mcp__colign__list_projects` to verify the MCP server is working.
-
-- **Success**: Show the project list and confirm everything is connected
-- **Auth error**: Token is invalid or expired — regenerate in Colign Settings
-- **Connection error**: Check if the URL is correct and the server is reachable
-
-### Step 4: Confirm setup
+Present a quick overview:
 
 ```
-Colign MCP: Connected
-URL: [url]
-Projects: [count] accessible
+Connected to Colign!
 
-You're all set! Here's how to get started:
-- /colign:explore — Browse your projects and specs
-- /colign:propose — Start a new change with a proposal
+Projects:
+● My Project — 2 changes (1 in Design, 1 in Draft)
+● Other Project — no changes yet
 ```
+
+## Step 3: Recommend Next Action
+
+Based on what you found, suggest the most relevant skill:
+
+| Situation | Recommendation |
+|-----------|---------------|
+| No projects exist | "Create a project first on the Colign web app, then come back" |
+| Project exists, no changes | `/colign:propose` — "Start by proposing a new change" |
+| Change exists with proposal only | `/colign:plan` — "There's a proposal ready. Want to plan the implementation?" |
+| Change exists with design + tasks | `/colign:implement` — "Tasks are ready. Want to start implementing?" |
+| All tasks done, not advanced | `/colign:complete` — "Looks like implementation is done. Ready to wrap up?" |
+| Just want to look around | `/colign:explore` — "Let's explore what's in the project" |
+
+## Available Skills
+
+```
+/colign:explore   — Browse projects and think through ideas
+/colign:propose   — Write a proposal for a new change
+/colign:plan      — Design the implementation and create tasks
+/colign:implement — Code against the task list
+/colign:complete  — Verify, advance stage, and archive
+```
+
+---
 
 ## Error Recovery
 

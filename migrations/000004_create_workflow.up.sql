@@ -42,6 +42,7 @@ CREATE TABLE acceptance_criteria (
     steps JSONB NOT NULL DEFAULT '[]',
     met BOOLEAN NOT NULL DEFAULT FALSE,
     sort_order INTEGER NOT NULL DEFAULT 0,
+    test_ref TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

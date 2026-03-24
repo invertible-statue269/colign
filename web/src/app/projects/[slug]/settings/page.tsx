@@ -75,11 +75,13 @@ export default function ProjectSettingsPage() {
     projectClient
       .getProject({ slug })
       .then((res) => {
-        if (res.project) {
-          setProjectId(res.project.id);
-          setProjectName(res.project.name);
-          setProjectDescription(res.project.description);
+        if (!res.project) {
+          router.replace("/projects");
+          return;
         }
+        setProjectId(res.project.id);
+        setProjectName(res.project.name);
+        setProjectDescription(res.project.description);
       })
       .catch((err: unknown) => {
         showError(t("toast.projectLoadFailed"), err);

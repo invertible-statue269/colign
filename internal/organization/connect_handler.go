@@ -95,6 +95,22 @@ func (h *ConnectHandler) SwitchOrganization(ctx context.Context, req *connect.Re
 	}), nil
 }
 
+func (h *ConnectHandler) CreateOrganization(ctx context.Context, req *connect.Request[organizationv1.CreateOrganizationRequest]) (*connect.Response[organizationv1.CreateOrganizationResponse], error) {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	org, err := h.service.Create(ctx, claims.UserID, req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+
+	return connect.NewResponse(&organizationv1.CreateOrganizationResponse{
+		Organization: orgToProto(org),
+	}), nil
+}
+
 func (h *ConnectHandler) UpdateOrganization(ctx context.Context, req *connect.Request[organizationv1.UpdateOrganizationRequest]) (*connect.Response[organizationv1.UpdateOrganizationResponse], error) {
 	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {

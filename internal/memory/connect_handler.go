@@ -33,12 +33,12 @@ func (h *ConnectHandler) extractClaims(ctx context.Context, header string) (*aut
 }
 
 func (h *ConnectHandler) GetMemory(ctx context.Context, req *connect.Request[memoryv1.GetMemoryRequest]) (*connect.Response[memoryv1.GetMemoryResponse], error) {
-	_, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}
 
-	mem, err := h.service.Get(ctx, req.Msg.ProjectId)
+	mem, err := h.service.Get(ctx, req.Msg.ProjectId, claims.OrgID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -57,7 +57,7 @@ func (h *ConnectHandler) SaveMemory(ctx context.Context, req *connect.Request[me
 		return nil, err
 	}
 
-	mem, err := h.service.Save(ctx, req.Msg.ProjectId, req.Msg.Content, claims.UserID)
+	mem, err := h.service.Save(ctx, req.Msg.ProjectId, req.Msg.Content, claims.UserID, claims.OrgID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}

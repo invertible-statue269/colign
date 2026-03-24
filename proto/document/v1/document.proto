@@ -20,6 +20,7 @@ message Document {
 message GetDocumentRequest {
   int64 change_id = 1;
   string type = 2;
+  int64 project_id = 3;
 }
 
 message GetDocumentResponse {
@@ -31,6 +32,7 @@ message SaveDocumentRequest {
   string type = 2;
   string title = 3;
   string content = 4;
+  int64 project_id = 5;
 }
 
 message SaveDocumentResponse {

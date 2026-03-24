@@ -25,7 +25,12 @@ func NewConnectHandler(service *Service, jwtManager *auth.JWTManager, apiTokenVa
 }
 
 func (h *ConnectHandler) GetDocument(ctx context.Context, req *connect.Request[documentv1.GetDocumentRequest]) (*connect.Response[documentv1.GetDocumentResponse], error) {
-	doc, err := h.service.Get(ctx, req.Msg.ChangeId, models.DocumentType(req.Msg.Type))
+	claims, err := auth.ResolveFromHeader(h.jwtManager, h.apiTokenValidator, ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+
+	doc, err := h.service.Get(ctx, req.Msg.ChangeId, models.DocumentType(req.Msg.Type), claims.OrgID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -49,7 +54,7 @@ func (h *ConnectHandler) SaveDocument(ctx context.Context, req *connect.Request[
 		Title:    req.Msg.Title,
 		Content:  req.Msg.Content,
 		UserID:   claims.UserID,
-	})
+	}, claims.OrgID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}

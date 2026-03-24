@@ -14,7 +14,6 @@ import (
 
 var (
 	ErrTaskNotFound  = errors.New("task not found")
-	ErrNotAuthorized = errors.New("not authorized to modify this task")
 	ErrInvalidChange = errors.New("task does not belong to specified change")
 )
 
@@ -97,9 +96,14 @@ func (s *Service) Create(ctx context.Context, task *models.Task) error {
 	return nil
 }
 
-func (s *Service) Update(ctx context.Context, id int64, title *string, description *string, status *string, specRef *string, assigneeID *int64, clearAssignee bool) (*models.Task, error) {
+func (s *Service) Update(ctx context.Context, id int64, title *string, description *string, status *string, specRef *string, assigneeID *int64, clearAssignee bool, orgID int64) (*models.Task, error) {
 	task := new(models.Task)
-	err := s.db.NewSelect().Model(task).Where("t.id = ?", id).Scan(ctx)
+	err := s.db.NewSelect().Model(task).
+		Join("JOIN changes AS c ON c.id = t.change_id").
+		Join("JOIN projects AS p ON p.id = c.project_id").
+		Where("t.id = ?", id).
+		Where("p.organization_id = ?", orgID).
+		Scan(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrTaskNotFound
@@ -159,10 +163,11 @@ func (s *Service) Update(ctx context.Context, id int64, title *string, descripti
 	return task, nil
 }
 
-func (s *Service) Delete(ctx context.Context, id int64) error {
+func (s *Service) Delete(ctx context.Context, id int64, orgID int64) error {
 	res, err := s.db.NewDelete().
 		TableExpr("tasks").
 		Where("id = ?", id).
+		Where("change_id IN (SELECT c.id FROM changes c JOIN projects p ON p.id = c.project_id WHERE p.organization_id = ?)", orgID).
 		Exec(ctx)
 	if err != nil {
 		return err
@@ -179,8 +184,23 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (s *Service) Reorder(ctx context.Context, changeID int64, items []ReorderItem) error {
+func (s *Service) Reorder(ctx context.Context, changeID int64, items []ReorderItem, orgID int64) error {
 	return s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		// Verify change belongs to org
+		exists, err := tx.NewSelect().
+			TableExpr("changes c").
+			Join("JOIN projects p ON p.id = c.project_id").
+			ColumnExpr("1").
+			Where("c.id = ?", changeID).
+			Where("p.organization_id = ?", orgID).
+			Exists(ctx)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return ErrTaskNotFound
+		}
+
 		if len(items) == 0 {
 			return nil
 		}
@@ -191,7 +211,7 @@ func (s *Service) Reorder(ctx context.Context, changeID int64, items []ReorderIt
 		}
 
 		var count int
-		err := tx.NewSelect().
+		err = tx.NewSelect().
 			TableExpr("tasks").
 			ColumnExpr("COUNT(*)").
 			Where("id IN (?)", bun.List(ids)).
@@ -218,22 +238,4 @@ func (s *Service) Reorder(ctx context.Context, changeID int64, items []ReorderIt
 
 		return nil
 	})
-}
-
-func (s *Service) CheckProjectMembership(ctx context.Context, changeID int64, userID int64) error {
-	var exists int
-	err := s.db.NewSelect().
-		TableExpr("changes ch").
-		ColumnExpr("1").
-		Join("JOIN project_members pm ON pm.project_id = ch.project_id").
-		Where("ch.id = ?", changeID).
-		Where("pm.user_id = ?", userID).
-		Scan(ctx, &exists)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return ErrNotAuthorized
-		}
-		return err
-	}
-	return nil
 }

@@ -199,9 +199,9 @@ type UpdateProjectInput struct {
 	Readme      *string
 }
 
-func (s *Service) Update(ctx context.Context, input UpdateProjectInput) (*models.Project, error) {
+func (s *Service) Update(ctx context.Context, input UpdateProjectInput, orgID int64) (*models.Project, error) {
 	project := new(models.Project)
-	err := s.db.NewSelect().Model(project).Where("id = ?", input.ID).Scan(ctx)
+	err := s.db.NewSelect().Model(project).Where("id = ?", input.ID).Where("organization_id = ?", orgID).Scan(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrProjectNotFound
@@ -289,31 +289,86 @@ func (s *Service) ListLabels(ctx context.Context, orgID int64) ([]models.Project
 	return labels, nil
 }
 
-func (s *Service) AssignLabel(ctx context.Context, projectID, labelID int64) error {
+func (s *Service) AssignLabel(ctx context.Context, projectID, labelID int64, orgID int64) error {
+	// Verify project belongs to org
+	exists, err := s.db.NewSelect().Model((*models.Project)(nil)).
+		Where("id = ?", projectID).
+		Where("organization_id = ?", orgID).
+		Exists(ctx)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return ErrProjectNotFound
+	}
+	// Verify label belongs to org
+	exists, err = s.db.NewSelect().Model((*models.ProjectLabel)(nil)).
+		Where("id = ?", labelID).
+		Where("organization_id = ?", orgID).
+		Exists(ctx)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return ErrProjectNotFound
+	}
+
 	assignment := &models.ProjectLabelAssignment{
 		ProjectID: projectID,
 		LabelID:   labelID,
 	}
-	_, err := s.db.NewInsert().Model(assignment).
+	_, err = s.db.NewInsert().Model(assignment).
 		On("CONFLICT (project_id, label_id) DO NOTHING").
 		Exec(ctx)
 	return err
 }
 
-func (s *Service) RemoveLabel(ctx context.Context, projectID, labelID int64) error {
-	_, err := s.db.NewDelete().Model((*models.ProjectLabelAssignment)(nil)).
+func (s *Service) RemoveLabel(ctx context.Context, projectID, labelID int64, orgID int64) error {
+	exists, err := s.db.NewSelect().Model((*models.Project)(nil)).
+		Where("id = ?", projectID).
+		Where("organization_id = ?", orgID).
+		Exists(ctx)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return ErrProjectNotFound
+	}
+
+	_, err = s.db.NewDelete().Model((*models.ProjectLabelAssignment)(nil)).
 		Where("project_id = ?", projectID).
 		Where("label_id = ?", labelID).
 		Exec(ctx)
 	return err
 }
 
-func (s *Service) Delete(ctx context.Context, id int64) error {
-	_, err := s.db.NewDelete().Model((*models.Project)(nil)).Where("id = ?", id).Exec(ctx)
-	return err
+func (s *Service) Delete(ctx context.Context, id int64, orgID int64) error {
+	res, err := s.db.NewDelete().Model((*models.Project)(nil)).Where("id = ?", id).Where("organization_id = ?", orgID).Exec(ctx)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return ErrProjectNotFound
+	}
+	return nil
 }
 
-func (s *Service) CreateChange(ctx context.Context, projectID int64, name string) (*models.Change, error) {
+func (s *Service) CreateChange(ctx context.Context, projectID int64, name string, orgID int64) (*models.Change, error) {
+	exists, err := s.db.NewSelect().Model((*models.Project)(nil)).
+		Where("id = ?", projectID).
+		Where("organization_id = ?", orgID).
+		Exists(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, ErrProjectNotFound
+	}
+
 	change := &models.Change{
 		ProjectID: projectID,
 		Name:      name,
@@ -326,7 +381,18 @@ func (s *Service) CreateChange(ctx context.Context, projectID int64, name string
 	return change, nil
 }
 
-func (s *Service) ListChanges(ctx context.Context, projectID int64, filter string) ([]models.Change, error) {
+func (s *Service) ListChanges(ctx context.Context, projectID int64, filter string, orgID int64) ([]models.Change, error) {
+	exists, err := s.db.NewSelect().Model((*models.Project)(nil)).
+		Where("id = ?", projectID).
+		Where("organization_id = ?", orgID).
+		Exists(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, ErrProjectNotFound
+	}
+
 	var changes []models.Change
 	q := s.db.NewSelect().Model(&changes).
 		Where("project_id = ?", projectID).
@@ -347,9 +413,13 @@ func (s *Service) ListChanges(ctx context.Context, projectID int64, filter strin
 	return changes, nil
 }
 
-func (s *Service) GetChange(ctx context.Context, id int64) (*models.Change, error) {
+func (s *Service) GetChange(ctx context.Context, id int64, orgID int64) (*models.Change, error) {
 	change := new(models.Change)
-	err := s.db.NewSelect().Model(change).Where("id = ?", id).Scan(ctx)
+	err := s.db.NewSelect().Model(change).
+		Join("JOIN projects AS p ON p.id = ch.project_id").
+		Where("ch.id = ?", id).
+		Where("p.organization_id = ?", orgID).
+		Scan(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrProjectNotFound
@@ -359,21 +429,47 @@ func (s *Service) GetChange(ctx context.Context, id int64) (*models.Change, erro
 	return change, nil
 }
 
-func (s *Service) DeleteChange(ctx context.Context, id int64) error {
-	_, err := s.db.NewDelete().Model((*models.Change)(nil)).Where("id = ?", id).Exec(ctx)
-	return err
+func (s *Service) DeleteChange(ctx context.Context, id int64, orgID int64) error {
+	res, err := s.db.NewDelete().Model((*models.Change)(nil)).
+		Where("id = ?", id).
+		Where("project_id IN (SELECT id FROM projects WHERE organization_id = ?)", orgID).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return ErrProjectNotFound
+	}
+	return nil
 }
 
 type InviteMemberInput struct {
 	ProjectID int64
 	Email     string
 	Role      models.Role
+	OrgID     int64
 }
 
 func (s *Service) InviteMember(ctx context.Context, input InviteMemberInput) (*models.ProjectMember, error) {
+	// Verify project belongs to org
+	exists, err := s.db.NewSelect().Model((*models.Project)(nil)).
+		Where("id = ?", input.ProjectID).
+		Where("organization_id = ?", input.OrgID).
+		Exists(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, ErrProjectNotFound
+	}
+
 	// Find user by email
 	user := new(models.User)
-	err := s.db.NewSelect().Model(user).Where("email = ?", input.Email).Scan(ctx)
+	err = s.db.NewSelect().Model(user).Where("email = ?", input.Email).Scan(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			// User not registered — create pending invitation

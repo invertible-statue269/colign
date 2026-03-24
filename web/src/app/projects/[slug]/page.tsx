@@ -213,6 +213,10 @@ export default function ProjectDetailPage() {
     async function load() {
       try {
         const projectRes = await projectClient.getProject({ slug });
+        if (!projectRes.project) {
+          router.replace("/projects");
+          return;
+        }
         if (projectRes.project) {
           setProject(mapProjectDetail(projectRes.project));
           // Members from API
@@ -285,6 +289,7 @@ export default function ProjectDetailPage() {
           id: project.id,
           name: renameName.trim(),
           description: renameDesc,
+          projectId: project.id,
         }),
         projectClient.updateArchivePolicy({
           projectId: project.id,
@@ -325,7 +330,7 @@ export default function ProjectDetailPage() {
     } as ProjectDetail);
     setActiveProperty(null);
     try {
-      const updatePayload: Record<string, unknown> = { id: project.id };
+      const updatePayload: Record<string, unknown> = { id: project.id, projectId: project.id };
       if (field === "status") updatePayload.status = value as string;
       else if (field === "priority") updatePayload.priority = value as string;
       else if (field === "health") updatePayload.health = value as string;
@@ -349,7 +354,7 @@ export default function ProjectDetailPage() {
     if (!project) return;
     setDeleting(true);
     try {
-      await projectClient.deleteProject({ id: project.id });
+      await projectClient.deleteProject({ id: project.id, projectId: project.id });
       router.push("/projects");
     } catch (err) {
       showError(t("toast.deleteFailed"), err);
@@ -996,7 +1001,7 @@ function OverviewTab({
 }) {
   const handleReadmeSave = async (html: string) => {
     try {
-      await projectClient.updateProject({ id: projectId, readme: html });
+      await projectClient.updateProject({ id: projectId, readme: html, projectId });
       onReadmeUpdate(html);
     } catch (err) {
       showError(t("toast.saveFailed"), err);

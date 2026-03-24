@@ -35,6 +35,7 @@ func (h *ConnectHandler) CreateAC(ctx context.Context, req *connect.Request[acce
 		Scenario:  req.Msg.Scenario,
 		Steps:     protoStepsToModel(req.Msg.Steps),
 		SortOrder: int(req.Msg.SortOrder),
+		TestRef:   req.Msg.TestRef,
 	}
 	if err := h.service.Create(ctx, ac); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
@@ -62,11 +63,18 @@ func (h *ConnectHandler) ListAC(ctx context.Context, req *connect.Request[accept
 }
 
 func (h *ConnectHandler) UpdateAC(ctx context.Context, req *connect.Request[acceptancev1.UpdateACRequest]) (*connect.Response[acceptancev1.UpdateACResponse], error) {
-	if _, err := auth.ResolveFromHeader(h.jwtManager, h.apiTokenValidator, ctx, req.Header().Get("Authorization")); err != nil {
+	claims, err := auth.ResolveFromHeader(h.jwtManager, h.apiTokenValidator, ctx, req.Header().Get("Authorization"))
+	if err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, err)
 	}
 
-	ac, err := h.service.Update(ctx, req.Msg.Id, req.Msg.Scenario, protoStepsToModel(req.Msg.Steps), int(req.Msg.SortOrder))
+	testRef := req.Msg.TestRef
+	ac, err := h.service.Update(ctx, req.Msg.Id, UpdateInput{
+		Scenario:  req.Msg.Scenario,
+		Steps:     protoStepsToModel(req.Msg.Steps),
+		SortOrder: int(req.Msg.SortOrder),
+		TestRef:   &testRef,
+	}, claims.OrgID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, err)
@@ -80,11 +88,12 @@ func (h *ConnectHandler) UpdateAC(ctx context.Context, req *connect.Request[acce
 }
 
 func (h *ConnectHandler) ToggleAC(ctx context.Context, req *connect.Request[acceptancev1.ToggleACRequest]) (*connect.Response[acceptancev1.ToggleACResponse], error) {
-	if _, err := auth.ResolveFromHeader(h.jwtManager, h.apiTokenValidator, ctx, req.Header().Get("Authorization")); err != nil {
+	claims, err := auth.ResolveFromHeader(h.jwtManager, h.apiTokenValidator, ctx, req.Header().Get("Authorization"))
+	if err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, err)
 	}
 
-	ac, err := h.service.Toggle(ctx, req.Msg.Id, req.Msg.Met)
+	ac, err := h.service.Toggle(ctx, req.Msg.Id, req.Msg.Met, claims.OrgID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, err)
@@ -98,11 +107,15 @@ func (h *ConnectHandler) ToggleAC(ctx context.Context, req *connect.Request[acce
 }
 
 func (h *ConnectHandler) DeleteAC(ctx context.Context, req *connect.Request[acceptancev1.DeleteACRequest]) (*connect.Response[acceptancev1.DeleteACResponse], error) {
-	if _, err := auth.ResolveFromHeader(h.jwtManager, h.apiTokenValidator, ctx, req.Header().Get("Authorization")); err != nil {
+	claims, err := auth.ResolveFromHeader(h.jwtManager, h.apiTokenValidator, ctx, req.Header().Get("Authorization"))
+	if err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, err)
 	}
 
-	if err := h.service.Delete(ctx, req.Msg.Id); err != nil {
+	if err := h.service.Delete(ctx, req.Msg.Id, claims.OrgID); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
@@ -129,6 +142,7 @@ func acToProto(ac *models.AcceptanceCriteria) *acceptancev1.AcceptanceCriteria {
 		Steps:     steps,
 		Met:       ac.Met,
 		SortOrder: int32(ac.SortOrder),
+		TestRef:   ac.TestRef,
 		CreatedAt: timestamppb.New(ac.CreatedAt),
 		UpdatedAt: timestamppb.New(ac.UpdatedAt),
 	}

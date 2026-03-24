@@ -27,6 +27,7 @@ type TaskType = {
 
 interface TaskBoardProps {
   changeId: bigint;
+  projectId: bigint;
   members: Array<{ userId: bigint; userName: string }>;
 }
 
@@ -39,7 +40,7 @@ function readStoredViewMode(): ViewMode {
   return "kanban";
 }
 
-export function TaskBoard({ changeId, members }: TaskBoardProps) {
+export function TaskBoard({ changeId, projectId, members }: TaskBoardProps) {
   const { t } = useI18n();
   const { on } = useEvents();
   const [tasks, setTasks] = useState<TaskType[]>([]);
@@ -182,12 +183,12 @@ export function TaskBoard({ changeId, members }: TaskBoardProps) {
     }
 
     try {
-      await taskClient.updateTask(req);
+      await taskClient.updateTask({ ...req, projectId });
     } catch (err) {
       showError(t("toast.taskUpdateFailed"), err);
       setTasks(prevTasks);
     }
-  }, []);
+  }, [projectId]);
 
   const handleUndo = useCallback(() => {
     if (!pendingDelete) return;
@@ -208,7 +209,7 @@ export function TaskBoard({ changeId, members }: TaskBoardProps) {
       }
       // If there was a previous pending delete, commit it immediately
       if (pendingDelete) {
-        taskClient.deleteTask({ id: pendingDelete.task.id }).catch((err) => {
+        taskClient.deleteTask({ id: pendingDelete.task.id, projectId }).catch((err) => {
           showError(t("toast.taskDeleteFailed"), err);
         });
         setPendingDelete(null);
@@ -223,12 +224,12 @@ export function TaskBoard({ changeId, members }: TaskBoardProps) {
       undoTimeoutRef.current = setTimeout(() => {
         undoTimeoutRef.current = null;
         setPendingDelete(null);
-        taskClient.deleteTask({ id }).catch((err) => {
+        taskClient.deleteTask({ id, projectId }).catch((err) => {
           showError(t("toast.taskDeleteFailed"), err);
         });
       }, 3000);
     },
-    [tasks, pendingDelete],
+    [tasks, pendingDelete, projectId],
   );
 
   const handleReorder = useCallback(

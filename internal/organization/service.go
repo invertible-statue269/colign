@@ -29,6 +29,42 @@ func NewService(db *bun.DB) *Service {
 	return &Service{db: db}
 }
 
+func (s *Service) Create(ctx context.Context, userID int64, name string) (*models.Organization, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, errors.New("organization name is required")
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	org := &models.Organization{
+		Name: name,
+		Slug: generateOrgSlug(name),
+	}
+	if _, err := tx.NewInsert().Model(org).Exec(ctx); err != nil {
+		return nil, err
+	}
+
+	member := &models.OrganizationMember{
+		OrganizationID: org.ID,
+		UserID:         userID,
+		Role:           models.OrgRoleOwner,
+	}
+	if _, err := tx.NewInsert().Model(member).Exec(ctx); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return org, nil
+}
+
 func (s *Service) ListByUser(ctx context.Context, userID int64) ([]models.Organization, error) {
 	var orgs []models.Organization
 	err := s.db.NewSelect().Model(&orgs).
@@ -355,4 +391,12 @@ func (s *Service) Update(ctx context.Context, id int64, name string) (*models.Or
 		return nil, err
 	}
 	return org, nil
+}
+
+func generateOrgSlug(name string) string {
+	slug := strings.ToLower(strings.TrimSpace(name))
+	slug = strings.ReplaceAll(slug, " ", "-")
+	b := make([]byte, 4)
+	_, _ = rand.Read(b)
+	return fmt.Sprintf("%s-%s", slug, hex.EncodeToString(b))
 }

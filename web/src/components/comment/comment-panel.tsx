@@ -28,6 +28,7 @@ interface ReplyData {
 
 interface CommentPanelProps {
   changeId: bigint;
+  projectId: bigint;
   documentType: string;
   currentUserId?: number;
   onCommentClick?: (commentId: string) => void;
@@ -47,6 +48,7 @@ function timeAgo(date: Date): string {
 
 export function CommentPanel({
   changeId,
+  projectId,
   documentType,
   currentUserId,
   onCommentClick,
@@ -61,7 +63,7 @@ export function CommentPanel({
 
   const loadComments = useCallback(async () => {
     try {
-      const res = await commentClient.listComments({ changeId, documentType });
+      const res = await commentClient.listComments({ changeId, documentType, projectId });
       setComments(
         res.comments.map((c) => ({
           id: c.id,
@@ -97,19 +99,19 @@ export function CommentPanel({
   }, [refreshRef, loadComments]);
 
   const handleResolve = async (commentId: bigint) => {
-    await commentClient.resolveComment({ commentId });
+    await commentClient.resolveComment({ commentId, projectId });
     loadComments();
   };
 
   const handleDelete = async (commentId: bigint) => {
     if (!confirm(t("comments.deleteConfirm"))) return;
-    await commentClient.deleteComment({ commentId });
+    await commentClient.deleteComment({ commentId, projectId });
     loadComments();
   };
 
   const handleReply = async (commentId: bigint) => {
     if (!replyText.trim()) return;
-    await commentClient.createReply({ commentId, body: replyText });
+    await commentClient.createReply({ commentId, body: replyText, projectId });
     setReplyText("");
     setReplyingTo(null);
     loadComments();

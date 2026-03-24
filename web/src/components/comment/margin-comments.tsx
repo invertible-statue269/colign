@@ -28,6 +28,7 @@ interface ReplyData {
 
 interface MarginCommentsProps {
   changeId: bigint;
+  projectId: bigint;
   documentType: string;
   currentUserId?: number;
   editorDom: HTMLElement | null;
@@ -48,6 +49,7 @@ function timeAgo(date: Date): string {
 
 export function MarginComments({
   changeId,
+  projectId,
   documentType,
   currentUserId,
   editorDom,
@@ -67,7 +69,7 @@ export function MarginComments({
 
   const loadComments = useCallback(async () => {
     try {
-      const res = await commentClient.listComments({ changeId, documentType });
+      const res = await commentClient.listComments({ changeId, documentType, projectId });
       setComments(
         res.comments.map((c) => ({
           id: c.id,
@@ -179,14 +181,14 @@ export function MarginComments({
   };
 
   const handleResolve = async (commentId: bigint) => {
-    await commentClient.resolveComment({ commentId });
+    await commentClient.resolveComment({ commentId, projectId });
     onRemoveHighlight?.(String(commentId));
     loadComments();
   };
 
   const handleDelete = async (commentId: bigint) => {
     if (!confirm(t("comments.deleteConfirm"))) return;
-    await commentClient.deleteComment({ commentId });
+    await commentClient.deleteComment({ commentId, projectId });
     onRemoveHighlight?.(String(commentId));
     loadComments();
   };
@@ -195,7 +197,7 @@ export function MarginComments({
     if (!replyText.trim() || submitting) return;
     setSubmitting(true);
     try {
-      await commentClient.createReply({ commentId, body: replyText });
+      await commentClient.createReply({ commentId, body: replyText, projectId });
       setReplyText("");
       setReplyingTo(null);
       loadComments();

@@ -99,6 +99,7 @@ export default function ChangeDetailPage() {
   const [animatingFrom, setAnimatingFrom] = useState<number | null>(null);
   const [showConfirmAdvance, setShowConfirmAdvance] = useState(false);
   const [members, setMembers] = useState<Array<{ userId: bigint; userName: string }>>([]);
+  const [projectId, setProjectId] = useState<bigint>(BigInt(0));
   const [archivedAt, setArchivedAt] = useState<{ seconds: bigint; nanos: number } | undefined>(undefined);
   const [archiving, setArchiving] = useState(false);
 
@@ -107,6 +108,12 @@ export default function ChangeDetailPage() {
   async function loadAll() {
     try {
       const projectRes = await projectClient.getProject({ slug });
+      if (!projectRes.project) {
+        router.replace("/projects");
+        return;
+      }
+      const pid = projectRes.project.id;
+      setProjectId(pid);
       setMembers(
         (projectRes.members || []).map((m) => ({
           userId: m.userId,
@@ -114,9 +121,9 @@ export default function ChangeDetailPage() {
         })),
       );
       const [statusRes, historyRes, changeRes] = await Promise.all([
-        workflowClient.getStatus({ changeId }),
-        workflowClient.getHistory({ changeId }),
-        projectClient.getChange({ id: changeId }),
+        workflowClient.getStatus({ changeId, projectId: pid }),
+        workflowClient.getHistory({ changeId, projectId: pid }),
+        projectClient.getChange({ id: changeId, projectId: pid }),
       ]);
       setStage(statusRes.stage);
       setConditions(
@@ -143,7 +150,7 @@ export default function ChangeDetailPage() {
   async function handleArchive() {
     setArchiving(true);
     try {
-      await projectClient.archiveChange({ changeId });
+      await projectClient.archiveChange({ changeId, projectId });
       await loadAll();
     } catch (err) {
       showError(t("toast.archiveFailed"), err);
@@ -155,7 +162,7 @@ export default function ChangeDetailPage() {
   async function handleUnarchive() {
     setArchiving(true);
     try {
-      await projectClient.unarchiveChange({ changeId });
+      await projectClient.unarchiveChange({ changeId, projectId });
       await loadAll();
     } catch (err) {
       showError(t("toast.restoreFailed"), err);
@@ -202,7 +209,7 @@ export default function ChangeDetailPage() {
 
   async function doAdvance() {
     setShowConfirmAdvance(false);
-    await workflowClient.advance({ changeId });
+    await workflowClient.advance({ changeId, projectId });
     loadAll();
   }
 
@@ -534,12 +541,12 @@ export default function ChangeDetailPage() {
 
           {/* Tab Content */}
           {activeTab === "proposal" && (
-            <StructuredProposal changeId={changeId} currentStage={stage} />
+            <StructuredProposal changeId={changeId} projectId={projectId} currentStage={stage} />
           )}
-          {activeTab === "design" && <DocumentTab changeId={changeId} docType="design" />}
+          {activeTab === "design" && <DocumentTab changeId={changeId} projectId={projectId} docType="design" />}
           {activeTab === "tasks" && (
             <div className="min-h-0 max-h-[calc(100svh-20rem)] overflow-y-auto pr-1 md:max-h-[calc(100svh-18rem)]">
-              <TaskBoard changeId={changeId} members={members} />
+              <TaskBoard changeId={changeId} projectId={projectId} members={members} />
             </div>
           )}
           {activeTab === "history" && (

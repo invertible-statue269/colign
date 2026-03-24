@@ -93,6 +93,7 @@ message UpdateProjectRequest {
   optional string icon = 10;
   optional string color = 11;
   optional string readme = 12;
+  int64 project_id = 13;
 }
 
 message UpdateProjectResponse {
@@ -101,6 +102,7 @@ message UpdateProjectResponse {
 
 message DeleteProjectRequest {
   int64 id = 1;
+  int64 project_id = 2;
 }
 
 message DeleteProjectResponse {}
@@ -170,6 +172,7 @@ message ListChangesResponse {
 
 message GetChangeRequest {
   int64 id = 1;
+  int64 project_id = 2;
 }
 
 message GetChangeResponse {
@@ -178,6 +181,7 @@ message GetChangeResponse {
 
 message DeleteChangeRequest {
   int64 id = 1;
+  int64 project_id = 2;
 }
 
 message DeleteChangeResponse {}
@@ -185,6 +189,7 @@ message DeleteChangeResponse {}
 // Archive
 message ArchiveChangeRequest {
   int64 change_id = 1;
+  int64 project_id = 2;
 }
 message ArchiveChangeResponse {
   Change change = 1;
@@ -192,6 +197,7 @@ message ArchiveChangeResponse {
 
 message UnarchiveChangeRequest {
   int64 change_id = 1;
+  int64 project_id = 2;
 }
 message UnarchiveChangeResponse {
   Change change = 1;

@@ -43,6 +43,15 @@ message SwitchOrganizationResponse {
   Organization organization = 4;
 }
 
+// Create a new organization for the current user
+message CreateOrganizationRequest {
+  string name = 1;
+}
+
+message CreateOrganizationResponse {
+  Organization organization = 1;
+}
+
 // Update organization name
 message UpdateOrganizationRequest {
   int64 id = 1;
@@ -143,6 +152,7 @@ message SetAllowedDomainsResponse {
 service OrganizationService {
   rpc ListOrganizations(ListOrganizationsRequest) returns (ListOrganizationsResponse) {}
   rpc SwitchOrganization(SwitchOrganizationRequest) returns (SwitchOrganizationResponse) {}
+  rpc CreateOrganization(CreateOrganizationRequest) returns (CreateOrganizationResponse) {}
   rpc UpdateOrganization(UpdateOrganizationRequest) returns (UpdateOrganizationResponse) {}
   rpc ListMembers(ListMembersRequest) returns (ListMembersResponse) {}
   rpc InviteOrgMember(InviteOrgMemberRequest) returns (InviteOrgMemberResponse) {}

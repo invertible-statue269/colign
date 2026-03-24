@@ -130,7 +130,7 @@ func (s *Server) setupRoutes(cfg *config.Config) error {
 	if err != nil {
 		return fmt.Errorf("creating RBAC enforcer: %w", err)
 	}
-	rbacInterceptor := authz.NewRBACInterceptor(s.db, enforcer)
+	rbacInterceptor := authz.NewRBACInterceptor(s.db, enforcer, s.jwtManager, apiTokenService)
 	rbacOpts := connect.WithInterceptors(rbacInterceptor)
 
 	// Project service (Connect)

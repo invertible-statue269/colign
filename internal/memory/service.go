@@ -11,6 +11,8 @@ import (
 	"github.com/gobenpark/colign/internal/models"
 )
 
+var ErrProjectNotFound = errors.New("project not found")
+
 type Service struct {
 	db *bun.DB
 }
@@ -19,9 +21,21 @@ func NewService(db *bun.DB) *Service {
 	return &Service{db: db}
 }
 
-func (s *Service) Get(ctx context.Context, projectID int64) (*models.ProjectMemory, error) {
+func (s *Service) Get(ctx context.Context, projectID int64, orgID int64) (*models.ProjectMemory, error) {
+	// Verify project belongs to org
+	exists, err := s.db.NewSelect().Model((*models.Project)(nil)).
+		Where("id = ?", projectID).
+		Where("organization_id = ?", orgID).
+		Exists(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, nil // Return nil like "no memory found" to avoid leaking info
+	}
+
 	mem := new(models.ProjectMemory)
-	err := s.db.NewSelect().Model(mem).
+	err = s.db.NewSelect().Model(mem).
 		Where("project_id = ?", projectID).
 		Relation("User").
 		Scan(ctx)
@@ -34,9 +48,21 @@ func (s *Service) Get(ctx context.Context, projectID int64) (*models.ProjectMemo
 	return mem, nil
 }
 
-func (s *Service) Save(ctx context.Context, projectID int64, content string, userID int64) (*models.ProjectMemory, error) {
+func (s *Service) Save(ctx context.Context, projectID int64, content string, userID int64, orgID int64) (*models.ProjectMemory, error) {
+	// Verify project belongs to org
+	exists, err := s.db.NewSelect().Model((*models.Project)(nil)).
+		Where("id = ?", projectID).
+		Where("organization_id = ?", orgID).
+		Exists(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, ErrProjectNotFound
+	}
+
 	mem := new(models.ProjectMemory)
-	err := s.db.NewSelect().Model(mem).
+	err = s.db.NewSelect().Model(mem).
 		Where("project_id = ?", projectID).
 		Scan(ctx)
 

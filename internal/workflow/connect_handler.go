@@ -38,7 +38,12 @@ func (h *ConnectHandler) extractClaims(ctx context.Context, header string) (*aut
 }
 
 func (h *ConnectHandler) GetStatus(ctx context.Context, req *connect.Request[workflowv1.GetStatusRequest]) (*connect.Response[workflowv1.GetStatusResponse], error) {
-	stage, conditions, err := h.service.GetStatus(ctx, req.Msg.ChangeId)
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	stage, conditions, err := h.service.GetStatus(ctx, req.Msg.ChangeId, claims.OrgID)
 	if err != nil {
 		if errors.Is(err, ErrChangeNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, err)
@@ -67,7 +72,7 @@ func (h *ConnectHandler) Advance(ctx context.Context, req *connect.Request[workf
 		return nil, err
 	}
 
-	newStage, err := h.service.Advance(ctx, req.Msg.ChangeId, claims.UserID)
+	newStage, err := h.service.Advance(ctx, req.Msg.ChangeId, claims.UserID, claims.OrgID)
 	if err != nil {
 		if errors.Is(err, ErrChangeNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, err)
@@ -86,6 +91,21 @@ func (h *ConnectHandler) Approve(ctx context.Context, req *connect.Request[workf
 		return nil, err
 	}
 
+	// Verify change belongs to user's org
+	var exists bool
+	exists, err = h.db.NewSelect().
+		TableExpr("changes c").
+		Join("JOIN projects p ON p.id = c.project_id").
+		Where("c.id = ?", req.Msg.ChangeId).
+		Where("p.organization_id = ?", claims.OrgID).
+		Exists(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if !exists {
+		return nil, connect.NewError(connect.CodeNotFound, ErrChangeNotFound)
+	}
+
 	approval := &models.Approval{
 		ChangeID: req.Msg.ChangeId,
 		UserID:   claims.UserID,
@@ -100,7 +120,7 @@ func (h *ConnectHandler) Approve(ctx context.Context, req *connect.Request[workf
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
-	advanced, err := h.service.EvaluateAndAdvance(ctx, req.Msg.ChangeId)
+	advanced, err := h.service.EvaluateAndAdvance(ctx, req.Msg.ChangeId, claims.OrgID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -108,7 +128,11 @@ func (h *ConnectHandler) Approve(ctx context.Context, req *connect.Request[workf
 	resp := &workflowv1.ApproveResponse{Advanced: advanced}
 	if advanced {
 		change := new(models.Change)
-		if err := h.db.NewSelect().Model(change).Where("id = ?", req.Msg.ChangeId).Scan(ctx); err == nil {
+		if err := h.db.NewSelect().Model(change).
+			Join("JOIN projects AS p ON p.id = ch.project_id").
+			Where("ch.id = ?", req.Msg.ChangeId).
+			Where("p.organization_id = ?", claims.OrgID).
+			Scan(ctx); err == nil {
 			resp.NewStage = string(change.Stage)
 		}
 	}
@@ -122,12 +146,16 @@ func (h *ConnectHandler) RequestChanges(ctx context.Context, req *connect.Reques
 		return nil, err
 	}
 
-	if err := h.service.Revert(ctx, req.Msg.ChangeId, claims.UserID, req.Msg.Reason); err != nil {
+	if err := h.service.Revert(ctx, req.Msg.ChangeId, claims.UserID, req.Msg.Reason, claims.OrgID); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
 	change := new(models.Change)
-	if err := h.db.NewSelect().Model(change).Where("id = ?", req.Msg.ChangeId).Scan(ctx); err != nil {
+	if err := h.db.NewSelect().Model(change).
+		Join("JOIN projects AS p ON p.id = ch.project_id").
+		Where("ch.id = ?", req.Msg.ChangeId).
+		Where("p.organization_id = ?", claims.OrgID).
+		Scan(ctx); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
@@ -142,12 +170,16 @@ func (h *ConnectHandler) Revert(ctx context.Context, req *connect.Request[workfl
 		return nil, err
 	}
 
-	if err := h.service.Revert(ctx, req.Msg.ChangeId, claims.UserID, req.Msg.Reason); err != nil {
+	if err := h.service.Revert(ctx, req.Msg.ChangeId, claims.UserID, req.Msg.Reason, claims.OrgID); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
 	change := new(models.Change)
-	if err := h.db.NewSelect().Model(change).Where("id = ?", req.Msg.ChangeId).Scan(ctx); err != nil {
+	if err := h.db.NewSelect().Model(change).
+		Join("JOIN projects AS p ON p.id = ch.project_id").
+		Where("ch.id = ?", req.Msg.ChangeId).
+		Where("p.organization_id = ?", claims.OrgID).
+		Scan(ctx); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
@@ -157,10 +189,18 @@ func (h *ConnectHandler) Revert(ctx context.Context, req *connect.Request[workfl
 }
 
 func (h *ConnectHandler) GetHistory(ctx context.Context, req *connect.Request[workflowv1.GetHistoryRequest]) (*connect.Response[workflowv1.GetHistoryResponse], error) {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
 	var events []models.WorkflowEvent
-	err := h.db.NewSelect().Model(&events).
+	err = h.db.NewSelect().Model(&events).
 		Relation("User").
+		Join("JOIN changes AS c ON c.id = we.change_id").
+		Join("JOIN projects AS p ON p.id = c.project_id").
 		Where("we.change_id = ?", req.Msg.ChangeId).
+		Where("p.organization_id = ?", claims.OrgID).
 		OrderExpr("we.created_at DESC").
 		Scan(ctx)
 	if err != nil {
@@ -191,6 +231,23 @@ func (h *ConnectHandler) GetHistory(ctx context.Context, req *connect.Request[wo
 }
 
 func (h *ConnectHandler) SetApprovalPolicy(ctx context.Context, req *connect.Request[workflowv1.SetApprovalPolicyRequest]) (*connect.Response[workflowv1.SetApprovalPolicyResponse], error) {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify project belongs to user's org
+	exists, err := h.db.NewSelect().Model((*models.Project)(nil)).
+		Where("id = ?", req.Msg.ProjectId).
+		Where("organization_id = ?", claims.OrgID).
+		Exists(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if !exists {
+		return nil, connect.NewError(connect.CodeNotFound, ErrChangeNotFound)
+	}
+
 	policy := &models.ApprovalPolicy{
 		ProjectID: req.Msg.ProjectId,
 		Policy:    req.Msg.Policy,

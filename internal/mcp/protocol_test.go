@@ -15,6 +15,7 @@ func TestToolDefinitions(t *testing.T) {
 	expectedTools := []string{
 		"list_projects", "get_change", "read_spec",
 		"write_spec", "list_tasks", "update_task", "suggest_spec",
+		"get_change_history",
 	}
 
 	toolMap := make(map[string]bool)
@@ -25,6 +26,157 @@ func TestToolDefinitions(t *testing.T) {
 	for _, name := range expectedTools {
 		assert.True(t, toolMap[name], "missing tool: %s", name)
 	}
+}
+
+func TestUpdateTaskToolHasAssigneeParams(t *testing.T) {
+	tools := ListTools()
+
+	var updateTask *Tool
+	for i, tool := range tools {
+		if tool.Name == "update_task" {
+			updateTask = &tools[i]
+			break
+		}
+	}
+	require.NotNil(t, updateTask, "update_task tool not found")
+
+	assert.Contains(t, updateTask.InputSchema.Properties, "assignee_id", "update_task should have assignee_id param")
+	assert.Contains(t, updateTask.InputSchema.Properties, "clear_assignee", "update_task should have clear_assignee param")
+	assert.Equal(t, "integer", updateTask.InputSchema.Properties["assignee_id"].Type)
+	assert.Equal(t, "boolean", updateTask.InputSchema.Properties["clear_assignee"].Type)
+
+	// status should no longer be required (only task_id is)
+	assert.Equal(t, []string{"task_id"}, updateTask.InputSchema.Required)
+}
+
+func TestLinkACToTestToolDefinition(t *testing.T) {
+	tools := ListTools()
+
+	var linkTool *Tool
+	for i, tool := range tools {
+		if tool.Name == "link_ac_to_test" {
+			linkTool = &tools[i]
+			break
+		}
+	}
+	require.NotNil(t, linkTool, "link_ac_to_test tool not found")
+
+	assert.Contains(t, linkTool.InputSchema.Properties, "ac_id")
+	assert.Contains(t, linkTool.InputSchema.Properties, "test_ref")
+	assert.Equal(t, []string{"ac_id", "test_ref"}, linkTool.InputSchema.Required)
+}
+
+func TestCreateACToolHasTestRefParam(t *testing.T) {
+	tools := ListTools()
+
+	var createAC *Tool
+	for i, tool := range tools {
+		if tool.Name == "create_acceptance_criteria" {
+			createAC = &tools[i]
+			break
+		}
+	}
+	require.NotNil(t, createAC, "create_acceptance_criteria tool not found")
+
+	assert.Contains(t, createAC.InputSchema.Properties, "test_ref", "create_acceptance_criteria should have test_ref param")
+}
+
+func TestGetChangeHistoryToolDefinition(t *testing.T) {
+	tools := ListTools()
+
+	var historyTool *Tool
+	for i, tool := range tools {
+		if tool.Name == "get_change_history" {
+			historyTool = &tools[i]
+			break
+		}
+	}
+	require.NotNil(t, historyTool, "get_change_history tool not found")
+
+	assert.Contains(t, historyTool.InputSchema.Properties, "change_id")
+	assert.Equal(t, []string{"change_id"}, historyTool.InputSchema.Required)
+}
+
+func TestPOToolsExist(t *testing.T) {
+	tools := ListTools()
+	toolMap := make(map[string]bool)
+	for _, tool := range tools {
+		toolMap[tool.Name] = true
+	}
+
+	poTools := []string{
+		"get_change_summary",
+		"get_project_dashboard",
+		"get_gate_status",
+		"approve_change",
+		"reject_change",
+		"archive_change",
+	}
+
+	for _, name := range poTools {
+		assert.True(t, toolMap[name], "missing PO tool: %s", name)
+	}
+}
+
+func TestApproveChangeToolDefinition(t *testing.T) {
+	tools := ListTools()
+
+	var tool *Tool
+	for i, tt := range tools {
+		if tt.Name == "approve_change" {
+			tool = &tools[i]
+			break
+		}
+	}
+	require.NotNil(t, tool)
+	assert.Contains(t, tool.InputSchema.Properties, "change_id")
+	assert.Contains(t, tool.InputSchema.Properties, "comment")
+	assert.Equal(t, []string{"change_id"}, tool.InputSchema.Required, "only change_id required, comment is optional")
+}
+
+func TestRejectChangeToolDefinition(t *testing.T) {
+	tools := ListTools()
+
+	var tool *Tool
+	for i, tt := range tools {
+		if tt.Name == "reject_change" {
+			tool = &tools[i]
+			break
+		}
+	}
+	require.NotNil(t, tool)
+	assert.Contains(t, tool.InputSchema.Properties, "reason")
+	assert.Equal(t, []string{"change_id", "reason"}, tool.InputSchema.Required, "reason is required")
+}
+
+func TestGetWorkContextToolDefinition(t *testing.T) {
+	tools := ListTools()
+
+	var tool *Tool
+	for i, tt := range tools {
+		if tt.Name == "get_work_context" {
+			tool = &tools[i]
+			break
+		}
+	}
+	require.NotNil(t, tool, "get_work_context tool not found")
+	assert.Contains(t, tool.InputSchema.Properties, "change_id")
+	assert.Equal(t, []string{"change_id"}, tool.InputSchema.Required)
+}
+
+func TestListChangesToolIncludesProgress(t *testing.T) {
+	tools := ListTools()
+
+	var tool *Tool
+	for i, tt := range tools {
+		if tt.Name == "list_changes" {
+			tool = &tools[i]
+			break
+		}
+	}
+	require.NotNil(t, tool)
+	// list_changes tool exists — progress is added at handler level, not schema level
+	assert.Contains(t, tool.InputSchema.Properties, "project_id")
 }
 
 func TestJSONRPCRequest(t *testing.T) {

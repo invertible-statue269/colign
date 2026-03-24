@@ -55,13 +55,6 @@ func (h *ConnectHandler) CreateTask(ctx context.Context, req *connect.Request[ta
 		return nil, err
 	}
 
-	if err := h.service.CheckProjectMembership(ctx, req.Msg.ChangeId, claims.UserID); err != nil {
-		if errors.Is(err, ErrNotAuthorized) {
-			return nil, connect.NewError(connect.CodePermissionDenied, err)
-		}
-		return nil, connect.NewError(connect.CodeInternal, err)
-	}
-
 	status := req.Msg.Status
 	if status == "" {
 		status = "todo"
@@ -95,23 +88,7 @@ func (h *ConnectHandler) UpdateTask(ctx context.Context, req *connect.Request[ta
 		return nil, err
 	}
 
-	// Fetch the task first to get change_id for membership check
-	existing, err := h.service.Update(ctx, req.Msg.Id, nil, nil, nil, nil, nil, false)
-	if err != nil {
-		if errors.Is(err, ErrTaskNotFound) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
-		}
-		return nil, connect.NewError(connect.CodeInternal, err)
-	}
-
-	if err := h.service.CheckProjectMembership(ctx, existing.ChangeID, claims.UserID); err != nil {
-		if errors.Is(err, ErrNotAuthorized) {
-			return nil, connect.NewError(connect.CodePermissionDenied, err)
-		}
-		return nil, connect.NewError(connect.CodeInternal, err)
-	}
-
-	t, err := h.service.Update(ctx, req.Msg.Id, req.Msg.Title, req.Msg.Description, req.Msg.Status, req.Msg.SpecRef, req.Msg.AssigneeId, req.Msg.ClearAssignee)
+	t, err := h.service.Update(ctx, req.Msg.Id, req.Msg.Title, req.Msg.Description, req.Msg.Status, req.Msg.SpecRef, req.Msg.AssigneeId, req.Msg.ClearAssignee, claims.OrgID)
 	if err != nil {
 		if errors.Is(err, ErrTaskNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, err)
@@ -125,12 +102,12 @@ func (h *ConnectHandler) UpdateTask(ctx context.Context, req *connect.Request[ta
 }
 
 func (h *ConnectHandler) DeleteTask(ctx context.Context, req *connect.Request[taskv1.DeleteTaskRequest]) (*connect.Response[taskv1.DeleteTaskResponse], error) {
-	_, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}
 
-	if err := h.service.Delete(ctx, req.Msg.Id); err != nil {
+	if err := h.service.Delete(ctx, req.Msg.Id, claims.OrgID); err != nil {
 		if errors.Is(err, ErrTaskNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, err)
 		}
@@ -146,13 +123,6 @@ func (h *ConnectHandler) ReorderTasks(ctx context.Context, req *connect.Request[
 		return nil, err
 	}
 
-	if err := h.service.CheckProjectMembership(ctx, req.Msg.ChangeId, claims.UserID); err != nil {
-		if errors.Is(err, ErrNotAuthorized) {
-			return nil, connect.NewError(connect.CodePermissionDenied, err)
-		}
-		return nil, connect.NewError(connect.CodeInternal, err)
-	}
-
 	items := make([]ReorderItem, len(req.Msg.Items))
 	for i, item := range req.Msg.Items {
 		items[i] = ReorderItem{
@@ -162,7 +132,7 @@ func (h *ConnectHandler) ReorderTasks(ctx context.Context, req *connect.Request[
 		}
 	}
 
-	if err := h.service.Reorder(ctx, req.Msg.ChangeId, items); err != nil {
+	if err := h.service.Reorder(ctx, req.Msg.ChangeId, items, claims.OrgID); err != nil {
 		if errors.Is(err, ErrInvalidChange) {
 			return nil, connect.NewError(connect.CodeInvalidArgument, err)
 		}

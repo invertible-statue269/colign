@@ -20,6 +20,7 @@ type AcceptanceCriteria struct {
 	Steps     []ACStep  `bun:"steps,type:jsonb,notnull,default:'[]'"`
 	Met       bool      `bun:"met,notnull,default:false"`
 	SortOrder int       `bun:"sort_order,notnull,default:0"`
+	TestRef   string    `bun:"test_ref,notnull,default:''"`
 	CreatedAt time.Time `bun:"created_at,notnull,default:current_timestamp"`
 	UpdatedAt time.Time `bun:"updated_at,notnull,default:current_timestamp"`
 

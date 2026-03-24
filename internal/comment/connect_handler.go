@@ -71,7 +71,7 @@ func (h *ConnectHandler) ResolveComment(ctx context.Context, req *connect.Reques
 		return nil, err
 	}
 
-	comment, err := h.service.Resolve(ctx, req.Msg.CommentId, claims.UserID)
+	comment, err := h.service.Resolve(ctx, req.Msg.CommentId, claims.UserID, claims.OrgID)
 	if err != nil {
 		if errors.Is(err, ErrCommentNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, err)
@@ -90,7 +90,7 @@ func (h *ConnectHandler) DeleteComment(ctx context.Context, req *connect.Request
 		return nil, err
 	}
 
-	if err := h.service.Delete(ctx, req.Msg.CommentId, claims.UserID); err != nil {
+	if err := h.service.Delete(ctx, req.Msg.CommentId, claims.UserID, claims.OrgID); err != nil {
 		if errors.Is(err, ErrCommentNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, err)
 		}
@@ -109,7 +109,7 @@ func (h *ConnectHandler) CreateReply(ctx context.Context, req *connect.Request[c
 		return nil, err
 	}
 
-	reply, err := h.service.CreateReply(ctx, req.Msg.CommentId, req.Msg.Body, claims.UserID)
+	reply, err := h.service.CreateReply(ctx, req.Msg.CommentId, req.Msg.Body, claims.UserID, claims.OrgID)
 	if err != nil {
 		if errors.Is(err, ErrCommentNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, err)

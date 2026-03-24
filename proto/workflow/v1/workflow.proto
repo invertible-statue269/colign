@@ -25,6 +25,7 @@ message WorkflowEvent {
 
 message GetStatusRequest {
   int64 change_id = 1;
+  int64 project_id = 2;
 }
 
 message GetStatusResponse {
@@ -35,6 +36,7 @@ message GetStatusResponse {
 message ApproveRequest {
   int64 change_id = 1;
   string comment = 2;
+  int64 project_id = 3;
 }
 
 message ApproveResponse {
@@ -45,6 +47,7 @@ message ApproveResponse {
 message RequestChangesRequest {
   int64 change_id = 1;
   string reason = 2;
+  int64 project_id = 3;
 }
 
 message RequestChangesResponse {
@@ -54,6 +57,7 @@ message RequestChangesResponse {
 message RevertRequest {
   int64 change_id = 1;
   string reason = 2;
+  int64 project_id = 3;
 }
 
 message RevertResponse {
@@ -62,6 +66,7 @@ message RevertResponse {
 
 message GetHistoryRequest {
   int64 change_id = 1;
+  int64 project_id = 2;
 }
 
 message GetHistoryResponse {
@@ -70,6 +75,7 @@ message GetHistoryResponse {
 
 message AdvanceRequest {
   int64 change_id = 1;
+  int64 project_id = 2;
 }
 
 message AdvanceResponse {

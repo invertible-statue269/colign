@@ -24,6 +24,7 @@ func setupTestDB(t *testing.T) (*bun.DB, sqlmock.Sqlmock) {
 	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 	require.NoError(t, err)
 	db := bun.NewDB(mockDB, pgdialect.New())
+	db.RegisterModel((*models.ProjectLabelAssignment)(nil))
 	t.Cleanup(func() { _ = db.Close() })
 	return db, mock
 }
@@ -101,7 +102,7 @@ func TestArchive(t *testing.T) {
 		mock.ExpectQuery("SELECT").
 			WillReturnError(sql.ErrNoRows)
 
-		result, err := svc.Archive(ctx, 999, 1)
+		result, err := svc.Archive(ctx, 999, 1, 1)
 		assert.Nil(t, result)
 		require.ErrorIs(t, err, ErrChangeNotFound)
 		require.NoError(t, mock.ExpectationsWereMet())
@@ -117,7 +118,7 @@ func TestArchive(t *testing.T) {
 		mock.ExpectQuery("SELECT").
 			WillReturnRows(rows)
 
-		result, err := svc.Archive(ctx, 1, 1)
+		result, err := svc.Archive(ctx, 1, 1, 1)
 		assert.Nil(t, result)
 		require.ErrorIs(t, err, ErrNotReady)
 		require.NoError(t, mock.ExpectationsWereMet())
@@ -134,7 +135,7 @@ func TestArchive(t *testing.T) {
 		mock.ExpectQuery("SELECT").
 			WillReturnRows(rows)
 
-		result, err := svc.Archive(ctx, 1, 1)
+		result, err := svc.Archive(ctx, 1, 1, 1)
 		assert.Nil(t, result)
 		require.ErrorIs(t, err, ErrAlreadyArchived)
 		require.NoError(t, mock.ExpectationsWereMet())
@@ -158,7 +159,7 @@ func TestArchive(t *testing.T) {
 		mock.ExpectQuery("INSERT").
 			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(1)))
 
-		result, err := svc.Archive(ctx, 1, 1)
+		result, err := svc.Archive(ctx, 1, 1, 1)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		assert.NotNil(t, result.ArchivedAt)
@@ -179,7 +180,7 @@ func TestUnarchive(t *testing.T) {
 		mock.ExpectQuery("SELECT").
 			WillReturnError(sql.ErrNoRows)
 
-		result, err := svc.Unarchive(ctx, 999, 1)
+		result, err := svc.Unarchive(ctx, 999, 1, 1)
 		assert.Nil(t, result)
 		require.ErrorIs(t, err, ErrChangeNotFound)
 		require.NoError(t, mock.ExpectationsWereMet())
@@ -195,7 +196,7 @@ func TestUnarchive(t *testing.T) {
 		mock.ExpectQuery("SELECT").
 			WillReturnRows(rows)
 
-		result, err := svc.Unarchive(ctx, 1, 1)
+		result, err := svc.Unarchive(ctx, 1, 1, 1)
 		assert.Nil(t, result)
 		require.ErrorIs(t, err, ErrNotArchived)
 		require.NoError(t, mock.ExpectationsWereMet())
@@ -220,7 +221,7 @@ func TestUnarchive(t *testing.T) {
 		mock.ExpectQuery("INSERT").
 			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(1)))
 
-		result, err := svc.Unarchive(ctx, 1, 1)
+		result, err := svc.Unarchive(ctx, 1, 1, 1)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		assert.Nil(t, result.ArchivedAt)

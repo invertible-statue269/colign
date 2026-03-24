@@ -109,6 +109,11 @@ func (h *ConnectHandler) ListProjects(ctx context.Context, req *connect.Request[
 }
 
 func (h *ConnectHandler) UpdateProject(ctx context.Context, req *connect.Request[projectv1.UpdateProjectRequest]) (*connect.Response[projectv1.UpdateProjectResponse], error) {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
 	input := UpdateProjectInput{
 		ID:          req.Msg.Id,
 		Name:        req.Msg.Name,
@@ -166,7 +171,7 @@ func (h *ConnectHandler) UpdateProject(ctx context.Context, req *connect.Request
 		input.Readme = req.Msg.Readme
 	}
 
-	project, err := h.service.Update(ctx, input)
+	project, err := h.service.Update(ctx, input, claims.OrgID)
 	if err != nil {
 		if errors.Is(err, ErrProjectNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, err)
@@ -180,19 +185,36 @@ func (h *ConnectHandler) UpdateProject(ctx context.Context, req *connect.Request
 }
 
 func (h *ConnectHandler) DeleteProject(ctx context.Context, req *connect.Request[projectv1.DeleteProjectRequest]) (*connect.Response[projectv1.DeleteProjectResponse], error) {
-	if err := h.service.Delete(ctx, req.Msg.Id); err != nil {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.service.Delete(ctx, req.Msg.Id, claims.OrgID); err != nil {
+		if errors.Is(err, ErrProjectNotFound) {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&projectv1.DeleteProjectResponse{}), nil
 }
 
 func (h *ConnectHandler) InviteMember(ctx context.Context, req *connect.Request[projectv1.InviteMemberRequest]) (*connect.Response[projectv1.InviteMemberResponse], error) {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
 	member, err := h.service.InviteMember(ctx, InviteMemberInput{
 		ProjectID: req.Msg.ProjectId,
 		Email:     req.Msg.Email,
 		Role:      models.Role(req.Msg.Role),
+		OrgID:     claims.OrgID,
 	})
 	if err != nil {
+		if errors.Is(err, ErrProjectNotFound) {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
@@ -239,22 +261,46 @@ func (h *ConnectHandler) ListLabels(ctx context.Context, req *connect.Request[pr
 }
 
 func (h *ConnectHandler) AssignLabel(ctx context.Context, req *connect.Request[projectv1.AssignLabelRequest]) (*connect.Response[projectv1.AssignLabelResponse], error) {
-	if err := h.service.AssignLabel(ctx, req.Msg.ProjectId, req.Msg.LabelId); err != nil {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.service.AssignLabel(ctx, req.Msg.ProjectId, req.Msg.LabelId, claims.OrgID); err != nil {
+		if errors.Is(err, ErrProjectNotFound) {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&projectv1.AssignLabelResponse{}), nil
 }
 
 func (h *ConnectHandler) RemoveLabel(ctx context.Context, req *connect.Request[projectv1.RemoveLabelRequest]) (*connect.Response[projectv1.RemoveLabelResponse], error) {
-	if err := h.service.RemoveLabel(ctx, req.Msg.ProjectId, req.Msg.LabelId); err != nil {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.service.RemoveLabel(ctx, req.Msg.ProjectId, req.Msg.LabelId, claims.OrgID); err != nil {
+		if errors.Is(err, ErrProjectNotFound) {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&projectv1.RemoveLabelResponse{}), nil
 }
 
 func (h *ConnectHandler) CreateChange(ctx context.Context, req *connect.Request[projectv1.CreateChangeRequest]) (*connect.Response[projectv1.CreateChangeResponse], error) {
-	change, err := h.service.CreateChange(ctx, req.Msg.ProjectId, req.Msg.Name)
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
+		return nil, err
+	}
+
+	change, err := h.service.CreateChange(ctx, req.Msg.ProjectId, req.Msg.Name, claims.OrgID)
+	if err != nil {
+		if errors.Is(err, ErrProjectNotFound) {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
@@ -264,12 +310,20 @@ func (h *ConnectHandler) CreateChange(ctx context.Context, req *connect.Request[
 }
 
 func (h *ConnectHandler) ListChanges(ctx context.Context, req *connect.Request[projectv1.ListChangesRequest]) (*connect.Response[projectv1.ListChangesResponse], error) {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
 	filter := "active"
 	if req.Msg.Filter != nil {
 		filter = *req.Msg.Filter
 	}
-	changes, err := h.service.ListChanges(ctx, req.Msg.ProjectId, filter)
+	changes, err := h.service.ListChanges(ctx, req.Msg.ProjectId, filter, claims.OrgID)
 	if err != nil {
+		if errors.Is(err, ErrProjectNotFound) {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
@@ -284,7 +338,12 @@ func (h *ConnectHandler) ListChanges(ctx context.Context, req *connect.Request[p
 }
 
 func (h *ConnectHandler) GetChange(ctx context.Context, req *connect.Request[projectv1.GetChangeRequest]) (*connect.Response[projectv1.GetChangeResponse], error) {
-	change, err := h.service.GetChange(ctx, req.Msg.Id)
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	change, err := h.service.GetChange(ctx, req.Msg.Id, claims.OrgID)
 	if err != nil {
 		if errors.Is(err, ErrProjectNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, err)
@@ -298,28 +357,18 @@ func (h *ConnectHandler) GetChange(ctx context.Context, req *connect.Request[pro
 }
 
 func (h *ConnectHandler) DeleteChange(ctx context.Context, req *connect.Request[projectv1.DeleteChangeRequest]) (*connect.Response[projectv1.DeleteChangeResponse], error) {
-	if err := h.service.DeleteChange(ctx, req.Msg.Id); err != nil {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.service.DeleteChange(ctx, req.Msg.Id, claims.OrgID); err != nil {
+		if errors.Is(err, ErrProjectNotFound) {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&projectv1.DeleteChangeResponse{}), nil
-}
-
-func (h *ConnectHandler) checkChangeRole(ctx context.Context, changeID int64, userID int64, requiredRole string) error {
-	var role string
-	err := h.service.db.NewSelect().
-		TableExpr("project_members pm").
-		ColumnExpr("pm.role").
-		Join("JOIN changes ch ON ch.project_id = pm.project_id").
-		Where("ch.id = ?", changeID).
-		Where("pm.user_id = ?", userID).
-		Scan(ctx, &role)
-	if err != nil {
-		return connect.NewError(connect.CodePermissionDenied, errors.New("not a project member"))
-	}
-	if requiredRole == "owner" && role != "owner" {
-		return connect.NewError(connect.CodePermissionDenied, errors.New("owner access required"))
-	}
-	return nil
 }
 
 func (h *ConnectHandler) ArchiveChange(ctx context.Context, req *connect.Request[projectv1.ArchiveChangeRequest]) (*connect.Response[projectv1.ArchiveChangeResponse], error) {
@@ -328,11 +377,7 @@ func (h *ConnectHandler) ArchiveChange(ctx context.Context, req *connect.Request
 		return nil, err
 	}
 
-	if err := h.checkChangeRole(ctx, req.Msg.ChangeId, claims.UserID, "editor"); err != nil {
-		return nil, err
-	}
-
-	change, err := h.archiveService.Archive(ctx, req.Msg.ChangeId, claims.UserID)
+	change, err := h.archiveService.Archive(ctx, req.Msg.ChangeId, claims.UserID, claims.OrgID)
 	if err != nil {
 		switch {
 		case errors.Is(err, archive.ErrChangeNotFound):
@@ -355,11 +400,7 @@ func (h *ConnectHandler) UnarchiveChange(ctx context.Context, req *connect.Reque
 		return nil, err
 	}
 
-	if err := h.checkChangeRole(ctx, req.Msg.ChangeId, claims.UserID, "editor"); err != nil {
-		return nil, err
-	}
-
-	change, err := h.archiveService.Unarchive(ctx, req.Msg.ChangeId, claims.UserID)
+	change, err := h.archiveService.Unarchive(ctx, req.Msg.ChangeId, claims.UserID, claims.OrgID)
 	if err != nil {
 		switch {
 		case errors.Is(err, archive.ErrChangeNotFound):
@@ -377,12 +418,12 @@ func (h *ConnectHandler) UnarchiveChange(ctx context.Context, req *connect.Reque
 }
 
 func (h *ConnectHandler) GetArchivePolicy(ctx context.Context, req *connect.Request[projectv1.GetArchivePolicyRequest]) (*connect.Response[projectv1.GetArchivePolicyResponse], error) {
-	_, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {
 		return nil, err
 	}
 
-	policy, err := h.archiveService.GetPolicy(ctx, req.Msg.ProjectId)
+	policy, err := h.archiveService.GetPolicy(ctx, req.Msg.ProjectId, claims.OrgID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -403,27 +444,12 @@ func (h *ConnectHandler) UpdateArchivePolicy(ctx context.Context, req *connect.R
 		return nil, err
 	}
 
-	// Check that the user is an owner of the project
-	var role string
-	dbErr := h.service.db.NewSelect().
-		TableExpr("project_members").
-		ColumnExpr("role").
-		Where("project_id = ?", req.Msg.ProjectId).
-		Where("user_id = ?", claims.UserID).
-		Scan(ctx, &role)
-	if dbErr != nil {
-		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("not a project member"))
-	}
-	if role != "owner" {
-		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("owner access required"))
-	}
-
 	policy, err := h.archiveService.UpdatePolicy(ctx, &models.ArchivePolicy{
 		ProjectID:   req.Msg.ProjectId,
 		Mode:        models.ArchiveMode(req.Msg.Mode),
 		TriggerType: models.ArchiveTrigger(req.Msg.Trigger),
 		DaysDelay:   int(req.Msg.DaysDelay),
-	})
+	}, claims.OrgID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}

@@ -21,12 +21,15 @@ func NewService(db *bun.DB) *Service {
 	return &Service{db: db}
 }
 
-func (s *Service) Get(ctx context.Context, changeID int64, docType models.DocumentType) (*models.Document, error) {
+func (s *Service) Get(ctx context.Context, changeID int64, docType models.DocumentType, orgID int64) (*models.Document, error) {
 	doc := new(models.Document)
 	err := s.db.NewSelect().Model(doc).
-		Where("change_id = ?", changeID).
-		Where("type = ?", docType).
-		OrderExpr("updated_at DESC").
+		Join("JOIN changes AS c ON c.id = d.change_id").
+		Join("JOIN projects AS p ON p.id = c.project_id").
+		Where("d.change_id = ?", changeID).
+		Where("d.type = ?", docType).
+		Where("p.organization_id = ?", orgID).
+		OrderExpr("d.updated_at DESC").
 		Limit(1).
 		Scan(ctx)
 	if err != nil {
@@ -46,9 +49,23 @@ type SaveInput struct {
 	UserID   int64
 }
 
-func (s *Service) Save(ctx context.Context, input SaveInput) (*models.Document, error) {
+func (s *Service) Save(ctx context.Context, input SaveInput, orgID int64) (*models.Document, error) {
+	// Verify change belongs to org
+	exists, err := s.db.NewSelect().
+		TableExpr("changes c").
+		Join("JOIN projects p ON p.id = c.project_id").
+		Where("c.id = ?", input.ChangeID).
+		Where("p.organization_id = ?", orgID).
+		Exists(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, ErrDocumentNotFound
+	}
+
 	doc := new(models.Document)
-	err := s.db.NewSelect().Model(doc).
+	err = s.db.NewSelect().Model(doc).
 		Where("change_id = ?", input.ChangeID).
 		Where("type = ?", input.Type).
 		OrderExpr("updated_at DESC").
@@ -102,7 +119,7 @@ func (s *Service) GetHistory(ctx context.Context, documentID int64) ([]models.Do
 	return versions, err
 }
 
-func (s *Service) Restore(ctx context.Context, documentID int64, version int, userID int64) (*models.Document, error) {
+func (s *Service) Restore(ctx context.Context, documentID int64, version int, userID int64, orgID int64) (*models.Document, error) {
 	dv := new(models.DocumentVersion)
 	err := s.db.NewSelect().Model(dv).
 		Where("document_id = ?", documentID).
@@ -118,6 +135,20 @@ func (s *Service) Restore(ctx context.Context, documentID int64, version int, us
 	doc := new(models.Document)
 	if err := s.db.NewSelect().Model(doc).Where("id = ?", documentID).Scan(ctx); err != nil {
 		return nil, err
+	}
+
+	// Verify document's change belongs to user's org
+	exists, err := s.db.NewSelect().
+		TableExpr("changes c").
+		Join("JOIN projects p ON p.id = c.project_id").
+		Where("c.id = ?", doc.ChangeID).
+		Where("p.organization_id = ?", orgID).
+		Exists(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, ErrDocumentNotFound
 	}
 
 	doc.Content = dv.Content

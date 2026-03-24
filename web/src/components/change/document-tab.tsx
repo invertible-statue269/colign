@@ -13,11 +13,12 @@ import { AcceptanceCriteria } from "@/components/change/acceptance-criteria";
 
 interface DocumentTabProps {
   changeId: bigint;
+  projectId: bigint;
   docType: "proposal" | "design" | "spec";
   currentStage?: string;
 }
 
-export function DocumentTab({ changeId, docType, currentStage }: DocumentTabProps) {
+export function DocumentTab({ changeId, projectId, docType, currentStage }: DocumentTabProps) {
   const { t } = useI18n();
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
@@ -41,7 +42,7 @@ export function DocumentTab({ changeId, docType, currentStage }: DocumentTabProp
   useEffect(() => {
     async function loadDocument() {
       try {
-        const res = await documentClient.getDocument({ changeId, type: docType });
+        const res = await documentClient.getDocument({ changeId, type: docType, projectId });
         if (res.document) {
           setContent(res.document.content);
         } else {
@@ -88,6 +89,7 @@ export function DocumentTab({ changeId, docType, currentStage }: DocumentTabProp
         documentType: docType,
         quotedText: pendingQuotedText,
         body: commentInput,
+        projectId,
       });
       if (res.comment && editorRef.current) {
         editorRef.current.addHighlightAtSavedSelection(String(res.comment.id));
@@ -182,6 +184,7 @@ export function DocumentTab({ changeId, docType, currentStage }: DocumentTabProp
         {/* Margin comments */}
         <MarginComments
           changeId={changeId}
+          projectId={projectId}
           documentType={docType}
           currentUserId={payload?.user_id}
           editorDom={editorDom}
@@ -196,6 +199,7 @@ export function DocumentTab({ changeId, docType, currentStage }: DocumentTabProp
       {docType === "proposal" && (
         <AcceptanceCriteria
           changeId={changeId}
+          projectId={projectId}
           reviewMode={currentStage === "review" || currentStage === "ready"}
         />
       )}

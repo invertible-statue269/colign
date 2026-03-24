@@ -65,9 +65,14 @@ func (s *Service) List(ctx context.Context, changeID int64, documentType string)
 	return comments, nil
 }
 
-func (s *Service) Resolve(ctx context.Context, commentID int64, userID int64) (*models.Comment, error) {
+func (s *Service) Resolve(ctx context.Context, commentID int64, userID int64, orgID int64) (*models.Comment, error) {
 	comment := new(models.Comment)
-	err := s.db.NewSelect().Model(comment).Where("id = ?", commentID).Scan(ctx)
+	err := s.db.NewSelect().Model(comment).
+		Join("JOIN changes AS ch ON ch.id = c.change_id").
+		Join("JOIN projects AS p ON p.id = ch.project_id").
+		Where("c.id = ?", commentID).
+		Where("p.organization_id = ?", orgID).
+		Scan(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrCommentNotFound
@@ -89,9 +94,14 @@ func (s *Service) Resolve(ctx context.Context, commentID int64, userID int64) (*
 	return comment, nil
 }
 
-func (s *Service) Delete(ctx context.Context, commentID int64, userID int64) error {
+func (s *Service) Delete(ctx context.Context, commentID int64, userID int64, orgID int64) error {
 	comment := new(models.Comment)
-	err := s.db.NewSelect().Model(comment).Where("id = ?", commentID).Scan(ctx)
+	err := s.db.NewSelect().Model(comment).
+		Join("JOIN changes AS ch ON ch.id = c.change_id").
+		Join("JOIN projects AS p ON p.id = ch.project_id").
+		Where("c.id = ?", commentID).
+		Where("p.organization_id = ?", orgID).
+		Scan(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrCommentNotFound
@@ -109,9 +119,15 @@ func (s *Service) Delete(ctx context.Context, commentID int64, userID int64) err
 	return nil
 }
 
-func (s *Service) CreateReply(ctx context.Context, commentID int64, body string, userID int64) (*models.CommentReply, error) {
-	// Verify comment exists
-	exists, err := s.db.NewSelect().Model((*models.Comment)(nil)).Where("id = ?", commentID).Exists(ctx)
+func (s *Service) CreateReply(ctx context.Context, commentID int64, body string, userID int64, orgID int64) (*models.CommentReply, error) {
+	// Verify comment exists AND belongs to user's org
+	exists, err := s.db.NewSelect().
+		Model((*models.Comment)(nil)).
+		Join("JOIN changes AS ch ON ch.id = c.change_id").
+		Join("JOIN projects AS p ON p.id = ch.project_id").
+		Where("c.id = ?", commentID).
+		Where("p.organization_id = ?", orgID).
+		Exists(ctx)
 	if err != nil {
 		return nil, err
 	}

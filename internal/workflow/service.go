@@ -30,9 +30,13 @@ func NewService(db *bun.DB) *Service {
 
 // EvaluateAndAdvance checks gate conditions and auto-advances the change if all are met.
 // Returns true if the stage was advanced.
-func (s *Service) EvaluateAndAdvance(ctx context.Context, changeID int64) (bool, error) {
+func (s *Service) EvaluateAndAdvance(ctx context.Context, changeID int64, orgID int64) (bool, error) {
 	change := new(models.Change)
-	err := s.db.NewSelect().Model(change).Where("id = ?", changeID).Scan(ctx)
+	err := s.db.NewSelect().Model(change).
+		Join("JOIN projects AS p ON p.id = ch.project_id").
+		Where("ch.id = ?", changeID).
+		Where("p.organization_id = ?", orgID).
+		Scan(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, ErrChangeNotFound
@@ -84,9 +88,13 @@ func (s *Service) EvaluateAndAdvance(ctx context.Context, changeID int64) (bool,
 }
 
 // Advance manually moves the change to the next stage.
-func (s *Service) Advance(ctx context.Context, changeID int64, userID int64) (models.ChangeStage, error) {
+func (s *Service) Advance(ctx context.Context, changeID int64, userID int64, orgID int64) (models.ChangeStage, error) {
 	change := new(models.Change)
-	err := s.db.NewSelect().Model(change).Where("id = ?", changeID).Scan(ctx)
+	err := s.db.NewSelect().Model(change).
+		Join("JOIN projects AS p ON p.id = ch.project_id").
+		Where("ch.id = ?", changeID).
+		Where("p.organization_id = ?", orgID).
+		Scan(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", ErrChangeNotFound
@@ -126,9 +134,13 @@ func (s *Service) Advance(ctx context.Context, changeID int64, userID int64) (mo
 }
 
 // Revert moves the change to the previous stage with a recorded reason.
-func (s *Service) Revert(ctx context.Context, changeID int64, userID int64, reason string) error {
+func (s *Service) Revert(ctx context.Context, changeID int64, userID int64, reason string, orgID int64) error {
 	change := new(models.Change)
-	err := s.db.NewSelect().Model(change).Where("id = ?", changeID).Scan(ctx)
+	err := s.db.NewSelect().Model(change).
+		Join("JOIN projects AS p ON p.id = ch.project_id").
+		Where("ch.id = ?", changeID).
+		Where("p.organization_id = ?", orgID).
+		Scan(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrChangeNotFound
@@ -168,9 +180,13 @@ func (s *Service) Revert(ctx context.Context, changeID int64, userID int64, reas
 }
 
 // GetStatus returns the current gate conditions for a change.
-func (s *Service) GetStatus(ctx context.Context, changeID int64) (models.ChangeStage, []GateCondition, error) {
+func (s *Service) GetStatus(ctx context.Context, changeID int64, orgID int64) (models.ChangeStage, []GateCondition, error) {
 	change := new(models.Change)
-	err := s.db.NewSelect().Model(change).Where("id = ?", changeID).Scan(ctx)
+	err := s.db.NewSelect().Model(change).
+		Join("JOIN projects AS p ON p.id = ch.project_id").
+		Where("ch.id = ?", changeID).
+		Where("p.organization_id = ?", orgID).
+		Scan(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", nil, ErrChangeNotFound

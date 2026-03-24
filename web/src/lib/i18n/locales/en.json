@@ -423,6 +423,7 @@
     "members": "Members",
     "approvalPolicy": "Approval Policy",
     "archivePolicy": "Archive",
+    "ai": "AI",
     "dangerZone": "Danger Zone",
     "archivePolicyDesc": "Configure how changes are automatically archived",
     "archiveMode": "Archive Mode",

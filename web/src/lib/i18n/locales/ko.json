@@ -423,6 +423,7 @@
     "members": "멤버",
     "approvalPolicy": "승인 정책",
     "archivePolicy": "보관",
+    "ai": "AI",
     "dangerZone": "위험 영역",
     "archivePolicyDesc": "변경 사항 자동 보관 방식을 설정하세요",
     "archiveMode": "보관 모드",

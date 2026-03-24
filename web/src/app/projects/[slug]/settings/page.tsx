@@ -18,14 +18,16 @@ import { workflowClient } from "@/lib/workflow";
 import { projectClient } from "@/lib/project";
 import { useI18n } from "@/lib/i18n";
 import { showError, showSuccess } from "@/lib/toast";
+import { AIConfigSettings } from "@/components/settings/ai-config";
 
-type SettingsTab = "general" | "members" | "approval" | "archive" | "danger";
+type SettingsTab = "general" | "members" | "approval" | "archive" | "ai" | "danger";
 
 const tabs: { id: SettingsTab; labelKey: string }[] = [
   { id: "general", labelKey: "projectSettings.general" },
   { id: "members", labelKey: "projectSettings.members" },
   { id: "approval", labelKey: "projectSettings.approvalPolicy" },
   { id: "archive", labelKey: "projectSettings.archivePolicy" },
+  { id: "ai", labelKey: "projectSettings.ai" },
   { id: "danger", labelKey: "projectSettings.dangerZone" },
 ];
 
@@ -434,6 +436,11 @@ export default function ProjectSettingsPage() {
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {/* AI Configuration */}
+          {activeTab === "ai" && projectId && (
+            <AIConfigSettings projectId={projectId} />
           )}
 
           {/* Danger Zone */}

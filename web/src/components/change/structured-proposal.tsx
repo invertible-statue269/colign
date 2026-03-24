@@ -5,7 +5,8 @@ import { useI18n } from "@/lib/i18n";
 import { documentClient } from "@/lib/document";
 import { showError } from "@/lib/toast";
 import { AcceptanceCriteria } from "@/components/change/acceptance-criteria";
-import { ChevronDown, ChevronRight, ExternalLink, Figma, Link2, Plus, Sparkles, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, Figma, Link2, Plus, Trash2 } from "lucide-react";
+import { AIProposalGenerator } from "@/components/ai/ai-proposal-generator";
 
 interface ProposalSections {
   problem: string;
@@ -91,10 +92,11 @@ function parseContent(content: string): ProposalSections {
 
 interface StructuredProposalProps {
   changeId: bigint;
+  projectId: bigint;
   currentStage?: string;
 }
 
-export function StructuredProposal({ changeId, currentStage }: StructuredProposalProps) {
+export function StructuredProposal({ changeId, projectId, currentStage }: StructuredProposalProps) {
   const { t } = useI18n();
   const [sections, setSections] = useState<ProposalSections>(EMPTY_SECTIONS);
   const [loading, setLoading] = useState(true);
@@ -110,7 +112,7 @@ export function StructuredProposal({ changeId, currentStage }: StructuredProposa
   useEffect(() => {
     async function load() {
       try {
-        const res = await documentClient.getDocument({ changeId, type: "proposal" });
+        const res = await documentClient.getDocument({ changeId, type: "proposal", projectId });
         if (res.document?.content) {
           const parsed = parseContent(res.document.content);
           setSections(parsed);
@@ -137,6 +139,7 @@ export function StructuredProposal({ changeId, currentStage }: StructuredProposa
         type: "proposal",
         title: "Proposal",
         content: JSON.stringify(sectionsRef.current),
+        projectId,
       });
     } catch (err) {
       showError("Failed to save proposal", err);
@@ -188,8 +191,31 @@ export function StructuredProposal({ changeId, currentStage }: StructuredProposa
 
   const isReviewMode = currentStage === "review" || currentStage === "ready";
 
+  const isProposalEmpty =
+    !sections.problem.trim() &&
+    !sections.scope.trim() &&
+    !sections.outOfScope.trim() &&
+    !sections.approach.trim();
+
+  function handleAIApply(applied: { problem: string; scope: string; outOfScope: string; approach: string }) {
+    setSections((prev) => ({ ...prev, ...applied }));
+    // Expand optional sections that now have content
+    setCollapsed({
+      outOfScope: !applied.outOfScope,
+      approach: !applied.approach,
+    });
+    save();
+  }
+
   return (
     <div className="py-4 space-y-4">
+      {!isReviewMode && (
+        <AIProposalGenerator
+          changeId={changeId}
+          onApply={handleAIApply}
+          hasExistingContent={!isProposalEmpty}
+        />
+      )}
       {SECTIONS.map((section) => {
         const isCollapsed = collapsed[section.key] && !sections[section.key];
         const hasContent = !!sections[section.key].trim();
@@ -253,16 +279,8 @@ export function StructuredProposal({ changeId, currentStage }: StructuredProposa
         t={t}
       />
 
-      {/* AI Generate placeholder — future feature */}
-      <div className="flex items-center gap-2 rounded-xl border border-dashed border-border/30 px-5 py-3">
-        <Sparkles className="size-4 text-muted-foreground/30" />
-        <span className="text-xs text-muted-foreground/40">
-          AI-assisted spec generation — coming soon
-        </span>
-      </div>
-
       {/* Acceptance Criteria */}
-      <AcceptanceCriteria changeId={changeId} reviewMode={isReviewMode} />
+      <AcceptanceCriteria changeId={changeId} projectId={projectId} reviewMode={isReviewMode} />
     </div>
   );
 }

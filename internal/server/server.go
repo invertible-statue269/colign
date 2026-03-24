@@ -16,6 +16,7 @@ import (
 
 	eeoauth "github.com/gobenpark/colign/ee/mcp/oauth"
 	"github.com/gobenpark/colign/gen/proto/acceptance/v1/acceptancev1connect"
+	aiconfigv1connect "github.com/gobenpark/colign/gen/proto/aiconfig/v1/aiconfigv1connect"
 	"github.com/gobenpark/colign/gen/proto/apitoken/v1/apitokenv1connect"
 	"github.com/gobenpark/colign/gen/proto/auth/v1/authv1connect"
 	"github.com/gobenpark/colign/gen/proto/comment/v1/commentv1connect"
@@ -27,6 +28,7 @@ import (
 	taskv1connect "github.com/gobenpark/colign/gen/proto/task/v1/taskv1connect"
 	"github.com/gobenpark/colign/gen/proto/workflow/v1/workflowv1connect"
 	"github.com/gobenpark/colign/internal/acceptance"
+	"github.com/gobenpark/colign/internal/aiconfig"
 	"github.com/gobenpark/colign/internal/apitoken"
 	"github.com/gobenpark/colign/internal/archive"
 	"github.com/gobenpark/colign/internal/comment"
@@ -174,6 +176,12 @@ func (s *Server) setupRoutes(cfg *config.Config) {
 	memoryConnectHandler := memory.NewConnectHandler(memoryService, s.jwtManager, apiTokenService)
 	memoryPath, memoryHandler := memoryv1connect.NewMemoryServiceHandler(memoryConnectHandler)
 	s.mux.Handle(memoryPath, memoryHandler)
+
+	// AI Config service (Connect)
+	aiConfigService := aiconfig.NewService(s.db, []byte(cfg.AIEncryptionKey))
+	aiConfigConnectHandler := aiconfig.NewConnectHandler(aiConfigService, s.jwtManager, apiTokenService)
+	aiConfigPath, aiConfigHandler := aiconfigv1connect.NewAIConfigServiceHandler(aiConfigConnectHandler)
+	s.mux.Handle(aiConfigPath, aiConfigHandler)
 
 	// MCP Streamable HTTP endpoint
 	apiURL := fmt.Sprintf("http://localhost:%s", cfg.Port)

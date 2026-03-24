@@ -1,0 +1,45 @@
+syntax = "proto3";
+package aiconfig.v1;
+option go_package = "github.com/gobenpark/colign/gen/proto/aiconfig/v1;aiconfigv1";
+
+import "google/protobuf/timestamp.proto";
+
+message AIConfigProto {
+  int64 id = 1;
+  int64 project_id = 2;
+  string provider = 3;
+  string model = 4;
+  string api_key_masked = 5;
+  bool include_project_context = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message GetAIConfigRequest { int64 project_id = 1; }
+message GetAIConfigResponse { optional AIConfigProto config = 1; }
+
+message SaveAIConfigRequest {
+  int64 project_id = 1;
+  string provider = 2;
+  string model = 3;
+  string api_key = 4;
+  bool include_project_context = 5;
+}
+message SaveAIConfigResponse { AIConfigProto config = 1; }
+
+message TestConnectionRequest {
+  string provider = 1;
+  string model = 2;
+  string api_key = 3;
+}
+message TestConnectionResponse { bool success = 1; string error = 2; }
+
+message DeleteAIConfigRequest { int64 project_id = 1; }
+message DeleteAIConfigResponse {}
+
+service AIConfigService {
+  rpc GetAIConfig(GetAIConfigRequest) returns (GetAIConfigResponse) {}
+  rpc SaveAIConfig(SaveAIConfigRequest) returns (SaveAIConfigResponse) {}
+  rpc TestConnection(TestConnectionRequest) returns (TestConnectionResponse) {}
+  rpc DeleteAIConfig(DeleteAIConfigRequest) returns (DeleteAIConfigResponse) {}
+}

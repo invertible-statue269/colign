@@ -235,7 +235,11 @@
     "noComments": "No comments yet",
     "showResolved": "Show resolved",
     "hideResolved": "Hide resolved",
-    "comments": "Comments"
+    "comments": "Comments",
+    "composePlaceholder": "Leave a comment...",
+    "send": "Send",
+    "hidePanel": "Hide comments",
+    "showPanel": "Show comments"
   },
   "ac": {
     "title": "Acceptance Criteria",

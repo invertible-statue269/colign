@@ -3,10 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { documentClient } from "@/lib/document";
+import { useEvents } from "@/lib/events";
 import { showError } from "@/lib/toast";
 import { AcceptanceCriteria } from "@/components/change/acceptance-criteria";
 import { ChevronDown, ChevronRight, ExternalLink, Figma, Link2, Plus, Trash2 } from "lucide-react";
 import { AIProposalGenerator } from "@/components/ai/ai-proposal-generator";
+import { CommentPanel } from "@/components/comment/comment-panel";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { MessageSquare, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { getTokenPayload } from "@/lib/auth";
+import type { MentionMember } from "@/components/comment/mention-textarea";
 
 interface ProposalSections {
   problem: string;
@@ -94,10 +101,15 @@ interface StructuredProposalProps {
   changeId: bigint;
   projectId: bigint;
   currentStage?: string;
+  members?: MentionMember[];
 }
 
-export function StructuredProposal({ changeId, projectId, currentStage }: StructuredProposalProps) {
+export function StructuredProposal({ changeId, projectId, currentStage, members = [] }: StructuredProposalProps) {
   const { t } = useI18n();
+  const { on } = useEvents();
+  const payload = typeof window !== "undefined" ? getTokenPayload() : null;
+  const [mobileCommentsOpen, setMobileCommentsOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(true);
   const [sections, setSections] = useState<ProposalSections>(EMPTY_SECTIONS);
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
@@ -105,34 +117,62 @@ export function StructuredProposal({ changeId, projectId, currentStage }: Struct
     approach: true,
   });
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const localRevisionRef = useRef(0);
+  const lastSavedRevisionRef = useRef(0);
+  const inFlightSaveRevisionRef = useRef<number | null>(null);
   const sectionsRef = useRef(sections);
   sectionsRef.current = sections;
 
-  // Load
-  useEffect(() => {
-    async function load() {
-      try {
-        const res = await documentClient.getDocument({ changeId, type: "proposal", projectId });
-        if (res.document?.content) {
-          const parsed = parseContent(res.document.content);
-          setSections(parsed);
-          // Auto-expand optional sections if they have content
-          setCollapsed({
-            outOfScope: !parsed.outOfScope,
-            approach: !parsed.approach,
-          });
-        }
-      } catch (err) {
-        showError("Failed to save proposal", err);
-      } finally {
-        setLoading(false);
+  const load = useCallback(async () => {
+    try {
+      const res = await documentClient.getDocument({ changeId, type: "proposal", projectId });
+      if (res.document?.content) {
+        const parsed = parseContent(res.document.content);
+        setSections(parsed);
+        setCollapsed({
+          outOfScope: !parsed.outOfScope,
+          approach: !parsed.approach,
+        });
+      } else {
+        setSections(EMPTY_SECTIONS);
       }
+    } catch (err) {
+      showError("Failed to save proposal", err);
+    } finally {
+      setLoading(false);
     }
+  }, [changeId, projectId]);
+
+  useEffect(() => {
     load();
-  }, [changeId]);
+  }, [load]);
+
+  useEffect(() => {
+    return on((event) => {
+      if (event.type !== "document_updated" || event.changeId !== changeId) return;
+      // Skip remote reload while local edits are pending or currently being saved.
+      if (
+        saveTimerRef.current ||
+        inFlightSaveRevisionRef.current !== null ||
+        localRevisionRef.current !== lastSavedRevisionRef.current
+      ) {
+        return;
+      }
+      try {
+        const eventPayload = event.payload ? JSON.parse(event.payload) : {};
+        if (eventPayload.docType === "proposal") {
+          load();
+        }
+      } catch {
+        // Ignore malformed payloads.
+      }
+    });
+  }, [on, changeId, load]);
 
   // Save to server
   const saveNow = useCallback(async () => {
+    const revisionToSave = localRevisionRef.current;
+    inFlightSaveRevisionRef.current = revisionToSave;
     try {
       await documentClient.saveDocument({
         changeId,
@@ -141,25 +181,37 @@ export function StructuredProposal({ changeId, projectId, currentStage }: Struct
         content: JSON.stringify(sectionsRef.current),
         projectId,
       });
+      if (localRevisionRef.current === revisionToSave) {
+        lastSavedRevisionRef.current = revisionToSave;
+      }
     } catch (err) {
       showError("Failed to save proposal", err);
+    } finally {
+      if (inFlightSaveRevisionRef.current === revisionToSave) {
+        inFlightSaveRevisionRef.current = null;
+      }
     }
-  }, [changeId]);
+  }, [changeId, projectId]);
 
   // Debounced save for text input
   const save = useCallback(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(saveNow, 1000);
+    saveTimerRef.current = setTimeout(async () => {
+      saveTimerRef.current = null;
+      await saveNow();
+    }, 1000);
   }, [saveNow]);
 
   function updateSection(key: TextSectionKey, value: string) {
     setSections((prev) => ({ ...prev, [key]: value }));
+    localRevisionRef.current += 1;
     save();
   }
 
   function addDesignLink(url: string) {
     const trimmed = url.trim();
     if (!trimmed) return;
+    localRevisionRef.current += 1;
     setSections((prev) => {
       const updated = { ...prev, designLinks: [...(prev.designLinks || []), trimmed] };
       sectionsRef.current = updated;
@@ -169,6 +221,7 @@ export function StructuredProposal({ changeId, projectId, currentStage }: Struct
   }
 
   function removeDesignLink(index: number) {
+    localRevisionRef.current += 1;
     setSections((prev) => {
       const updated = { ...prev, designLinks: (prev.designLinks || []).filter((_, i) => i !== index) };
       sectionsRef.current = updated;
@@ -199,6 +252,7 @@ export function StructuredProposal({ changeId, projectId, currentStage }: Struct
 
   function handleAIApply(applied: { problem: string; scope: string; outOfScope: string; approach: string }) {
     setSections((prev) => ({ ...prev, ...applied }));
+    localRevisionRef.current += 1;
     // Expand optional sections that now have content
     setCollapsed({
       outOfScope: !applied.outOfScope,
@@ -208,7 +262,8 @@ export function StructuredProposal({ changeId, projectId, currentStage }: Struct
   }
 
   return (
-    <div className="py-4 space-y-4">
+    <div className="flex gap-4 py-4">
+      <div className="min-w-0 flex-1 space-y-4">
       {!isReviewMode && (
         <AIProposalGenerator
           changeId={changeId}
@@ -286,6 +341,70 @@ export function StructuredProposal({ changeId, projectId, currentStage }: Struct
         reviewMode={isReviewMode}
         hasProposal={!!(sections.problem || sections.scope)}
       />
+      </div>
+
+      {/* Comment Panel — desktop */}
+      <div className="hidden shrink-0 md:block">
+        <div className="sticky top-20">
+          {commentsOpen ? (
+            <div className="w-80 rounded-xl border border-border/40 bg-card/50" style={{ maxHeight: "calc(100vh - 8rem)" }}>
+              <div className="flex items-center justify-end border-b border-border/50 px-2 py-1">
+                <button
+                  onClick={() => setCommentsOpen(false)}
+                  className="cursor-pointer rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                  title={t("comments.hidePanel")}
+                >
+                  <PanelRightClose className="size-4" />
+                </button>
+              </div>
+              <CommentPanel
+                changeId={changeId}
+                projectId={projectId}
+                documentType="proposal"
+                currentUserId={payload?.user_id}
+                members={members}
+                showCompose
+              />
+            </div>
+          ) : (
+            <button
+              onClick={() => setCommentsOpen(true)}
+              className="cursor-pointer rounded-xl border border-border/40 bg-card/50 p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
+              title={t("comments.showPanel")}
+            >
+              <PanelRightOpen className="size-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Comment Panel — mobile */}
+      <div className="fixed bottom-6 right-6 z-40 md:hidden">
+        <Button
+          size="icon"
+          onClick={() => setMobileCommentsOpen(true)}
+          className="h-12 w-12 cursor-pointer rounded-full shadow-lg"
+        >
+          <MessageSquare className="size-5" />
+        </Button>
+      </div>
+      {mobileCommentsOpen && (
+        <Sheet open={mobileCommentsOpen} onOpenChange={setMobileCommentsOpen}>
+          <SheetContent side="right">
+            <SheetTitle>{t("comments.comments")}</SheetTitle>
+            <div className="flex-1 overflow-y-auto">
+              <CommentPanel
+                changeId={changeId}
+                projectId={projectId}
+                documentType="proposal"
+                currentUserId={payload?.user_id}
+                members={members}
+                showCompose
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   );
 }

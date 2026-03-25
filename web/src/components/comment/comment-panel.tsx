@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { commentClient } from "@/lib/comment";
 import { MessageSquare, Check, Trash2, ChevronDown, ChevronUp, Send } from "lucide-react";
 import { showError } from "@/lib/toast";
+import { MentionTextarea, type MentionMember } from "./mention-textarea";
 
 interface CommentData {
   id: bigint;
@@ -31,6 +32,8 @@ interface CommentPanelProps {
   projectId: bigint;
   documentType: string;
   currentUserId?: number;
+  showCompose?: boolean;
+  members?: MentionMember[];
   onCommentClick?: (commentId: string) => void;
   refreshRef?: React.MutableRefObject<(() => void) | null>;
 }
@@ -51,6 +54,8 @@ export function CommentPanel({
   projectId,
   documentType,
   currentUserId,
+  showCompose,
+  members = [],
   onCommentClick,
   refreshRef,
 }: CommentPanelProps) {
@@ -60,6 +65,8 @@ export function CommentPanel({
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
+  const [composeText, setComposeText] = useState("");
+  const submittingRef = useRef(false);
 
   const loadComments = useCallback(async () => {
     try {
@@ -85,7 +92,7 @@ export function CommentPanel({
     } catch (err) {
       showError(t("toast.loadFailed"), err);
     }
-  }, [changeId, documentType, t]);
+  }, [changeId, documentType, projectId, t]);
 
   useEffect(() => {
     loadComments();
@@ -100,6 +107,10 @@ export function CommentPanel({
 
   const handleResolve = async (commentId: bigint) => {
     await commentClient.resolveComment({ commentId, projectId });
+    if (replyingTo === String(commentId)) {
+      setReplyingTo(null);
+      setReplyText("");
+    }
     loadComments();
   };
 
@@ -110,11 +121,44 @@ export function CommentPanel({
   };
 
   const handleReply = async (commentId: bigint) => {
-    if (!replyText.trim()) return;
-    await commentClient.createReply({ commentId, body: replyText, projectId });
-    setReplyText("");
-    setReplyingTo(null);
-    loadComments();
+    if (!replyText.trim() || submittingRef.current) return;
+    const targetComment = comments.find((comment) => comment.id === commentId);
+    if (!targetComment || targetComment.resolved) {
+      setReplyingTo(null);
+      setReplyText("");
+      return;
+    }
+    submittingRef.current = true;
+    try {
+      await commentClient.createReply({ commentId, body: replyText, projectId });
+      const threadId = String(commentId);
+      setReplyText("");
+      setReplyingTo(null);
+      setExpandedThreads((prev) => new Set(prev).add(threadId));
+      loadComments();
+    } finally {
+      submittingRef.current = false;
+    }
+  };
+
+  const handleCompose = async () => {
+    if (!composeText.trim() || submittingRef.current) return;
+    submittingRef.current = true;
+    try {
+      await commentClient.createComment({
+        changeId,
+        documentType,
+        quotedText: "",
+        body: composeText,
+        projectId,
+      });
+      setComposeText("");
+      loadComments();
+    } catch (err) {
+      showError(t("toast.saveFailed"), err);
+    } finally {
+      submittingRef.current = false;
+    }
   };
 
   const toggleThread = (id: string) => {
@@ -204,14 +248,16 @@ export function CommentPanel({
                         {t("comments.resolve")}
                       </Button>
                     )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setReplyingTo(replyingTo === id ? null : id)}
-                      className="h-6 cursor-pointer gap-1 px-1.5 text-[10px] text-muted-foreground"
-                    >
-                      {t("comments.reply")}
-                    </Button>
+                    {!comment.resolved && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setReplyingTo(replyingTo === id ? null : id)}
+                        className="h-6 cursor-pointer gap-1 px-1.5 text-[10px] text-muted-foreground"
+                      >
+                        {t("comments.reply")}
+                      </Button>
+                    )}
                     {isOwner && (
                       <Button
                         variant="ghost"
@@ -254,18 +300,16 @@ export function CommentPanel({
                   )}
 
                   {/* Reply input */}
-                  {replyingTo === id && (
+                  {replyingTo === id && !comment.resolved && (
                     <div className="mt-2 flex gap-1.5">
-                      <input
-                        autoFocus
+                      <MentionTextarea
                         value={replyText}
-                        onChange={(e) => setReplyText(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            handleReply(comment.id);
-                          }
-                        }}
+                        onChange={setReplyText}
+                        members={members}
+                        autoFocus
+                        rows={2}
+                        submitShortcut="enter"
+                        onSubmit={() => handleReply(comment.id)}
                         placeholder={t("comments.replyPlaceholder")}
                         className="flex-1 rounded-md border border-border/50 bg-transparent px-2 py-1 text-xs outline-none focus:border-primary"
                       />
@@ -285,6 +329,34 @@ export function CommentPanel({
           </div>
         )}
       </div>
+
+      {/* Compose new comment */}
+      {showCompose && (
+        <div className="border-t border-border/50 px-4 py-3">
+          <MentionTextarea
+            value={composeText}
+            onChange={setComposeText}
+            members={members}
+            submitShortcut="mod-enter"
+            onSubmit={handleCompose}
+            placeholder={t("comments.composePlaceholder")}
+            rows={2}
+            className="w-full resize-none rounded-md border border-border/50 bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted-foreground/50 focus:border-primary"
+          />
+          <div className="mt-1.5 flex items-center justify-between">
+            <span className="text-[10px] text-muted-foreground">⌘+Enter</span>
+            <Button
+              size="sm"
+              onClick={handleCompose}
+              disabled={!composeText.trim()}
+              className="h-7 cursor-pointer gap-1 px-2"
+            >
+              <Send className="size-3" />
+              {t("comments.send")}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

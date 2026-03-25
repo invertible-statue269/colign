@@ -6,6 +6,7 @@ import { commentClient } from "@/lib/comment";
 import { Check, Trash2, Send, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { showError } from "@/lib/toast";
+import { MentionTextarea, type MentionMember } from "./mention-textarea";
 
 interface CommentData {
   id: bigint;
@@ -31,6 +32,7 @@ interface MarginCommentsProps {
   projectId: bigint;
   documentType: string;
   currentUserId?: number;
+  members?: MentionMember[];
   editorDom: HTMLElement | null;
   refreshRef?: React.MutableRefObject<(() => void) | null>;
   onRemoveHighlight?: (commentId: string) => void;
@@ -52,6 +54,7 @@ export function MarginComments({
   projectId,
   documentType,
   currentUserId,
+  members = [],
   editorDom,
   refreshRef,
   onRemoveHighlight,
@@ -91,7 +94,7 @@ export function MarginComments({
     } catch (err) {
       showError(t("toast.loadFailed"), err);
     }
-  }, [changeId, documentType, t]);
+  }, [changeId, documentType, projectId, t]);
 
   useEffect(() => {
     loadComments();
@@ -336,16 +339,14 @@ export function MarginComments({
                   {/* Reply input */}
                   {replyingTo === id && (
                     <div className="mt-2 flex gap-1">
-                      <input
-                        autoFocus
+                      <MentionTextarea
                         value={replyText}
-                        onChange={(e) => setReplyText(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            handleReply(comment.id);
-                          }
-                        }}
+                        onChange={setReplyText}
+                        members={members}
+                        autoFocus
+                        rows={2}
+                        submitShortcut="enter"
+                        onSubmit={() => handleReply(comment.id)}
                         placeholder={t("comments.replyPlaceholder")}
                         className="flex-1 rounded border border-border/50 bg-transparent px-2 py-1 text-xs outline-none focus:border-primary"
                       />

@@ -11,12 +11,14 @@ import { showError } from "@/lib/toast";
 import { getTokenPayload } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { AcceptanceCriteria } from "@/components/change/acceptance-criteria";
+import { MentionTextarea, type MentionMember } from "@/components/comment/mention-textarea";
 
 interface DocumentTabProps {
   changeId: bigint;
   projectId: bigint;
   docType: "proposal" | "design" | "spec";
   currentStage?: string;
+  members?: MentionMember[];
 }
 
 function normalizeDocumentContent(content: string) {
@@ -80,7 +82,7 @@ function legacyHtmlToMarkdown(content: string) {
   return blocks.join("\n\n");
 }
 
-export function DocumentTab({ changeId, projectId, docType, currentStage }: DocumentTabProps) {
+export function DocumentTab({ changeId, projectId, docType, currentStage, members = [] }: DocumentTabProps) {
   const { t } = useI18n();
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
@@ -192,22 +194,19 @@ export function DocumentTab({ changeId, projectId, docType, currentStage }: Docu
                 <div className="rounded border-l-2 border-yellow-500/50 bg-yellow-500/5 px-2 py-1 text-xs text-muted-foreground">
                   &ldquo;{pendingQuotedText}&rdquo;
                 </div>
-                <textarea
-                  autoFocus
+                <MentionTextarea
                   value={commentInput}
-                  onChange={(e) => setCommentInput(e.target.value)}
+                  onChange={setCommentInput}
+                  members={members}
+                  autoFocus
                   placeholder={t("comments.placeholder")}
                   className="mt-2 w-full resize-none rounded-md border border-border/50 bg-transparent px-2 py-1.5 text-sm outline-none focus:border-primary"
                   rows={2}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                      e.preventDefault();
-                      handleSubmitComment();
-                    }
-                    if (e.key === "Escape") {
-                      setPendingQuotedText(null);
-                      setCommentPosition(null);
-                    }
+                  submitShortcut="mod-enter"
+                  onSubmit={handleSubmitComment}
+                  onEscape={() => {
+                    setPendingQuotedText(null);
+                    setCommentPosition(null);
                   }}
                 />
                 <div className="mt-1.5 flex justify-end gap-1.5">
@@ -249,6 +248,7 @@ export function DocumentTab({ changeId, projectId, docType, currentStage }: Docu
           projectId={projectId}
           documentType={docType}
           currentUserId={payload?.user_id}
+          members={members}
           editorDom={editorDom}
           refreshRef={commentRefreshRef}
           onRemoveHighlight={(commentId) => {

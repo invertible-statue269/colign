@@ -235,7 +235,11 @@
     "noComments": "코멘트가 없습니다",
     "showResolved": "해결된 코멘트 보기",
     "hideResolved": "해결된 코멘트 숨기기",
-    "comments": "코멘트"
+    "comments": "코멘트",
+    "composePlaceholder": "코멘트를 남겨주세요...",
+    "send": "전송",
+    "hidePanel": "코멘트 숨기기",
+    "showPanel": "코멘트 보기"
   },
   "ac": {
     "title": "인수 조건",

@@ -3,6 +3,7 @@ openspec/
 
 # Go
 bin/
+.gocache/
 *.exe
 *.exe~
 *.dll

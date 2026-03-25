@@ -2,7 +2,7 @@ import * as Y from "yjs";
 
 /**
  * Converts simple HTML (from TipTap/markdownToHTML) into Y.js XmlFragment nodes.
- * Handles: headings (h1-h3), paragraphs, bullet lists, ordered lists, bold, italic, code.
+ * Handles: headings, paragraphs, bullet/ordered lists, code blocks, bold, italic, code.
  */
 export function htmlToYXmlFragment(
   doc: Y.Doc,
@@ -28,6 +28,13 @@ export function htmlToYXmlFragment(
       const el = new Y.XmlElement("paragraph");
       const text = new Y.XmlText();
       applyInlineFormatting(text, token.content);
+      el.insert(0, [text]);
+      fragment.insert(fragment.length, [el]);
+      i++;
+    } else if (token.type === "codeblock") {
+      const el = new Y.XmlElement("codeBlock");
+      const text = new Y.XmlText();
+      text.insert(0, unescapeHtml(token.content));
       el.insert(0, [text]);
       fragment.insert(fragment.length, [el]);
       i++;
@@ -57,7 +64,7 @@ export function htmlToYXmlFragment(
 }
 
 interface Token {
-  type: "heading" | "paragraph" | "listitem";
+  type: "heading" | "paragraph" | "listitem" | "codeblock";
   content: string;
   level?: number;
   listType?: "ul" | "ol";
@@ -66,7 +73,7 @@ interface Token {
 function tokenize(html: string): Token[] {
   const tokens: Token[] = [];
   // Match top-level HTML elements
-  const tagRegex = /<(h[1-6]|p|ul|ol)([^>]*)>([\s\S]*?)<\/\1>/gi;
+  const tagRegex = /<(h[1-6]|p|ul|ol|pre)([^>]*)>([\s\S]*?)<\/\1>/gi;
   let match: RegExpExecArray | null;
 
   while ((match = tagRegex.exec(html)) !== null) {
@@ -77,7 +84,7 @@ function tokenize(html: string): Token[] {
       const level = parseInt(tag[1], 10);
       tokens.push({
         type: "heading",
-        content: stripTags(content),
+        content: content,
         level,
       });
     } else if (tag === "p") {
@@ -92,10 +99,16 @@ function tokenize(html: string): Token[] {
       while ((liMatch = liRegex.exec(content)) !== null) {
         tokens.push({
           type: "listitem",
-          content: stripTags(liMatch[1]),
+          content: stripWrappingParagraph(liMatch[1]),
           listType: tag as "ul" | "ol",
         });
       }
+    } else if (tag === "pre") {
+      const codeMatch = content.match(/<code[^>]*>([\s\S]*?)<\/code>/i);
+      tokens.push({
+        type: "codeblock",
+        content: codeMatch ? codeMatch[1] : stripTags(content),
+      });
     }
   }
 
@@ -104,6 +117,13 @@ function tokenize(html: string): Token[] {
 
 function stripTags(html: string): string {
   return html.replace(/<[^>]+>/g, "");
+}
+
+function stripWrappingParagraph(html: string): string {
+  return html
+    .replace(/^<p[^>]*>/i, "")
+    .replace(/<\/p>$/i, "")
+    .trim();
 }
 
 /**

@@ -11,6 +11,7 @@ import { CommentHighlight } from "./extensions/comment-highlight";
 import { useEffect, useRef, useState } from "react";
 import { Bold, Italic, Heading2, Heading3, List, Code, MessageSquarePlus } from "lucide-react";
 import { getAccessToken } from "@/lib/auth";
+import { marked } from "marked";
 import * as Y from "yjs";
 
 interface SpecEditorProps {
@@ -27,6 +28,14 @@ interface SpecEditorProps {
   } | null>;
   documentId: string;
   userName?: string;
+}
+
+function normalizeInitialContent(content: string | undefined): string {
+  if (!content) return "";
+  const trimmed = content.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("<")) return content;
+  return marked.parse(content, { async: false }) as string;
 }
 
 function toggleSmartCodeBlock(editor: TiptapEditor) {
@@ -164,7 +173,7 @@ function SpecEditorInner({
     initializedRef.current = true;
 
     const yMeta = collab.ydoc.getMap("meta");
-    const legacyHtml = yMeta.get("initialHtml") as string | undefined;
+    const legacyHtml = normalizeInitialContent(yMeta.get("initialHtml") as string | undefined);
 
     // Check if Y.js fragment has real structured content (headings, lists, etc.)
     const fragment = collab.ydoc.getXmlFragment("default");
@@ -175,7 +184,7 @@ function SpecEditorInner({
 
     // Initialize if editor is empty OR Y.js has no structured content
     if ((editor.isEmpty || !hasStructure) && (legacyHtml || initialContent)) {
-      const contentToUse = legacyHtml || initialContent;
+      const contentToUse = legacyHtml || normalizeInitialContent(initialContent);
       editor.commands.setContent(contentToUse);
       if (legacyHtml) {
         yMeta.delete("initialHtml");

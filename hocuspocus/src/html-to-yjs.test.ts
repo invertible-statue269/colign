@@ -103,6 +103,56 @@ function elementChildren(el: Y.XmlElement): string {
   console.log("PASS: mixed content");
 }
 
+// Test code block conversion
+{
+  const doc = convert('<h2>Example</h2><pre><code class="language-tsx">const x = 1;\nconsole.log(x);</code></pre>');
+  const fragment = doc.getXmlFragment("default");
+
+  console.assert(fragment.length === 2, `Expected 2 elements (h2, codeBlock), got ${fragment.length}`);
+
+  const codeBlock = fragment.get(1) as Y.XmlElement;
+  console.assert(codeBlock.nodeName === "codeBlock", `Expected codeBlock, got ${codeBlock.nodeName}`);
+
+  const codeText = codeBlock.get(0) as Y.XmlText;
+  console.assert(
+    codeText.toString() === "const x = 1;\nconsole.log(x);",
+    `Expected code block text to round-trip, got ${JSON.stringify(codeText.toString())}`,
+  );
+
+  console.log("PASS: code blocks");
+}
+
+// Test inline formatting preserved in heading and list item
+{
+  const doc = convert("<h2>Hello <code>world()</code></h2><ol><li><strong>Step</strong> <code>one()</code></li></ol>");
+  const fragment = doc.getXmlFragment("default");
+
+  const heading = fragment.get(0) as Y.XmlElement;
+  const list = fragment.get(1) as Y.XmlElement;
+  const listItemParagraph = (list.get(0) as Y.XmlElement).get(0) as Y.XmlElement;
+
+  const headingText = heading.get(0) as Y.XmlText;
+  const listItemText = listItemParagraph.get(0) as Y.XmlText;
+
+  const headingDelta = headingText.toDelta();
+  const listDelta = listItemText.toDelta();
+
+  console.assert(
+    headingDelta.some((op) => typeof op.insert === "string" && op.attributes?.code),
+    "Expected heading inline code formatting to be preserved",
+  );
+  console.assert(
+    listDelta.some((op) => typeof op.insert === "string" && op.attributes?.bold),
+    "Expected list item bold formatting to be preserved",
+  );
+  console.assert(
+    listDelta.some((op) => typeof op.insert === "string" && op.attributes?.code),
+    "Expected list item inline code formatting to be preserved",
+  );
+
+  console.log("PASS: inline formatting");
+}
+
 // Test empty input
 {
   const doc = convert("");

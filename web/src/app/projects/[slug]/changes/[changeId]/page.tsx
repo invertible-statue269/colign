@@ -2,13 +2,13 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { workflowClient } from "@/lib/workflow";
 import { projectClient } from "@/lib/project";
 import { showError } from "@/lib/toast";
 import { Archive, ArchiveRestore } from "lucide-react";
+import { Header } from "@/components/layout/header";
 import { DocumentTab } from "@/components/change/document-tab";
 import { StructuredProposal } from "@/components/change/structured-proposal";
 import { TaskBoard } from "@/components/task/task-board";
@@ -100,6 +100,8 @@ export default function ChangeDetailPage() {
   const [showConfirmAdvance, setShowConfirmAdvance] = useState(false);
   const [members, setMembers] = useState<Array<{ userId: bigint; userName: string }>>([]);
   const [projectId, setProjectId] = useState<bigint>(BigInt(0));
+  const [projectName, setProjectName] = useState("");
+  const [changeName, setChangeName] = useState("");
   const [archivedAt, setArchivedAt] = useState<{ seconds: bigint; nanos: number } | undefined>(undefined);
   const [archiving, setArchiving] = useState(false);
 
@@ -110,6 +112,7 @@ export default function ChangeDetailPage() {
       const projectRes = await projectClient.getProject({ slug });
       const pid = projectRes.project!.id;
       setProjectId(pid);
+      setProjectName(projectRes.project!.name);
       setMembers(
         (projectRes.members || []).map((m) => ({
           userId: m.userId,
@@ -135,6 +138,7 @@ export default function ChangeDetailPage() {
           userName: e.userName,
         })),
       );
+      setChangeName(changeRes.change?.name ?? "");
       setArchivedAt(changeRes.change?.archivedAt);
     } catch (err) {
       showError(t("toast.loadFailed"), err);
@@ -222,31 +226,12 @@ export default function ChangeDetailPage() {
 
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden">
-      {/* Breadcrumb Header */}
-      <header className="border-b border-border/50 bg-background/80 backdrop-blur-md">
-        <div className="flex items-center gap-2 px-6 py-2.5">
-          <Link
-            href={`/projects/${slug}`}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200"
-          >
-            Project
-          </Link>
-          <svg
-            className="h-3.5 w-3.5 text-muted-foreground/40"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M8.25 4.5l7.5 7.5-7.5 7.5"
-            />
-          </svg>
-          <span className="text-sm font-medium">Change</span>
-        </div>
-      </header>
+      <Header
+        breadcrumbs={[
+          { label: projectName, href: `/projects/${slug}` },
+          { label: changeName },
+        ]}
+      />
 
       {/* Main Content */}
       <div className="relative isolate flex-1 overflow-y-auto overflow-x-hidden">

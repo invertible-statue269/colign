@@ -174,11 +174,15 @@ func writeSSEProposal(w http.ResponseWriter, r *http.Request, gen proposalGenera
 			slog.ErrorContext(r.Context(), "ai: marshal chunk failed", slog.String("error", err.Error()))
 			continue
 		}
-		_, _ = fmt.Fprintf(w, "data: %s\n\n", data) // SSE stream write; error handled by HTTP layer
+		if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
+			return // client disconnected
+		}
 		flusher.Flush()
 	}
 
-	_, _ = fmt.Fprintf(w, "data: [DONE]\n\n") // SSE stream write; error handled by HTTP layer
+	if _, err := fmt.Fprintf(w, "data: [DONE]\n\n"); err != nil {
+		return // client disconnected
+	}
 	flusher.Flush()
 }
 

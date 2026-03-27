@@ -374,8 +374,8 @@ func TestConfigToProto_MasksAPIKey(t *testing.T) {
 	assert.NotNil(t, proto.UpdatedAt)
 }
 
-// verifyInterfaceSatisfied is a compile-time check.
-func verifyInterfaceSatisfied() {
+// verifyInterfaceSatisfied_ is a compile-time check.
+var _ = func() {
 	var _ interface {
 		GetAIConfig(context.Context, *connect.Request[aiconfigv1.GetAIConfigRequest]) (*connect.Response[aiconfigv1.GetAIConfigResponse], error)
 		SaveAIConfig(context.Context, *connect.Request[aiconfigv1.SaveAIConfigRequest]) (*connect.Response[aiconfigv1.SaveAIConfigResponse], error)

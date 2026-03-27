@@ -33,7 +33,7 @@ Write in the same language as the user's input.`)
 			if len(truncated) > maxReadmeLen {
 				truncated = truncated[:maxReadmeLen] + "..."
 			}
-			sb.WriteString(fmt.Sprintf("\n- README:\n%s", truncated))
+			fmt.Fprintf(&sb, "\n- README:\n%s", truncated)
 		}
 		if len(recentChanges) > 0 {
 			changes := recentChanges
@@ -42,7 +42,7 @@ Write in the same language as the user's input.`)
 			}
 			sb.WriteString("\n- Recent changes:")
 			for _, c := range changes {
-				sb.WriteString(fmt.Sprintf("\n  - %s", c))
+				fmt.Fprintf(&sb, "\n  - %s", c)
 			}
 		}
 	}
@@ -70,14 +70,14 @@ Write in the same language as the proposal.`)
 		if len(existingAC) > 0 {
 			sb.WriteString("\n- Existing AC:")
 			for _, ac := range existingAC {
-				sb.WriteString(fmt.Sprintf("\n  - %s", ac))
+				fmt.Fprintf(&sb, "\n  - %s", ac)
 			}
 		}
 		if designDoc != "" {
-			sb.WriteString(fmt.Sprintf("\n- Design document:\n%s", designDoc))
+			fmt.Fprintf(&sb, "\n- Design document:\n%s", designDoc)
 		}
 		if specDoc != "" {
-			sb.WriteString(fmt.Sprintf("\n- Spec document:\n%s", specDoc))
+			fmt.Fprintf(&sb, "\n- Spec document:\n%s", specDoc)
 		}
 	}
 

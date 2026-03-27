@@ -228,7 +228,7 @@ func (s *Service) notifyMentions(ctx context.Context, input mentionNotificationI
 		Model((*models.ProjectMember)(nil)).
 		Column("user_id").
 		Where("project_id = ?", input.ProjectID).
-		Where("user_id IN (?)", bun.In(uniqueIDs)).
+		Where("user_id IN (?)", bun.List(uniqueIDs)).
 		Scan(ctx, &memberIDs); err != nil {
 		slog.Warn("failed to query project members for mention notification", "error", err, "project_id", input.ProjectID)
 		return

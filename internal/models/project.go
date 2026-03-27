@@ -49,6 +49,7 @@ type Project struct {
 	OrganizationID int64           `bun:"organization_id"`
 	Name           string          `bun:"name,notnull"`
 	Slug           string          `bun:"slug,notnull"`
+	Identifier     string          `bun:"identifier,notnull"`
 	Description    string          `bun:"description"`
 	Readme         string          `bun:"readme"`
 	Status         ProjectStatus   `bun:"status,notnull,default:'backlog'"`

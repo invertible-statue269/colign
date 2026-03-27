@@ -41,6 +41,7 @@ import { notificationClient } from "@/lib/notification";
 import { NOTIFICATIONS_UPDATED_EVENT } from "@/lib/notification-events";
 import { useEvents } from "@/lib/events";
 import { useI18n } from "@/lib/i18n";
+import { toProjectPath, toProjectRef } from "@/lib/project-ref";
 import { clearTokens, getTokenPayload } from "@/lib/auth";
 import { showError } from "@/lib/toast";
 import { transport } from "@/lib/connect";
@@ -88,7 +89,8 @@ export function AppSidebar() {
 
   useEffect(() => {
     const handleProfileUpdated = (event: Event) => {
-      const detail = (event as CustomEvent<{ name: string; email: string; avatarUrl: string }>).detail;
+      const detail = (event as CustomEvent<{ name: string; email: string; avatarUrl: string }>)
+        .detail;
       if (!detail) return;
       setProfile(detail);
     };
@@ -207,15 +209,20 @@ export function AppSidebar() {
 
         {/* Projects */}
         <SidebarGroup>
-          <SidebarGroupLabel className="cursor-pointer hover:text-sidebar-foreground" render={<Link href="/projects" />}>{t("sidebar.projects")}</SidebarGroupLabel>
+          <SidebarGroupLabel
+            className="cursor-pointer hover:text-sidebar-foreground"
+            render={<Link href="/projects" />}
+          >
+            {t("sidebar.projects")}
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {projects.map((project) => (
                 <SidebarMenuItem key={String(project.id)}>
                   <SidebarMenuButton
-                    isActive={pathname.startsWith(`/projects/${project.slug}`)}
+                    isActive={pathname.startsWith(`/projects/${toProjectRef(project)}`)}
                     tooltip={project.name}
-                    render={<Link href={`/projects/${project.slug}`} />}
+                    render={<Link href={toProjectPath(project)} />}
                   >
                     <FolderKanban className="size-4" />
                     <span className="truncate">{project.name}</span>

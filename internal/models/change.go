@@ -32,6 +32,7 @@ type Change struct {
 
 	ID         int64       `bun:"id,pk,autoincrement"`
 	ProjectID  int64       `bun:"project_id,notnull"`
+	Number     int         `bun:"number,notnull"`
 	Name       string      `bun:"name,notnull"`
 	Stage      ChangeStage `bun:"stage,notnull,default:'draft'"`
 	ChangeType ChangeType  `bun:"change_type,notnull,default:'feature'"`

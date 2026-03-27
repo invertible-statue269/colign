@@ -7,6 +7,7 @@ import { useI18n } from "@/lib/i18n";
 import { notificationClient } from "@/lib/notification";
 import { NOTIFICATIONS_UPDATED_EVENT } from "@/lib/notification-events";
 import { orgClient } from "@/lib/organization";
+import { toChangePath, toProjectPath } from "@/lib/project-ref";
 import { getTokenPayload, saveTokens } from "@/lib/auth";
 import { showError } from "@/lib/toast";
 import {
@@ -30,6 +31,7 @@ interface Notification {
   actorName: string;
   changeName: string;
   changeId: bigint;
+  projectId: bigint;
   projectName: string;
   projectSlug: string;
   organizationId: bigint;
@@ -95,6 +97,7 @@ export default function InboxPage() {
           actorName: n.actorName,
           changeName: n.changeName,
           changeId: n.changeId,
+          projectId: n.projectId,
           projectName: n.projectName,
           projectSlug: n.projectSlug,
           organizationId: n.organizationId,
@@ -148,9 +151,10 @@ export default function InboxPage() {
   }
 
   function getNotificationHref(n: Notification): string {
-    if (n.type === "invite") return `/projects/${n.projectSlug}`;
-    if (n.changeId) return `/projects/${n.projectSlug}/changes/${n.changeId}`;
-    return `/projects/${n.projectSlug}`;
+    const project = { id: n.projectId, slug: n.projectSlug };
+    if (n.type === "invite") return toProjectPath(project);
+    if (n.changeId) return toChangePath(project, n.changeId);
+    return toProjectPath(project);
   }
 
   async function navigateToNotification(n: Notification) {

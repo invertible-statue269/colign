@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useI18n } from "@/lib/i18n";
 import { projectClient } from "@/lib/project";
+import { toProjectPath } from "@/lib/project-ref";
 import { Folder, Calendar, icons, type LucideIcon } from "lucide-react";
 import { showError } from "@/lib/toast";
 import { CreateProjectDialog } from "@/components/project/create-project-dialog";
@@ -119,18 +120,23 @@ export default function ProjectsPage() {
               const health = project.health ? healthConfig[project.health] : null;
 
               return (
-                <Link key={String(project.id)} href={`/projects/${project.slug}`}>
+                <Link key={String(project.id)} href={toProjectPath(project)}>
                   <div className="group relative flex flex-col rounded-xl border border-border/50 bg-card p-4 transition-all duration-200 hover:border-primary/30 hover:bg-card/80 cursor-pointer">
                     {/* Header: Icon + Name + Status */}
                     <div className="flex items-start gap-3 mb-2">
                       <div
                         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-medium"
                         style={{
-                          backgroundColor: project.color ? `${project.color}15` : "hsl(var(--primary) / 0.08)",
+                          backgroundColor: project.color
+                            ? `${project.color}15`
+                            : "hsl(var(--primary) / 0.08)",
                           color: project.color || "hsl(var(--primary))",
                         }}
                       >
-                        <ProjectIcon name={project.icon} fallback={project.name.charAt(0).toUpperCase()} />
+                        <ProjectIcon
+                          name={project.icon}
+                          fallback={project.name.charAt(0).toUpperCase()}
+                        />
                       </div>
                       <div className="min-w-0 flex-1">
                         <h3 className="text-sm font-semibold leading-tight truncate">

@@ -170,6 +170,8 @@ func (s *Server) handleGetChange(ctx context.Context, args json.RawMessage) (any
 		"project_id": c.ProjectId,
 		"name":       c.Name,
 		"stage":      c.Stage,
+		"number":     c.Number,
+		"identifier": c.Identifier,
 	}, nil
 }
 
@@ -720,8 +722,10 @@ func (s *Server) handleCreateChange(ctx context.Context, args json.RawMessage) (
 
 	c := resp.Msg.Change
 	return map[string]any{
-		"id":   c.Id,
-		"name": c.Name,
+		"id":         c.Id,
+		"name":       c.Name,
+		"number":     c.Number,
+		"identifier": c.Identifier,
 	}, nil
 }
 
@@ -747,6 +751,7 @@ func (s *Server) handleListChanges(ctx context.Context, args json.RawMessage) (a
 	type changeInfo struct {
 		ID           int64        `json:"id"`
 		Name         string       `json:"name"`
+		Identifier   string       `json:"identifier"`
 		Stage        string       `json:"stage"`
 		TaskProgress progressInfo `json:"task_progress"`
 		ACProgress   progressInfo `json:"ac_progress"`
@@ -754,7 +759,7 @@ func (s *Server) handleListChanges(ctx context.Context, args json.RawMessage) (a
 
 	changes := make([]changeInfo, len(resp.Msg.Changes))
 	for i, c := range resp.Msg.Changes {
-		ci := changeInfo{ID: c.Id, Name: c.Name, Stage: c.Stage}
+		ci := changeInfo{ID: c.Id, Name: c.Name, Identifier: c.Identifier, Stage: c.Stage}
 
 		if taskResp, err := s.clients.task.ListTasks(ctx, connect.NewRequest(&taskv1.ListTasksRequest{ChangeId: c.Id, ProjectId: params.ProjectID.Int64()})); err == nil {
 			ci.TaskProgress.Total = len(taskResp.Msg.Tasks)

@@ -19,6 +19,7 @@ import {
   Settings,
 } from "lucide-react";
 import { projectClient } from "@/lib/project";
+import { toChangePath, toProjectPath } from "@/lib/project-ref";
 import { showError } from "@/lib/toast";
 import { useI18n } from "@/lib/i18n";
 
@@ -84,12 +85,13 @@ export function CommandPalette() {
   const handleSelect = (result: SearchResult) => {
     setOpen(false);
     setQuery("");
+    const project = { id: result.projectId, slug: result.slug };
     if (result.type === "project") {
-      router.push(`/projects/${result.slug}`);
+      router.push(toProjectPath(project));
     } else if (result.type === "change") {
-      router.push(`/projects/${result.slug}/changes/${result.id}`);
+      router.push(toChangePath(project, result.id));
     } else if (result.type === "task") {
-      router.push(`/projects/${result.slug}/changes/${result.id}`);
+      router.push(toChangePath(project, result.id));
     }
   };
 

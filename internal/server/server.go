@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -202,6 +204,45 @@ func (s *Server) setupRoutes(cfg *config.Config) error {
 	aiHandler := ai.NewHandler(aiService, aiService, s.jwtManager, aiConfigService, s.db)
 	s.mux.HandleFunc("POST /api/ai/generate-proposal", aiHandler.HandleGenerateProposal)
 	s.mux.HandleFunc("POST /api/ai/generate-ac", aiHandler.HandleGenerateAC)
+
+	// Public OG metadata endpoint (no auth required)
+	s.mux.HandleFunc("GET /api/og/projects/{slug}/changes/{changeId}", func(w http.ResponseWriter, r *http.Request) {
+		slug := r.PathValue("slug")
+		changeID, err := strconv.ParseInt(r.PathValue("changeId"), 10, 64)
+		if err != nil {
+			http.Error(w, "invalid change id", http.StatusBadRequest)
+			return
+		}
+		changeName, projectName, stage, err := projectService.GetChangeOG(r.Context(), slug, changeID)
+		if err != nil {
+			slog.Debug("og metadata not found", "slug", slug, "changeId", changeID, "error", err)
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "public, max-age=60")
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"changeName":  changeName,
+			"projectName": projectName,
+			"stage":       stage,
+		})
+	})
+
+	s.mux.HandleFunc("GET /api/og/projects/{slug}", func(w http.ResponseWriter, r *http.Request) {
+		slug := r.PathValue("slug")
+		projectName, description, err := projectService.GetProjectOG(r.Context(), slug)
+		if err != nil {
+			slog.Debug("og project metadata not found", "slug", slug, "error", err)
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "public, max-age=60")
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"projectName": projectName,
+			"description": description,
+		})
+	})
 
 	// MCP Streamable HTTP endpoint
 	apiURL := fmt.Sprintf("http://localhost:%s", cfg.Port)

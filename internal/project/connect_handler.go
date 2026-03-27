@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"connectrpc.com/connect"
@@ -121,6 +122,7 @@ func (h *ConnectHandler) UpdateProject(ctx context.Context, req *connect.Request
 		ID:          req.Msg.Id,
 		Name:        req.Msg.Name,
 		Description: req.Msg.Description,
+		Identifier:  req.Msg.Identifier,
 	}
 
 	if req.Msg.Status != nil {
@@ -309,8 +311,9 @@ func (h *ConnectHandler) CreateChange(ctx context.Context, req *connect.Request[
 
 	h.publishChangeEvent("change_created", change)
 
+	pid, _ := h.service.GetProjectIdentifier(ctx, req.Msg.ProjectId)
 	return connect.NewResponse(&projectv1.CreateChangeResponse{
-		Change: changeToProto(change),
+		Change: changeToProto(change, pid),
 	}), nil
 }
 
@@ -332,9 +335,10 @@ func (h *ConnectHandler) ListChanges(ctx context.Context, req *connect.Request[p
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
+	pid, _ := h.service.GetProjectIdentifier(ctx, req.Msg.ProjectId)
 	protoChanges := make([]*projectv1.Change, len(changes))
 	for i, c := range changes {
-		protoChanges[i] = changeToProto(&c)
+		protoChanges[i] = changeToProto(&c, pid)
 	}
 
 	return connect.NewResponse(&projectv1.ListChangesResponse{
@@ -356,8 +360,9 @@ func (h *ConnectHandler) GetChange(ctx context.Context, req *connect.Request[pro
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
+	pid, _ := h.service.GetProjectIdentifier(ctx, change.ProjectID)
 	return connect.NewResponse(&projectv1.GetChangeResponse{
-		Change: changeToProto(change),
+		Change: changeToProto(change, pid),
 	}), nil
 }
 
@@ -396,8 +401,9 @@ func (h *ConnectHandler) ArchiveChange(ctx context.Context, req *connect.Request
 
 	h.publishChangeEvent("change_updated", change)
 
+	apid, _ := h.service.GetProjectIdentifier(ctx, change.ProjectID)
 	return connect.NewResponse(&projectv1.ArchiveChangeResponse{
-		Change: changeToProto(change),
+		Change: changeToProto(change, apid),
 	}), nil
 }
 
@@ -421,8 +427,9 @@ func (h *ConnectHandler) UnarchiveChange(ctx context.Context, req *connect.Reque
 
 	h.publishChangeEvent("change_updated", change)
 
+	upid, _ := h.service.GetProjectIdentifier(ctx, change.ProjectID)
 	return connect.NewResponse(&projectv1.UnarchiveChangeResponse{
-		Change: changeToProto(change),
+		Change: changeToProto(change, upid),
 	}), nil
 }
 
@@ -501,6 +508,7 @@ func projectToProto(p *models.Project) *projectv1.Project {
 		Health:      string(p.Health),
 		Icon:        p.Icon,
 		Color:       p.Color,
+		Identifier:  p.Identifier,
 		CreatedAt:   timestamppb.New(p.CreatedAt),
 		UpdatedAt:   timestamppb.New(p.UpdatedAt),
 	}
@@ -538,7 +546,7 @@ func memberToProto(m *models.ProjectMember) *projectv1.ProjectMember {
 	return pm
 }
 
-func changeToProto(c *models.Change) *projectv1.Change {
+func changeToProto(c *models.Change, projectIdentifier string) *projectv1.Change {
 	pc := &projectv1.Change{
 		Id:        c.ID,
 		ProjectId: c.ProjectID,
@@ -546,6 +554,10 @@ func changeToProto(c *models.Change) *projectv1.Change {
 		Stage:     string(c.Stage),
 		CreatedAt: timestamppb.New(c.CreatedAt),
 		UpdatedAt: timestamppb.New(c.UpdatedAt),
+		Number:    int32(c.Number),
+	}
+	if projectIdentifier != "" {
+		pc.Identifier = fmt.Sprintf("%s-%d", projectIdentifier, c.Number)
 	}
 	if c.ArchivedAt != nil {
 		pc.ArchivedAt = timestamppb.New(*c.ArchivedAt)

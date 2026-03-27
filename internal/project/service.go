@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,9 +18,10 @@ import (
 )
 
 var (
-	ErrProjectNotFound = errors.New("project not found")
-	ErrNotAuthorized   = errors.New("not authorized")
-	slugRegexp         = regexp.MustCompile(`[^a-z0-9-]+`)
+	ErrProjectNotFound    = errors.New("project not found")
+	ErrNotAuthorized      = errors.New("not authorized")
+	slugRegexp            = regexp.MustCompile(`[^a-z0-9-]+`)
+	identifierStripRegexp = regexp.MustCompile(`[^A-Za-z0-9 -]+`)
 )
 
 type Service struct {
@@ -28,6 +30,59 @@ type Service struct {
 
 func NewService(db *bun.DB) *Service {
 	return &Service{db: db}
+}
+
+// GenerateIdentifier creates a short uppercase identifier from a project name.
+// Multi-word names use first letters (My Cool Project → MCP).
+// Single words use the first 3 characters (Colign → COL).
+func GenerateIdentifier(name string) string {
+	// Strip special chars, keep letters/digits/spaces/hyphens
+	cleaned := identifierStripRegexp.ReplaceAllString(name, "")
+	cleaned = strings.TrimSpace(cleaned)
+
+	// Split into words (by space or hyphen)
+	words := strings.FieldsFunc(cleaned, func(r rune) bool {
+		return r == ' ' || r == '-'
+	})
+
+	var id string
+	if len(words) > 1 {
+		// Multi-word: take first letter of each word (up to 5)
+		for _, w := range words {
+			if len(id) >= 5 {
+				break
+			}
+			if w != "" {
+				id += string([]rune(strings.ToUpper(w))[0])
+			}
+		}
+	} else if len(words) == 1 {
+		// Single word: take first 3 chars
+		upper := strings.ToUpper(words[0])
+		runes := []rune(upper)
+		if len(runes) > 3 {
+			runes = runes[:3]
+		}
+		id = string(runes)
+	}
+
+	// Fallback: use slug first 3 chars
+	if id == "" {
+		slug := GenerateSlug(name)
+		upper := strings.ToUpper(slug)
+		runes := []rune(upper)
+		if len(runes) > 3 {
+			runes = runes[:3]
+		}
+		id = string(runes)
+	}
+
+	// Final fallback
+	if id == "" {
+		id = "PRJ"
+	}
+
+	return id
 }
 
 func GenerateSlug(name string) string {
@@ -41,17 +96,90 @@ func GenerateSlug(name string) string {
 	return slug
 }
 
+func (s *Service) ensureUniqueIdentifier(ctx context.Context, identifier string, orgID int64, excludeProjectID int64) (string, error) {
+	base := strings.TrimSpace(identifier)
+	if base == "" {
+		return "", fmt.Errorf("identifier must not be empty")
+	}
+	if len(base) > 5 {
+		base = base[:5]
+	}
+	for i := 0; i < 100; i++ {
+		candidate := base
+		if i > 0 {
+			suffix := fmt.Sprintf("%d", i+1)
+			// Truncate base to leave room for the suffix within 5-char limit
+			maxBase := 5 - len(suffix)
+			if maxBase < 1 {
+				maxBase = 1
+			}
+			truncated := base
+			if len(truncated) > maxBase {
+				truncated = truncated[:maxBase]
+			}
+			candidate = truncated + suffix
+		}
+		q := s.db.NewSelect().Model((*models.Project)(nil)).
+			Where("identifier = ?", candidate).
+			Where("organization_id = ?", orgID)
+		if excludeProjectID > 0 {
+			q = q.Where("id != ?", excludeProjectID)
+		}
+		exists, err := q.Exists(ctx)
+		if err != nil {
+			return "", err
+		}
+		if !exists {
+			return candidate, nil
+		}
+	}
+	return "", fmt.Errorf("could not generate unique identifier for %q", identifier)
+}
+
+// nextChangeNumber returns the next sequential number for a change within a project.
+// Locks the project row with FOR UPDATE to prevent concurrent number collisions.
+func (s *Service) nextChangeNumber(ctx context.Context, tx bun.Tx, projectID int64) (int, error) {
+	// Lock the project row to serialize concurrent change creations
+	var dummy int64
+	if err := tx.NewSelect().
+		Model((*models.Project)(nil)).
+		Column("id").
+		Where("id = ?", projectID).
+		For("UPDATE").
+		Scan(ctx, &dummy); err != nil {
+		return 0, err
+	}
+
+	var maxNum int
+	err := tx.NewSelect().
+		Model((*models.Change)(nil)).
+		ColumnExpr("COALESCE(MAX(number), 0)").
+		Where("project_id = ?", projectID).
+		Scan(ctx, &maxNum)
+	if err != nil {
+		return 0, err
+	}
+	return maxNum + 1, nil
+}
+
 func (s *Service) ensureUniqueSlug(ctx context.Context, slug string, orgID int64) (string, error) {
+	return s.ensureUniqueSlugExcluding(ctx, slug, orgID, 0)
+}
+
+func (s *Service) ensureUniqueSlugExcluding(ctx context.Context, slug string, orgID int64, excludeProjectID int64) (string, error) {
 	baseSlug := slug
 	for i := 0; ; i++ {
 		candidate := baseSlug
 		if i > 0 {
 			candidate = fmt.Sprintf("%s-%d", baseSlug, i+1)
 		}
-		exists, err := s.db.NewSelect().Model((*models.Project)(nil)).
+		q := s.db.NewSelect().Model((*models.Project)(nil)).
 			Where("slug = ?", candidate).
-			Where("organization_id = ?", orgID).
-			Exists(ctx)
+			Where("organization_id = ?", orgID)
+		if excludeProjectID > 0 {
+			q = q.Where("id != ?", excludeProjectID)
+		}
+		exists, err := q.Exists(ctx)
 		if err != nil {
 			return "", err
 		}
@@ -75,10 +203,17 @@ func (s *Service) Create(ctx context.Context, input CreateProjectInput) (*models
 		return nil, err
 	}
 
+	identifier := GenerateIdentifier(input.Name)
+	uniqueIdentifier, err := s.ensureUniqueIdentifier(ctx, identifier, input.OrganizationID, 0)
+	if err != nil {
+		return nil, err
+	}
+
 	project := &models.Project{
 		OrganizationID: input.OrganizationID,
 		Name:           input.Name,
 		Slug:           uniqueSlug,
+		Identifier:     uniqueIdentifier,
 		Description:    input.Description,
 	}
 
@@ -108,16 +243,67 @@ func (s *Service) Create(ctx context.Context, input CreateProjectInput) (*models
 	return project, nil
 }
 
-func (s *Service) GetBySlug(ctx context.Context, slug string, orgID int64) (*models.Project, []models.ProjectMember, []models.ProjectLabel, error) {
-	project := new(models.Project)
-	err := s.db.NewSelect().Model(project).
-		Where("slug = ?", slug).
-		Where("organization_id = ?", orgID).
-		Scan(ctx)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil, nil, ErrProjectNotFound
+func parseProjectRef(projectRef string) (int64, string, bool) {
+	head, _, found := strings.Cut(projectRef, "-")
+	if !found {
+		if id, err := strconv.ParseInt(projectRef, 10, 64); err == nil && id > 0 {
+			return id, "", true
 		}
+		return 0, "", false
+	}
+	id, err := strconv.ParseInt(head, 10, 64)
+	if err != nil || id <= 0 {
+		return 0, "", false
+	}
+	return id, projectRef, true
+}
+
+func (s *Service) resolveProjectByRef(ctx context.Context, projectRef string, orgID int64) (*models.Project, error) {
+	project := new(models.Project)
+	if projectID, exactSlug, ok := parseProjectRef(projectRef); ok {
+		// Prefer an exact slug match first so legacy slug-only URLs like
+		// "123-service" don't get misrouted to an unrelated project id.
+		if exactSlug != "" {
+			err := s.db.NewSelect().Model(project).
+				Where("organization_id = ?", orgID).
+				Where("slug = ?", exactSlug).
+				Scan(ctx)
+			if err == nil {
+				return project, nil
+			}
+			if !errors.Is(err, sql.ErrNoRows) {
+				return nil, err
+			}
+		}
+
+		err := s.db.NewSelect().Model(project).
+			Where("organization_id = ?", orgID).
+			Where("id = ?", projectID).
+			Scan(ctx)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, ErrProjectNotFound
+			}
+			return nil, err
+		}
+	} else {
+		err := s.db.NewSelect().Model(project).
+			Where("organization_id = ?", orgID).
+			Where("slug = ?", projectRef).
+			Scan(ctx)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, ErrProjectNotFound
+			}
+			return nil, err
+		}
+	}
+	return project, nil
+}
+
+func (s *Service) GetBySlug(ctx context.Context, projectRef string, orgID int64) (*models.Project, []models.ProjectMember, []models.ProjectLabel, error) {
+	project, err := s.resolveProjectByRef(ctx, projectRef, orgID)
+	if err != nil {
 		return nil, nil, nil, err
 	}
 
@@ -185,6 +371,7 @@ type UpdateProjectInput struct {
 	ID          int64
 	Name        string
 	Description string
+	Identifier  *string
 	Status      *string
 	Priority    *string
 	Health      *string
@@ -210,9 +397,28 @@ func (s *Service) Update(ctx context.Context, input UpdateProjectInput, orgID in
 	}
 
 	if input.Name != "" {
+		if input.Name != project.Name {
+			slug := GenerateSlug(input.Name)
+			uniqueSlug, err := s.ensureUniqueSlugExcluding(ctx, slug, orgID, project.ID)
+			if err != nil {
+				return nil, err
+			}
+			project.Slug = uniqueSlug
+		}
 		project.Name = input.Name
 	}
 	project.Description = input.Description
+	if input.Identifier != nil && *input.Identifier != project.Identifier {
+		trimmed := strings.TrimSpace(*input.Identifier)
+		if trimmed == "" {
+			return nil, fmt.Errorf("identifier must not be empty")
+		}
+		uniqueID, err := s.ensureUniqueIdentifier(ctx, trimmed, orgID, project.ID)
+		if err != nil {
+			return nil, err
+		}
+		project.Identifier = uniqueID
+	}
 	if input.Status != nil {
 		project.Status = models.ProjectStatus(*input.Status)
 	}
@@ -357,6 +563,18 @@ func (s *Service) Delete(ctx context.Context, id int64, orgID int64) error {
 	return nil
 }
 
+func (s *Service) GetProjectIdentifier(ctx context.Context, projectID int64) (string, error) {
+	var identifier string
+	err := s.db.NewSelect().Model((*models.Project)(nil)).
+		Column("identifier").
+		Where("id = ?", projectID).
+		Scan(ctx, &identifier)
+	if err != nil {
+		return "", err
+	}
+	return identifier, nil
+}
+
 func (s *Service) CreateChange(ctx context.Context, projectID int64, name string, orgID int64) (*models.Change, error) {
 	exists, err := s.db.NewSelect().Model((*models.Project)(nil)).
 		Where("id = ?", projectID).
@@ -369,13 +587,28 @@ func (s *Service) CreateChange(ctx context.Context, projectID int64, name string
 		return nil, ErrProjectNotFound
 	}
 
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	num, err := s.nextChangeNumber(ctx, tx, projectID)
+	if err != nil {
+		return nil, err
+	}
+
 	change := &models.Change{
 		ProjectID: projectID,
+		Number:    num,
 		Name:      name,
 		Stage:     models.StageDraft,
 	}
 
-	if _, err := s.db.NewInsert().Model(change).Exec(ctx); err != nil {
+	if _, err := tx.NewInsert().Model(change).Exec(ctx); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return change, nil
@@ -427,6 +660,62 @@ func (s *Service) GetChange(ctx context.Context, id int64, orgID int64) (*models
 		return nil, err
 	}
 	return change, nil
+}
+
+// GetChangeOG returns minimal change info for Open Graph metadata without auth.
+func (s *Service) GetChangeOG(ctx context.Context, projectRef string, changeID int64) (changeName, projectName, stage string, err error) {
+	var result struct {
+		ChangeName  string `bun:"change_name"`
+		ProjectName string `bun:"project_name"`
+		Stage       string `bun:"stage"`
+	}
+	q := s.db.NewSelect().
+		TableExpr("changes AS ch").
+		Join("JOIN projects AS p ON p.id = ch.project_id").
+		ColumnExpr("ch.name AS change_name").
+		ColumnExpr("p.name AS project_name").
+		ColumnExpr("ch.stage AS stage").
+		Where("ch.id = ?", changeID)
+	if projectID, exactSlug, ok := parseProjectRef(projectRef); ok {
+		if exactSlug != "" {
+			q = q.Where("(p.slug = ? OR p.id = ?)", exactSlug, projectID)
+		} else {
+			q = q.Where("p.id = ?", projectID)
+		}
+	} else {
+		q = q.Where("p.slug = ?", projectRef)
+	}
+	err = q.Scan(ctx, &result)
+	if err != nil {
+		return "", "", "", err
+	}
+	return result.ChangeName, result.ProjectName, result.Stage, nil
+}
+
+// GetProjectOG returns minimal project info for Open Graph metadata without auth.
+func (s *Service) GetProjectOG(ctx context.Context, projectRef string) (projectName, description string, err error) {
+	var result struct {
+		Name        string `bun:"name"`
+		Description string `bun:"description"`
+	}
+	q := s.db.NewSelect().
+		TableExpr("projects AS p").
+		ColumnExpr("p.name").
+		ColumnExpr("p.description")
+	if projectID, exactSlug, ok := parseProjectRef(projectRef); ok {
+		if exactSlug != "" {
+			q = q.Where("(p.slug = ? OR p.id = ?)", exactSlug, projectID)
+		} else {
+			q = q.Where("p.id = ?", projectID)
+		}
+	} else {
+		q = q.Where("p.slug = ?", projectRef)
+	}
+	err = q.Scan(ctx, &result)
+	if err != nil {
+		return "", "", err
+	}
+	return result.Name, result.Description, nil
 }
 
 func (s *Service) DeleteChange(ctx context.Context, id int64, orgID int64) error {
@@ -599,25 +888,45 @@ func (s *Service) Search(ctx context.Context, query string, userID, orgID int64)
 		}
 	}
 
-	// Search changes
+	// Search changes (by name or identifier like COL-3)
 	var changes []models.Change
-	if err := s.db.NewSelect().Model(&changes).
+	changeQuery := s.db.NewSelect().Model(&changes).
 		Relation("Project").
 		Join("JOIN project_members AS pm ON pm.project_id = c.project_id").
 		Where("pm.user_id = ?", userID).
-		Where("c.name ILIKE ?", like).
-		Limit(10).
-		Scan(ctx); err == nil {
+		Limit(10)
+
+	// Check if query matches identifier pattern (e.g. COL-3)
+	if parts := strings.SplitN(strings.ToUpper(query), "-", 2); len(parts) == 2 {
+		if num, err := strconv.Atoi(parts[1]); err == nil && num > 0 {
+			changeQuery = changeQuery.Where(
+				"(c.name ILIKE ? OR (EXISTS (SELECT 1 FROM projects WHERE id = c.project_id AND UPPER(identifier) = ?) AND c.number = ?))",
+				like, parts[0], num,
+			)
+		} else {
+			changeQuery = changeQuery.Where("c.name ILIKE ?", like)
+		}
+	} else {
+		changeQuery = changeQuery.Where("c.name ILIKE ?", like)
+	}
+
+	if err := changeQuery.Scan(ctx); err == nil {
 		for _, c := range changes {
 			subtitle := string(c.Stage)
 			slug := ""
+			projectIdentifier := ""
 			if c.Project != nil {
 				slug = c.Project.Slug
+				projectIdentifier = c.Project.Identifier
+			}
+			title := c.Name
+			if projectIdentifier != "" && c.Number > 0 {
+				title = fmt.Sprintf("%s-%d %s", projectIdentifier, c.Number, c.Name)
 			}
 			results = append(results, SearchResult{
 				Type:      "change",
 				ID:        c.ID,
-				Title:     c.Name,
+				Title:     title,
 				Subtitle:  subtitle,
 				Slug:      slug,
 				ProjectID: c.ProjectID,

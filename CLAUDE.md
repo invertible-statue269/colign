@@ -18,6 +18,15 @@
 - goimports: group imports as stdlib → external packages → internal packages (separated by blank lines)
 - commitlint: conventional commits format, subject must start lowercase
 
+## Database
+
+- Always invoke `/database-design:postgresql` skill before writing or modifying migration SQL
+- Prefer `TEXT` over `VARCHAR(n)` — use `CHECK (LENGTH(col) <= n)` if limit needed
+- Use `BIGINT GENERATED ALWAYS AS IDENTITY` — never `BIGSERIAL` or `SERIAL`
+- Always add indexes on FK columns manually — PostgreSQL does not auto-index FKs
+- Do not create separate indexes for columns that already have a UNIQUE constraint
+- Use `TIMESTAMPTZ`, never `TIMESTAMP` without timezone
+
 ## Build
 
 - Go API: `CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o /tmp/colign-api ./cmd/api`

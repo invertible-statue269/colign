@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { projectClient } from "@/lib/project";
+import { toProjectPath } from "@/lib/project-ref";
 import { showError } from "@/lib/toast";
 import { useI18n } from "@/lib/i18n";
 
@@ -40,12 +41,17 @@ export function CreateProjectDialog({ onCreated, children }: CreateProjectDialog
     setSaving(true);
     setError("");
     try {
-      const res = await projectClient.createProject({ name: trimmedName, description: description.trim() });
+      const res = await projectClient.createProject({
+        name: trimmedName,
+        description: description.trim(),
+      });
       setOpen(false);
       setName("");
       setDescription("");
       onCreated?.();
-      router.push(`/projects/${res.project?.slug}`);
+      if (res.project) {
+        router.push(toProjectPath(res.project));
+      }
     } catch (err: unknown) {
       showError(t("toast.createFailed"), err);
       setError(err instanceof Error ? err.message : t("toast.createFailed"));
@@ -107,7 +113,13 @@ export function CreateProjectDialog({ onCreated, children }: CreateProjectDialog
             {error && <p className="text-sm text-destructive">{error}</p>}
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={saving} className="cursor-pointer">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleOpenChange(false)}
+                disabled={saving}
+                className="cursor-pointer"
+              >
                 {t("common.cancel")}
               </Button>
               <Button type="submit" disabled={saving || !name.trim()} className="cursor-pointer">

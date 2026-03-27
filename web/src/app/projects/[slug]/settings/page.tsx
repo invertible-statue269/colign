@@ -16,6 +16,7 @@ import {
 import { Header } from "@/components/layout/header";
 import { workflowClient } from "@/lib/workflow";
 import { projectClient } from "@/lib/project";
+import { isCanonicalProjectRef, toProjectPath } from "@/lib/project-ref";
 import { useI18n } from "@/lib/i18n";
 import { showError, showSuccess } from "@/lib/toast";
 import { AIConfigSettings } from "@/components/settings/ai-config";
@@ -40,16 +41,18 @@ const policyOptions = [
 
 export default function ProjectSettingsPage() {
   const params = useParams();
-  const slug = params.slug as string;
+  const projectRef = params.slug as string;
   const router = useRouter();
   const { t } = useI18n();
 
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
   const [projectId, setProjectId] = useState<bigint | null>(null);
+  const [projectSlug, setProjectSlug] = useState("");
 
   // General
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
+  const [projectIdentifier, setProjectIdentifier] = useState("");
 
   // Members
   const [inviteEmail, setInviteEmail] = useState("");
@@ -73,20 +76,26 @@ export default function ProjectSettingsPage() {
   // Load project ID on mount
   useEffect(() => {
     projectClient
-      .getProject({ slug })
+      .getProject({ slug: projectRef })
       .then((res) => {
         if (!res.project) {
           router.replace("/projects");
           return;
         }
+        if (!isCanonicalProjectRef(projectRef, res.project)) {
+          router.replace(`${toProjectPath(res.project)}/settings`);
+          return;
+        }
         setProjectId(res.project.id);
+        setProjectSlug(res.project.slug);
         setProjectName(res.project.name);
         setProjectDescription(res.project.description);
+        setProjectIdentifier(res.project.identifier);
       })
       .catch((err: unknown) => {
         showError(t("toast.projectLoadFailed"), err);
       });
-  }, [slug]);
+  }, [projectRef, router, t]);
 
   // Load archive policy when archive tab becomes active
   useEffect(() => {
@@ -116,6 +125,20 @@ export default function ProjectSettingsPage() {
 
   async function handleSave(section: string) {
     setSaving(true);
+    if (section === "general") {
+      try {
+        await projectClient.updateProject({
+          id: projectId ?? BigInt(0),
+          projectId: projectId ?? BigInt(0),
+          name: projectName,
+          description: projectDescription,
+          identifier: projectIdentifier.toUpperCase(),
+        });
+        showSuccess(t("toast.saveSuccess"));
+      } catch (err) {
+        showError(t("toast.saveFailed"), err);
+      }
+    }
     if (section === "approval") {
       try {
         await workflowClient.setApprovalPolicy({
@@ -160,7 +183,15 @@ export default function ProjectSettingsPage() {
   return (
     <div className="min-h-screen">
       <Header
-        breadcrumbs={[{ label: "Project", href: `/projects/${slug}` }, { label: "Settings" }]}
+        breadcrumbs={[
+          {
+            label: "Project",
+            href: projectId
+              ? toProjectPath({ id: projectId, slug: projectSlug })
+              : `/projects/${projectRef}`,
+          },
+          { label: "Settings" },
+        ]}
       />
 
       <div className="mx-auto flex max-w-5xl gap-8 px-6 py-8">
@@ -201,6 +232,27 @@ export default function ProjectSettingsPage() {
                     value={projectName}
                     onChange={(e) => setProjectName(e.target.value)}
                     placeholder="My App"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="project-identifier">Identifier</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Used for change numbering (e.g. COL-1, COL-2). 1-5 uppercase letters.
+                  </p>
+                  <Input
+                    id="project-identifier"
+                    value={projectIdentifier}
+                    onChange={(e) =>
+                      setProjectIdentifier(
+                        e.target.value
+                          .toUpperCase()
+                          .replace(/[^A-Z0-9]/g, "")
+                          .slice(0, 5),
+                      )
+                    }
+                    placeholder="COL"
+                    className="w-32 font-mono uppercase"
+                    maxLength={5}
                   />
                 </div>
                 <div className="space-y-2">
@@ -387,7 +439,10 @@ export default function ProjectSettingsPage() {
                     {archiveMode === "auto" && (
                       <div className="space-y-2">
                         <Label>{t("projectSettings.archiveTrigger")}</Label>
-                        <Select value={archiveTrigger} onValueChange={(v) => v && setArchiveTrigger(v)}>
+                        <Select
+                          value={archiveTrigger}
+                          onValueChange={(v) => v && setArchiveTrigger(v)}
+                        >
                           <SelectTrigger className="w-full cursor-pointer">
                             <SelectValue />
                           </SelectTrigger>
@@ -441,9 +496,7 @@ export default function ProjectSettingsPage() {
           )}
 
           {/* AI Configuration */}
-          {activeTab === "ai" && projectId && (
-            <AIConfigSettings projectId={projectId} />
-          )}
+          {activeTab === "ai" && projectId && <AIConfigSettings projectId={projectId} />}
 
           {/* Danger Zone */}
           {activeTab === "danger" && (

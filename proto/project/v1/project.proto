@@ -27,6 +27,7 @@ message Project {
   repeated ProjectLabel labels = 16;
   string lead_avatar_url = 17;
   string readme = 18;
+  string identifier = 19;
 }
 
 message ProjectMember {
@@ -52,6 +53,8 @@ message Change {
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp updated_at = 6;
   optional google.protobuf.Timestamp archived_at = 7;
+  int32 number = 8;
+  string identifier = 9;
 }
 
 // Project CRUD
@@ -94,6 +97,7 @@ message UpdateProjectRequest {
   optional string color = 11;
   optional string readme = 12;
   int64 project_id = 13;
+  optional string identifier = 14;
 }
 
 message UpdateProjectResponse {

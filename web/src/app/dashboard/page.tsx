@@ -6,6 +6,7 @@ import { Header } from "@/components/layout/header";
 import { useI18n } from "@/lib/i18n";
 import { useOrg } from "@/lib/org-context";
 import { projectClient } from "@/lib/project";
+import { toChangePath, toProjectPath } from "@/lib/project-ref";
 import { FolderKanban, GitBranch, Eye, CheckCircle2, ChevronRight } from "lucide-react";
 import { showError } from "@/lib/toast";
 
@@ -21,6 +22,7 @@ interface Change {
   id: bigint;
   projectId: bigint;
   name: string;
+  identifier?: string;
   stage: string;
   updatedAt?: { seconds: bigint };
 }
@@ -47,7 +49,7 @@ export default function DashboardPage() {
   const { currentOrg } = useOrg();
   const [projects, setProjects] = useState<Project[]>([]);
   const [allChanges, setAllChanges] = useState<
-    { change: Change; projectSlug: string; projectName: string }[]
+    { change: Change; projectId: bigint; projectSlug: string; projectName: string }[]
   >([]);
   const [loading, setLoading] = useState(true);
 
@@ -74,9 +76,11 @@ export default function DashboardPage() {
                   id: c.id,
                   projectId: c.projectId,
                   name: c.name,
+                  identifier: c.identifier,
                   stage: c.stage,
                   updatedAt: c.updatedAt ? { seconds: c.updatedAt.seconds } : undefined,
                 },
+                projectId: project.id,
                 projectSlug: project.slug,
                 projectName: project.name,
               }));
@@ -198,13 +202,21 @@ export default function DashboardPage() {
                   return (
                     <Link
                       key={String(item.change.id)}
-                      href={`/projects/${item.projectSlug}/changes/${item.change.id}`}
+                      href={toChangePath(
+                        { id: item.projectId, slug: item.projectSlug },
+                        item.change.id,
+                      )}
                     >
                       <div className="flex cursor-pointer items-center justify-between px-5 py-3 transition-colors hover:bg-accent/30">
                         <div className="flex items-center gap-3 min-w-0">
                           <div className={`h-2 w-2 shrink-0 rounded-full ${config.dot}`} />
                           <div className="min-w-0">
                             <p className="truncate text-sm">
+                              {item.change.identifier && (
+                                <span className="mr-1 text-muted-foreground">
+                                  {item.change.identifier}
+                                </span>
+                              )}
                               <span className="font-medium">{item.change.name}</span>
                               <span className="text-muted-foreground">
                                 {" "}
@@ -251,7 +263,7 @@ export default function DashboardPage() {
                     .slice(0, 3);
                   return (
                     <div key={String(project.id)} className="px-5 py-3">
-                      <Link href={`/projects/${project.slug}`}>
+                      <Link href={toProjectPath(project)}>
                         <div className="mb-2 flex cursor-pointer items-center gap-2 transition-colors hover:text-primary">
                           <FolderKanban className="size-3.5 text-muted-foreground/60" />
                           <span className="text-sm font-medium">{project.name}</span>
@@ -271,12 +283,17 @@ export default function DashboardPage() {
                             return (
                               <Link
                                 key={String(item.change.id)}
-                                href={`/projects/${project.slug}/changes/${item.change.id}`}
+                                href={toChangePath(project, item.change.id)}
                               >
                                 <div className="flex cursor-pointer items-center justify-between rounded-lg px-3 py-1.5 transition-colors hover:bg-accent/30">
                                   <div className="flex items-center gap-2">
                                     <div className={`h-1.5 w-1.5 rounded-full ${config.dot}`} />
                                     <span className="text-sm text-foreground/80">
+                                      {item.change.identifier && (
+                                        <span className="mr-1 text-muted-foreground">
+                                          {item.change.identifier}
+                                        </span>
+                                      )}
                                       {item.change.name}
                                     </span>
                                   </div>

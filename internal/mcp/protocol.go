@@ -386,6 +386,19 @@ func ListTools() []Tool {
 			},
 		},
 		{
+			Name:        "update_change",
+			Description: "Update a change's name.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"change_id":  {Type: "integer", Description: "Change ID"},
+					"project_id": {Type: "integer", Description: "Project ID"},
+					"name":       {Type: "string", Description: "New name for the change"},
+				},
+				Required: []string{"change_id", "project_id", "name"},
+			},
+		},
+		{
 			Name:        "archive_change",
 			Description: "Archive a change (cancel or shelve it).",
 			InputSchema: InputSchema{

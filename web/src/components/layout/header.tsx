@@ -8,6 +8,10 @@ import { useOrg } from "@/lib/org-context";
 interface Breadcrumb {
   label: string;
   href?: string;
+  editable?: boolean;
+  editablePrefix?: string;
+  editableValue?: string;
+  onSave?: (value: string) => void;
 }
 
 interface HeaderProps {
@@ -180,6 +184,13 @@ export function Header({ breadcrumbs = [], actions }: HeaderProps) {
                 >
                   {crumb.label}
                 </Link>
+              ) : crumb.editable && crumb.onSave ? (
+                <EditableBreadcrumb
+                  label={crumb.label}
+                  prefix={crumb.editablePrefix}
+                  editableValue={crumb.editableValue}
+                  onSave={crumb.onSave}
+                />
               ) : (
                 <span className="text-sm font-medium">{crumb.label}</span>
               )}
@@ -190,5 +201,73 @@ export function Header({ breadcrumbs = [], actions }: HeaderProps) {
         {actions && <div className="flex items-center gap-2">{actions}</div>}
       </div>
     </header>
+  );
+}
+
+function EditableBreadcrumb({
+  label,
+  prefix,
+  editableValue,
+  onSave,
+}: {
+  label: string;
+  prefix?: string;
+  editableValue?: string;
+  onSave: (value: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const actualValue = editableValue ?? label;
+  const [value, setValue] = useState(actualValue);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setValue(editableValue ?? label);
+  }, [editableValue, label]);
+
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.select();
+    }
+  }, [editing]);
+
+  function commit() {
+    const trimmed = value.trim();
+    if (trimmed && trimmed !== actualValue) {
+      onSave(trimmed);
+    } else {
+      setValue(actualValue);
+    }
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        {prefix && <span className="text-sm text-muted-foreground">{prefix}</span>}
+        <input
+          ref={inputRef}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+            if (e.key === "Escape") {
+              setValue(actualValue);
+              setEditing(false);
+            }
+          }}
+          className="rounded-md border border-primary/50 bg-transparent px-1.5 py-0.5 text-sm font-medium text-foreground outline-none"
+        />
+      </span>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setEditing(true)}
+      className="cursor-pointer rounded-md px-1.5 py-0.5 text-sm font-medium transition-colors hover:bg-accent"
+    >
+      {label}
+    </button>
   );
 }

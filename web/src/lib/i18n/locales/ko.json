@@ -133,7 +133,13 @@
     "advanceConfirm": "예, 진행",
     "labels": "라벨",
     "addLabel": "라벨 추가",
-    "removeLabel": "라벨 제거"
+    "removeLabel": "라벨 제거",
+    "newLabel": "새 라벨 만들기",
+    "delete": "삭제",
+    "deleteConfirm": "이 Change를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+    "deleteConfirmButton": "삭제",
+    "rename": "이름 변경",
+    "renamePlaceholder": "Change 이름"
   },
   "proposal": {
     "problem": "Problem",
@@ -406,6 +412,8 @@
     "rejectFailed": "반려 처리에 실패했습니다",
     "archiveFailed": "보관 처리에 실패했습니다",
     "restoreFailed": "복원 처리에 실패했습니다",
+    "deleteFailed": "Change 삭제에 실패했습니다",
+    "renameFailed": "Change 이름 변경에 실패했습니다",
     "networkError": "네트워크 오류입니다. 연결 상태를 확인하세요.",
     "retryAction": "재시도"
   },

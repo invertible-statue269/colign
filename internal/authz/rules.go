@@ -18,6 +18,7 @@ var rpcRules = map[string]AuthRule{
 	"/project.v1.ProjectService/CreateChange":        {Resource: "change", Action: "create"},
 	"/project.v1.ProjectService/ListChanges":         {Resource: "change", Action: "read"},
 	"/project.v1.ProjectService/GetChange":           {Resource: "change", Action: "read"},
+	"/project.v1.ProjectService/UpdateChange":        {Resource: "change", Action: "update"},
 	"/project.v1.ProjectService/DeleteChange":        {Resource: "change", Action: "delete"},
 	"/project.v1.ProjectService/ArchiveChange":       {Resource: "change", Action: "archive"},
 	"/project.v1.ProjectService/UnarchiveChange":     {Resource: "change", Action: "unarchive"},

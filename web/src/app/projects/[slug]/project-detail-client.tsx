@@ -894,56 +894,106 @@ function ChangeRow({
   change,
   project,
   t,
+  onDelete,
+  onRename,
 }: {
   change: Change;
   project: Pick<ProjectDetail, "id" | "slug">;
   t: (key: string) => string;
+  onDelete: (changeId: bigint) => void;
+  onRename: (changeId: bigint, currentName: string) => void;
 }) {
   const config = stageConfig[change.stage] ?? stageConfig.draft;
   const maxLabels = 3;
   const visibleLabels = change.labels.slice(0, maxLabels);
   const extraCount = change.labels.length - maxLabels;
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <Link
-      href={toChangePath(project, change.id)}
-      className="group flex cursor-pointer items-center justify-between px-3 py-2.5 transition-colors duration-150 hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-inset"
-    >
-      <div className="flex items-center gap-3 min-w-0">
+    <div className="group relative flex items-center">
+      <Link
+        href={toChangePath(project, change.id)}
+        className="flex flex-1 cursor-pointer items-center justify-between px-3 py-2.5 transition-colors duration-150 hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-inset"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <span
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${config.color.split(" ")[0].replace("/10", "")}`}
+          />
+          {change.identifier && (
+            <span className="shrink-0 text-xs text-muted-foreground">{change.identifier}</span>
+          )}
+          <span className="truncate text-sm font-medium text-foreground">{change.name}</span>
+          {visibleLabels.length > 0 && (
+            <div className="flex items-center gap-1 shrink-0">
+              {visibleLabels.map((label) => (
+                <span
+                  key={String(label.id)}
+                  className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none"
+                  style={{
+                    backgroundColor: `${label.color}18`,
+                    color: label.color,
+                  }}
+                >
+                  <span className="h-1 w-1 rounded-full" style={{ backgroundColor: label.color }} />
+                  {label.name}
+                </span>
+              ))}
+              {extraCount > 0 && (
+                <span className="text-[10px] text-muted-foreground">+{extraCount}</span>
+              )}
+            </div>
+          )}
+        </div>
         <span
-          className={`h-1.5 w-1.5 shrink-0 rounded-full ${config.color.split(" ")[0].replace("/10", "")}`}
-        />
-        {change.identifier && (
-          <span className="shrink-0 text-xs text-muted-foreground">{change.identifier}</span>
-        )}
-        <span className="truncate text-sm font-medium text-foreground">{change.name}</span>
-        {visibleLabels.length > 0 && (
-          <div className="flex items-center gap-1 shrink-0">
-            {visibleLabels.map((label) => (
-              <span
-                key={String(label.id)}
-                className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none"
-                style={{
-                  backgroundColor: `${label.color}18`,
-                  color: label.color,
+          className={`ml-3 inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-xs font-medium ${config.color}`}
+        >
+          {t(`stages.${change.stage}`)}
+        </span>
+      </Link>
+      <div className="relative mr-2">
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setMenuOpen((v) => !v);
+          }}
+          className="cursor-pointer rounded-md p-1 text-muted-foreground/0 transition-colors group-hover:text-muted-foreground hover:!text-foreground hover:bg-foreground/5"
+        >
+          <MoreHorizontal className="size-4" />
+        </button>
+        {menuOpen && (
+          <>
+            <div className="fixed inset-0 z-20" onClick={() => setMenuOpen(false)} />
+            <div className="absolute right-0 top-full z-30 mt-1 min-w-[140px] rounded-lg border border-border/40 bg-popover p-1 shadow-lg">
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setMenuOpen(false);
+                  onRename(change.id, change.name);
                 }}
+                className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 text-left text-xs text-foreground transition-colors hover:bg-accent"
               >
-                <span className="h-1 w-1 rounded-full" style={{ backgroundColor: label.color }} />
-                {label.name}
-              </span>
-            ))}
-            {extraCount > 0 && (
-              <span className="text-[10px] text-muted-foreground">+{extraCount}</span>
-            )}
-          </div>
+                <Pencil className="size-3.5" />
+                {t("change.rename")}
+              </button>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setMenuOpen(false);
+                  onDelete(change.id);
+                }}
+                className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 text-left text-xs text-destructive transition-colors hover:bg-destructive/10"
+              >
+                <Trash2 className="size-3.5" />
+                {t("change.delete")}
+              </button>
+            </div>
+          </>
         )}
       </div>
-      <span
-        className={`ml-3 inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-xs font-medium ${config.color}`}
-      >
-        {t(`stages.${change.stage}`)}
-      </span>
-    </Link>
+    </div>
   );
 }
 
@@ -976,6 +1026,53 @@ function ChangesTab({
   const [archivedChanges, setArchivedChanges] = useState<Change[]>([]);
   const [archivedCount, setArchivedCount] = useState<number | null>(null);
   const [loadingArchived, setLoadingArchived] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<bigint | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<{ id: bigint; name: string } | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renaming, setRenaming] = useState(false);
+
+  function handleRenameOpen(changeId: bigint, currentName: string) {
+    setRenameTarget({ id: changeId, name: currentName });
+    setRenameValue(currentName);
+  }
+
+  async function handleRenameSubmit() {
+    if (!renameTarget) return;
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === renameTarget.name) {
+      setRenameTarget(null);
+      return;
+    }
+    setRenaming(true);
+    try {
+      await projectClient.updateChange({
+        id: renameTarget.id,
+        projectId: project.id,
+        name: trimmed,
+      });
+      setRenameTarget(null);
+      await reloadChanges();
+    } catch (err) {
+      showError(t("toast.renameFailed"), err);
+    } finally {
+      setRenaming(false);
+    }
+  }
+
+  async function handleDeleteChange() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await projectClient.deleteChange({ id: deleteTarget, projectId: project.id });
+      setDeleteTarget(null);
+      await reloadChanges();
+    } catch (err) {
+      showError(t("toast.deleteFailed"), err);
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   // Load org labels
   useEffect(() => {
@@ -1416,7 +1513,14 @@ function ChangesTab({
               {/* Group Items */}
               <div className="divide-y divide-border/20">
                 {group.changes.map((change) => (
-                  <ChangeRow key={String(change.id)} change={change} project={project} t={t} />
+                  <ChangeRow
+                    key={String(change.id)}
+                    change={change}
+                    project={project}
+                    t={t}
+                    onDelete={setDeleteTarget}
+                    onRename={handleRenameOpen}
+                  />
                 ))}
               </div>
             </div>
@@ -1425,7 +1529,14 @@ function ChangesTab({
       ) : (
         <div className="divide-y divide-border/30">
           {displayChanges.map((change) => (
-            <ChangeRow key={String(change.id)} change={change} project={project} t={t} />
+            <ChangeRow
+              key={String(change.id)}
+              change={change}
+              project={project}
+              t={t}
+              onDelete={setDeleteTarget}
+              onRename={handleRenameOpen}
+            />
           ))}
         </div>
       )}
@@ -1456,6 +1567,94 @@ function ChangesTab({
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
                 ) : (
                   t("common.create")
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirm Dialog */}
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t("change.delete")}</DialogTitle>
+            <DialogDescription>{t("change.deleteConfirm")}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setDeleteTarget(null)}
+              className="cursor-pointer"
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteChange}
+              disabled={deleting}
+              className="cursor-pointer"
+            >
+              {deleting ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-destructive-foreground border-t-transparent" />
+              ) : (
+                t("change.deleteConfirmButton")
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Dialog */}
+      <Dialog
+        open={renameTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setRenameTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t("change.rename")}</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleRenameSubmit();
+            }}
+          >
+            <div className="py-2">
+              <Input
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                placeholder={t("change.renamePlaceholder")}
+                autoFocus
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                variant="ghost"
+                type="button"
+                onClick={() => setRenameTarget(null)}
+                className="cursor-pointer"
+              >
+                {t("common.cancel")}
+              </Button>
+              <Button
+                type="submit"
+                disabled={
+                  renaming || !renameValue.trim() || renameValue.trim() === renameTarget?.name
+                }
+                className="cursor-pointer"
+              >
+                {renaming ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                ) : (
+                  t("common.save")
                 )}
               </Button>
             </DialogFooter>

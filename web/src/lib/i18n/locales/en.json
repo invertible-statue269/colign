@@ -133,7 +133,13 @@
     "advanceConfirm": "Yes, advance",
     "labels": "Labels",
     "addLabel": "Add label",
-    "removeLabel": "Remove label"
+    "removeLabel": "Remove label",
+    "newLabel": "Create new label",
+    "delete": "Delete",
+    "deleteConfirm": "Are you sure you want to delete this change? This action cannot be undone.",
+    "deleteConfirmButton": "Delete",
+    "rename": "Rename",
+    "renamePlaceholder": "Change name"
   },
   "proposal": {
     "problem": "Problem",
@@ -406,6 +412,8 @@
     "rejectFailed": "Failed to submit rejection",
     "archiveFailed": "Failed to archive",
     "restoreFailed": "Failed to restore",
+    "deleteFailed": "Failed to delete change",
+    "renameFailed": "Failed to rename change",
     "networkError": "Network error. Please check your connection.",
     "retryAction": "Retry"
   },

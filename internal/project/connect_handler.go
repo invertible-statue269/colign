@@ -366,6 +366,28 @@ func (h *ConnectHandler) GetChange(ctx context.Context, req *connect.Request[pro
 	}), nil
 }
 
+func (h *ConnectHandler) UpdateChange(ctx context.Context, req *connect.Request[projectv1.UpdateChangeRequest]) (*connect.Response[projectv1.UpdateChangeResponse], error) {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	change, err := h.service.UpdateChange(ctx, req.Msg.Id, req.Msg.Name, claims.OrgID)
+	if err != nil {
+		if errors.Is(err, ErrProjectNotFound) {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	h.publishChangeEvent("change_updated", change)
+
+	pid, _ := h.service.GetProjectIdentifier(ctx, req.Msg.ProjectId)
+	return connect.NewResponse(&projectv1.UpdateChangeResponse{
+		Change: changeToProto(change, pid),
+	}), nil
+}
+
 func (h *ConnectHandler) DeleteChange(ctx context.Context, req *connect.Request[projectv1.DeleteChangeRequest]) (*connect.Response[projectv1.DeleteChangeResponse], error) {
 	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
 	if err != nil {

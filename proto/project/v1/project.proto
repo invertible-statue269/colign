@@ -185,6 +185,16 @@ message GetChangeResponse {
   Change change = 1;
 }
 
+message UpdateChangeRequest {
+  int64 id = 1;
+  int64 project_id = 2;
+  string name = 3;
+}
+
+message UpdateChangeResponse {
+  Change change = 1;
+}
+
 message DeleteChangeRequest {
   int64 id = 1;
   int64 project_id = 2;
@@ -284,6 +294,7 @@ service ProjectService {
   rpc CreateChange(CreateChangeRequest) returns (CreateChangeResponse) {}
   rpc ListChanges(ListChangesRequest) returns (ListChangesResponse) {}
   rpc GetChange(GetChangeRequest) returns (GetChangeResponse) {}
+  rpc UpdateChange(UpdateChangeRequest) returns (UpdateChangeResponse) {}
   rpc DeleteChange(DeleteChangeRequest) returns (DeleteChangeResponse) {}
   rpc ArchiveChange(ArchiveChangeRequest) returns (ArchiveChangeResponse) {}
   rpc UnarchiveChange(UnarchiveChangeRequest) returns (UnarchiveChangeResponse) {}

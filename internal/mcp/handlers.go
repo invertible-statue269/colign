@@ -82,6 +82,8 @@ func (s *Server) callTool(ctx context.Context, name string, args json.RawMessage
 		return s.handleApproveChange(ctx, args)
 	case "reject_change":
 		return s.handleRejectChange(ctx, args)
+	case "update_change":
+		return s.handleUpdateChange(ctx, args)
 	case "archive_change":
 		return s.handleArchiveChange(ctx, args)
 	case "get_work_context":
@@ -1213,6 +1215,34 @@ func (s *Server) handleRejectChange(ctx context.Context, args json.RawMessage) (
 		"change_id": params.ChangeID.Int64(),
 		"rejected":  true,
 		"new_stage": resp.Msg.NewStage,
+	}, nil
+}
+
+func (s *Server) handleUpdateChange(ctx context.Context, args json.RawMessage) (any, error) {
+	var params struct {
+		ChangeID  FlexInt64 `json:"change_id"`
+		ProjectID FlexInt64 `json:"project_id"`
+		Name      string    `json:"name"`
+	}
+	if err := json.Unmarshal(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
+	}
+
+	resp, err := s.clients.project.UpdateChange(ctx, connect.NewRequest(&projectv1.UpdateChangeRequest{
+		Id:        params.ChangeID.Int64(),
+		ProjectId: params.ProjectID.Int64(),
+		Name:      params.Name,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	c := resp.Msg.Change
+	return map[string]any{
+		"id":         c.Id,
+		"name":       c.Name,
+		"identifier": c.Identifier,
+		"updated":    true,
 	}, nil
 }
 

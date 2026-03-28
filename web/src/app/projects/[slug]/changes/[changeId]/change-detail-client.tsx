@@ -8,7 +8,7 @@ import { workflowClient } from "@/lib/workflow";
 import { projectClient } from "@/lib/project";
 import { isCanonicalProjectRef, toProjectPath } from "@/lib/project-ref";
 import { showError } from "@/lib/toast";
-import { Archive, ArchiveRestore } from "lucide-react";
+import { Archive, ArchiveRestore, Plus, Trash2 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { DocumentTab } from "@/components/change/document-tab";
 import { StructuredProposal } from "@/components/change/structured-proposal";
@@ -113,6 +113,8 @@ export default function ChangeDetailClient() {
     undefined,
   );
   const [archiving, setArchiving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [changeLabels, setChangeLabels] = useState<
     Array<{ id: bigint; name: string; color: string }>
   >([]);
@@ -120,6 +122,9 @@ export default function ChangeDetailClient() {
     [],
   );
   const [labelDropdownOpen, setLabelDropdownOpen] = useState(false);
+  const [creatingLabel, setCreatingLabel] = useState(false);
+  const [newLabelName, setNewLabelName] = useState("");
+  const [newLabelColor, setNewLabelColor] = useState("#6B7280");
 
   const prevStageRef = useRef(stage);
 
@@ -210,6 +215,26 @@ export default function ChangeDetailClient() {
     }
   }
 
+  async function handleCreateAndAssignLabel() {
+    const name = newLabelName.trim();
+    if (!name) return;
+    try {
+      const res = await projectClient.createLabel({ name, color: newLabelColor });
+      if (res.label) {
+        const newLabel = { id: res.label.id, name: res.label.name, color: res.label.color };
+        setOrgLabels((prev) => [...prev, newLabel]);
+        await projectClient.assignChangeLabel({ changeId, labelId: newLabel.id, projectId });
+        setChangeLabels((prev) => [...prev, newLabel]);
+      }
+      setNewLabelName("");
+      setNewLabelColor("#6B7280");
+      setCreatingLabel(false);
+      setLabelDropdownOpen(false);
+    } catch (err) {
+      showError(t("toast.loadFailed"), err);
+    }
+  }
+
   async function handleRemoveLabel(labelId: bigint) {
     try {
       await projectClient.removeChangeLabel({ changeId, labelId, projectId });
@@ -231,14 +256,41 @@ export default function ChangeDetailClient() {
     }
   }
 
-  // Close label dropdown on click outside
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      await projectClient.deleteChange({ id: changeId, projectId });
+      router.push(toProjectPath({ id: projectId, slug: projectSlug }));
+    } catch (err) {
+      showError(t("toast.deleteFailed"), err);
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  }
+
+  async function handleRename(newName: string) {
+    try {
+      await projectClient.updateChange({ id: changeId, projectId, name: newName });
+      setChangeName(newName);
+    } catch (err) {
+      showError(t("toast.renameFailed"), err);
+    }
+  }
+
+  // Close label dropdown on click outside (ref-based)
+  const labelDropdownRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!labelDropdownOpen) return;
-    function handleClick() {
-      setLabelDropdownOpen(false);
+    function handleClick(e: MouseEvent) {
+      if (labelDropdownRef.current && !labelDropdownRef.current.contains(e.target as Node)) {
+        setLabelDropdownOpen(false);
+        setCreatingLabel(false);
+        setNewLabelName("");
+      }
     }
-    document.addEventListener("click", handleClick);
-    return () => document.removeEventListener("click", handleClick);
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
   }, [labelDropdownOpen]);
 
   useEffect(() => {
@@ -312,8 +364,23 @@ export default function ChangeDetailClient() {
       <Header
         breadcrumbs={[
           { label: projectName, href: toProjectPath({ id: projectId, slug: projectSlug }) },
-          { label: changeIdentifier ? `${changeIdentifier} ${changeName}` : changeName },
+          {
+            label: changeIdentifier ? `${changeIdentifier} ${changeName}` : changeName,
+            editable: true,
+            editablePrefix: changeIdentifier || undefined,
+            editableValue: changeName,
+            onSave: handleRename,
+          },
         ]}
+        actions={
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            title={t("change.delete")}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        }
       />
 
       {/* Main Content */}
@@ -589,6 +656,32 @@ export default function ChangeDetailClient() {
                   </div>
                 </div>
               )}
+
+              {/* Delete Confirm */}
+              {showDeleteConfirm && (
+                <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                  <p className="text-sm text-destructive">{t("change.deleteConfirm")}</p>
+                  <div className="mt-2 flex gap-2">
+                    <Button
+                      onClick={handleDelete}
+                      size="sm"
+                      variant="destructive"
+                      className="cursor-pointer"
+                      disabled={deleting}
+                    >
+                      {t("change.deleteConfirmButton")}
+                    </Button>
+                    <Button
+                      onClick={() => setShowDeleteConfirm(false)}
+                      size="sm"
+                      variant="ghost"
+                      className="cursor-pointer"
+                    >
+                      {t("common.cancel")}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -618,12 +711,9 @@ export default function ChangeDetailClient() {
                   </button>
                 </span>
               ))}
-              <div className="relative">
+              <div className="relative" ref={labelDropdownRef}>
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setLabelDropdownOpen((v) => !v);
-                  }}
+                  onClick={() => setLabelDropdownOpen((v) => !v)}
                   className="cursor-pointer inline-flex items-center gap-1 rounded-full border border-dashed border-border/50 px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground"
                 >
                   + {t("change.addLabel")}
@@ -657,6 +747,72 @@ export default function ChangeDetailClient() {
                           </button>
                         ))
                     )}
+                    {/* Create new label */}
+                    <div className="border-t border-border/30 mt-1 pt-1">
+                      {creatingLabel ? (
+                        <div className="px-2 py-1.5 space-y-2">
+                          <input
+                            type="text"
+                            value={newLabelName}
+                            onChange={(e) => setNewLabelName(e.target.value)}
+                            placeholder={t("change.addLabel")}
+                            autoFocus
+                            className="w-full rounded-md border border-border/40 bg-transparent px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleCreateAndAssignLabel();
+                              if (e.key === "Escape") {
+                                setCreatingLabel(false);
+                                setNewLabelName("");
+                              }
+                            }}
+                          />
+                          <div className="flex items-center gap-1.5">
+                            {[
+                              "#EF4444",
+                              "#F59E0B",
+                              "#10B981",
+                              "#3B82F6",
+                              "#8B5CF6",
+                              "#EC4899",
+                              "#6B7280",
+                            ].map((c) => (
+                              <button
+                                key={c}
+                                onClick={() => setNewLabelColor(c)}
+                                className={`h-4 w-4 rounded-full cursor-pointer transition-transform ${newLabelColor === c ? "ring-2 ring-primary ring-offset-1 ring-offset-background scale-110" : "hover:scale-110"}`}
+                                style={{ backgroundColor: c }}
+                              />
+                            ))}
+                          </div>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => handleCreateAndAssignLabel()}
+                              disabled={!newLabelName.trim()}
+                              className="cursor-pointer flex-1 rounded-md bg-primary px-2 py-1 text-[10px] font-medium text-primary-foreground disabled:opacity-40 transition-colors"
+                            >
+                              {t("common.create")}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setCreatingLabel(false);
+                                setNewLabelName("");
+                              }}
+                              className="cursor-pointer rounded-md px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              {t("common.cancel")}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setCreatingLabel(true)}
+                          className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        >
+                          <Plus className="size-3" />
+                          {t("change.newLabel")}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

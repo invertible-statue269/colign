@@ -837,6 +837,28 @@ func (s *Service) GetProjectOG(ctx context.Context, projectRef string) (projectN
 	return result.Name, result.Description, nil
 }
 
+func (s *Service) UpdateChange(ctx context.Context, id int64, name string, orgID int64) (*models.Change, error) {
+	change := new(models.Change)
+	err := s.db.NewSelect().Model(change).
+		Where("ch.id = ?", id).
+		Where("ch.project_id IN (SELECT id FROM projects WHERE organization_id = ?)", orgID).
+		Scan(ctx)
+	if err != nil {
+		return nil, ErrProjectNotFound
+	}
+
+	change.Name = name
+	change.UpdatedAt = time.Now()
+	_, err = s.db.NewUpdate().Model(change).
+		Column("name", "updated_at").
+		Where("id = ?", id).
+		Exec(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return change, nil
+}
+
 func (s *Service) DeleteChange(ctx context.Context, id int64, orgID int64) error {
 	res, err := s.db.NewDelete().Model((*models.Change)(nil)).
 		Where("id = ?", id).

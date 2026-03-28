@@ -327,7 +327,7 @@ func (h *ConnectHandler) ListChanges(ctx context.Context, req *connect.Request[p
 	if req.Msg.Filter != nil {
 		filter = *req.Msg.Filter
 	}
-	changes, err := h.service.ListChanges(ctx, req.Msg.ProjectId, filter, claims.OrgID)
+	changes, err := h.service.ListChanges(ctx, req.Msg.ProjectId, filter, claims.OrgID, req.Msg.LabelIds)
 	if err != nil {
 		if errors.Is(err, ErrProjectNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, err)
@@ -546,6 +546,36 @@ func memberToProto(m *models.ProjectMember) *projectv1.ProjectMember {
 	return pm
 }
 
+func (h *ConnectHandler) AssignChangeLabel(ctx context.Context, req *connect.Request[projectv1.AssignChangeLabelRequest]) (*connect.Response[projectv1.AssignChangeLabelResponse], error) {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.service.AssignChangeLabel(ctx, req.Msg.ChangeId, req.Msg.LabelId, claims.OrgID); err != nil {
+		if errors.Is(err, ErrProjectNotFound) {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&projectv1.AssignChangeLabelResponse{}), nil
+}
+
+func (h *ConnectHandler) RemoveChangeLabel(ctx context.Context, req *connect.Request[projectv1.RemoveChangeLabelRequest]) (*connect.Response[projectv1.RemoveChangeLabelResponse], error) {
+	claims, err := h.extractClaims(ctx, req.Header().Get("Authorization"))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.service.RemoveChangeLabel(ctx, req.Msg.ChangeId, req.Msg.LabelId, claims.OrgID); err != nil {
+		if errors.Is(err, ErrProjectNotFound) {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&projectv1.RemoveChangeLabelResponse{}), nil
+}
+
 func changeToProto(c *models.Change, projectIdentifier string) *projectv1.Change {
 	pc := &projectv1.Change{
 		Id:        c.ID,
@@ -561,6 +591,9 @@ func changeToProto(c *models.Change, projectIdentifier string) *projectv1.Change
 	}
 	if c.ArchivedAt != nil {
 		pc.ArchivedAt = timestamppb.New(*c.ArchivedAt)
+	}
+	for i := range c.Labels {
+		pc.Labels = append(pc.Labels, labelToProto(&c.Labels[i]))
 	}
 	return pc
 }

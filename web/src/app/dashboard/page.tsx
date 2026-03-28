@@ -7,7 +7,7 @@ import { useI18n } from "@/lib/i18n";
 import { useOrg } from "@/lib/org-context";
 import { projectClient } from "@/lib/project";
 import { toChangePath, toProjectPath } from "@/lib/project-ref";
-import { FolderKanban, GitBranch, Eye, CheckCircle2, ChevronRight } from "lucide-react";
+import { FolderKanban, GitBranch, CheckCircle2, ChevronRight } from "lucide-react";
 import { showError } from "@/lib/toast";
 
 interface Project {
@@ -18,6 +18,12 @@ interface Project {
   createdAt?: { seconds: bigint };
 }
 
+interface ChangeLabel {
+  id: bigint;
+  name: string;
+  color: string;
+}
+
 interface Change {
   id: bigint;
   projectId: bigint;
@@ -25,13 +31,13 @@ interface Change {
   identifier?: string;
   stage: string;
   updatedAt?: { seconds: bigint };
+  labels: ChangeLabel[];
 }
 
 const stageConfig: Record<string, { label: string; color: string; dot: string }> = {
   draft: { label: "Draft", color: "text-amber-400", dot: "bg-amber-400" },
-  design: { label: "Design", color: "text-blue-400", dot: "bg-blue-400" },
-  review: { label: "Review", color: "text-violet-400", dot: "bg-violet-400" },
-  ready: { label: "Ready", color: "text-emerald-400", dot: "bg-emerald-400" },
+  spec: { label: "Spec", color: "text-blue-400", dot: "bg-blue-400" },
+  approved: { label: "Approved", color: "text-emerald-400", dot: "bg-emerald-400" },
 };
 
 function timeAgo(seconds: bigint | undefined): string {
@@ -79,6 +85,7 @@ export default function DashboardPage() {
                   identifier: c.identifier,
                   stage: c.stage,
                   updatedAt: c.updatedAt ? { seconds: c.updatedAt.seconds } : undefined,
+                  labels: (c.labels ?? []).map((l) => ({ id: l.id, name: l.name, color: l.color })),
                 },
                 projectId: project.id,
                 projectSlug: project.slug,
@@ -100,10 +107,9 @@ export default function DashboardPage() {
   }, [currentOrg]);
 
   const activeChanges = allChanges.filter(
-    (c) => c.change.stage === "draft" || c.change.stage === "design",
+    (c) => c.change.stage === "draft" || c.change.stage === "spec",
   );
-  const reviewChanges = allChanges.filter((c) => c.change.stage === "review");
-  const readyChanges = allChanges.filter((c) => c.change.stage === "ready");
+  const approvedChanges = allChanges.filter((c) => c.change.stage === "approved");
 
   // Sort by most recently updated
   const recentChanges = [...allChanges]
@@ -131,26 +137,16 @@ export default function DashboardPage() {
     {
       value: activeChanges.length,
       label: t("dashboard.activeChanges"),
-      sub: `${activeChanges.filter((c) => c.change.stage === "draft").length} draft, ${activeChanges.filter((c) => c.change.stage === "design").length} design`,
+      sub: `${activeChanges.filter((c) => c.change.stage === "draft").length} draft, ${activeChanges.filter((c) => c.change.stage === "spec").length} spec`,
       icon: GitBranch,
       iconColor: "text-blue-400",
     },
     {
-      value: reviewChanges.length,
-      label: t("dashboard.inReview"),
+      value: approvedChanges.length,
+      label: t("dashboard.approved"),
       sub:
-        reviewChanges.length > 0
-          ? `${reviewChanges.map((c) => c.projectName).filter((v, i, a) => a.indexOf(v) === i).length} projects`
-          : "No pending reviews",
-      icon: Eye,
-      iconColor: "text-violet-400",
-    },
-    {
-      value: readyChanges.length,
-      label: t("dashboard.ready"),
-      sub:
-        readyChanges.length > 0
-          ? `${readyChanges.map((c) => c.projectName).filter((v, i, a) => a.indexOf(v) === i).length} projects`
+        approvedChanges.length > 0
+          ? `${approvedChanges.map((c) => c.projectName).filter((v, i, a) => a.indexOf(v) === i).length} projects`
           : "All clear",
       icon: CheckCircle2,
       iconColor: "text-emerald-400",
@@ -218,6 +214,22 @@ export default function DashboardPage() {
                                 </span>
                               )}
                               <span className="font-medium">{item.change.name}</span>
+                              {item.change.labels.slice(0, 2).map((label) => (
+                                <span
+                                  key={String(label.id)}
+                                  className="ml-1 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none"
+                                  style={{
+                                    backgroundColor: `${label.color}18`,
+                                    color: label.color,
+                                  }}
+                                >
+                                  <span
+                                    className="h-1 w-1 rounded-full"
+                                    style={{ backgroundColor: label.color }}
+                                  />
+                                  {label.name}
+                                </span>
+                              ))}
                               <span className="text-muted-foreground">
                                 {" "}
                                 {t("dashboard.in")} {item.projectName}
@@ -296,6 +308,22 @@ export default function DashboardPage() {
                                       )}
                                       {item.change.name}
                                     </span>
+                                    {item.change.labels.slice(0, 2).map((label) => (
+                                      <span
+                                        key={String(label.id)}
+                                        className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none"
+                                        style={{
+                                          backgroundColor: `${label.color}18`,
+                                          color: label.color,
+                                        }}
+                                      >
+                                        <span
+                                          className="h-1 w-1 rounded-full"
+                                          style={{ backgroundColor: label.color }}
+                                        />
+                                        {label.name}
+                                      </span>
+                                    ))}
                                   </div>
                                   <span className={`text-xs font-medium ${config.color}`}>
                                     {config.label}

@@ -10,7 +10,7 @@ type DocumentType string
 
 const (
 	DocProposal DocumentType = "proposal"
-	DocDesign   DocumentType = "design"
+	DocSpec     DocumentType = "spec"
 	DocTasks    DocumentType = "tasks"
 )
 

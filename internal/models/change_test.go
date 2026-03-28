@@ -8,8 +8,8 @@ import (
 )
 
 func TestChangeStages(t *testing.T) {
-	stages := []ChangeStage{StageDraft, StageDesign, StageReview, StageReady}
-	expected := []string{"draft", "design", "review", "ready"}
+	stages := []ChangeStage{StageDraft, StageSpec, StageApproved}
+	expected := []string{"draft", "spec", "approved"}
 
 	for i, stage := range stages {
 		assert.Equal(t, expected[i], string(stage))
@@ -29,7 +29,7 @@ func TestChangeModel(t *testing.T) {
 
 func TestChangeStageOrder(t *testing.T) {
 	order := StageOrder()
-	require.Len(t, order, 4)
+	require.Len(t, order, 3)
 	assert.Equal(t, StageDraft, order[0])
-	assert.Equal(t, StageReady, order[3])
+	assert.Equal(t, StageApproved, order[2])
 }

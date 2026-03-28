@@ -3,10 +3,9 @@ package workflow
 import "github.com/gobenpark/colign/internal/models"
 
 var stageIndex = map[models.ChangeStage]int{
-	models.StageDraft:  0,
-	models.StageDesign: 1,
-	models.StageReview: 2,
-	models.StageReady:  3,
+	models.StageDraft:    0,
+	models.StageSpec:     1,
+	models.StageApproved: 2,
 }
 
 var stages = models.StageOrder()

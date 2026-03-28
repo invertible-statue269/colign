@@ -14,17 +14,13 @@ func TestCanTransition(t *testing.T) {
 		to      models.ChangeStage
 		allowed bool
 	}{
-		{models.StageDraft, models.StageDesign, true},
-		{models.StageDesign, models.StageReview, true},
-		{models.StageReview, models.StageReady, true},
+		{models.StageDraft, models.StageSpec, true},
+		{models.StageSpec, models.StageApproved, true},
 		// Can revert
-		{models.StageDesign, models.StageDraft, true},
-		{models.StageReview, models.StageDesign, true},
-		{models.StageReady, models.StageReview, true},
+		{models.StageSpec, models.StageDraft, true},
+		{models.StageApproved, models.StageSpec, true},
 		// Cannot skip
-		{models.StageDraft, models.StageReview, false},
-		{models.StageDraft, models.StageReady, false},
-		{models.StageDesign, models.StageReady, false},
+		{models.StageDraft, models.StageApproved, false},
 		// Cannot self-transition
 		{models.StageDraft, models.StageDraft, false},
 	}
@@ -41,10 +37,9 @@ func TestNextStage(t *testing.T) {
 		expected models.ChangeStage
 		hasNext  bool
 	}{
-		{models.StageDraft, models.StageDesign, true},
-		{models.StageDesign, models.StageReview, true},
-		{models.StageReview, models.StageReady, true},
-		{models.StageReady, "", false},
+		{models.StageDraft, models.StageSpec, true},
+		{models.StageSpec, models.StageApproved, true},
+		{models.StageApproved, "", false},
 	}
 
 	for _, tt := range tests {
@@ -63,9 +58,8 @@ func TestPrevStage(t *testing.T) {
 		hasPrev  bool
 	}{
 		{models.StageDraft, "", false},
-		{models.StageDesign, models.StageDraft, true},
-		{models.StageReview, models.StageDesign, true},
-		{models.StageReady, models.StageReview, true},
+		{models.StageSpec, models.StageDraft, true},
+		{models.StageApproved, models.StageSpec, true},
 	}
 
 	for _, tt := range tests {

@@ -45,7 +45,7 @@ func (s *Service) Archive(ctx context.Context, changeID, userID int64, orgID int
 		return nil, err
 	}
 
-	if change.Stage != models.StageReady {
+	if change.Stage != models.StageApproved {
 		return nil, ErrNotReady
 	}
 
@@ -225,8 +225,8 @@ func (s *Service) EvaluateAutoArchive(ctx context.Context, changeID int64) (bool
 		return false, err
 	}
 
-	// Only auto-archive changes in Ready stage that are not yet archived
-	if change.Stage != models.StageReady || change.ArchivedAt != nil {
+	// Only auto-archive changes in Approved stage that are not yet archived
+	if change.Stage != models.StageApproved || change.ArchivedAt != nil {
 		return false, nil
 	}
 
@@ -284,7 +284,7 @@ func shouldAutoArchive(trigger models.ArchiveTrigger, daysDelay int, allTasksDon
 	switch trigger {
 	case models.TriggerTasksDone:
 		return allTasksDone
-	case models.TriggerDaysAfterReady:
+	case models.TriggerDaysAfterApproved:
 		if readyAt == nil {
 			return false
 		}
@@ -327,12 +327,12 @@ func (s *Service) allTasksDone(ctx context.Context, changeID int64) (bool, error
 }
 
 // getReadyTimestamp returns the timestamp of the most recent workflow event
-// where the change transitioned to the "ready" stage.
+// where the change transitioned to the "approved" stage.
 func (s *Service) getReadyTimestamp(ctx context.Context, changeID int64) (*time.Time, error) {
 	event := new(models.WorkflowEvent)
 	err := s.db.NewSelect().Model(event).
 		Where("change_id = ?", changeID).
-		Where("to_stage = ?", "ready").
+		Where("to_stage = ?", "approved").
 		OrderExpr("created_at DESC").
 		Limit(1).
 		Scan(ctx)

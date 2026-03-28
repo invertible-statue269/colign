@@ -21,8 +21,6 @@ What problem does this solve? Why now?
 What's included in this change?
 ---SECTION:outOfScope---
 What's explicitly excluded?
----SECTION:approach---
-High-level implementation approach
 
 Write in the same language as the user's input.`)
 

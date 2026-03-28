@@ -24,6 +24,7 @@ func setupTestDB(t *testing.T) (*bun.DB, sqlmock.Sqlmock) {
 	require.NoError(t, err)
 	db := bun.NewDB(mockDB, pgdialect.New())
 	db.RegisterModel((*models.ProjectLabelAssignment)(nil))
+	db.RegisterModel((*models.ChangeLabelAssignment)(nil))
 	t.Cleanup(func() { _ = db.Close() })
 	return db, mock
 }
@@ -113,7 +114,7 @@ func TestListChanges_CrossTenantBlocked(t *testing.T) {
 	mock.ExpectQuery("SELECT").
 		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
 
-	_, err := svc.ListChanges(ctx, 1, "active", wrongOrgID)
+	_, err := svc.ListChanges(ctx, 1, "active", wrongOrgID, nil)
 	require.ErrorIs(t, err, ErrProjectNotFound)
 	require.NoError(t, mock.ExpectationsWereMet())
 }

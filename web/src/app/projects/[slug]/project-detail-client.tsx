@@ -47,6 +47,9 @@ import {
   Signal,
   Search,
   Settings,
+  List,
+  LayoutGrid,
+  Tag,
 } from "lucide-react";
 
 const stageConfig: Record<string, { label: string; color: string; icon: string; glow: string }> = {
@@ -56,20 +59,14 @@ const stageConfig: Record<string, { label: string; color: string; icon: string; 
     icon: "M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10",
     glow: "shadow-amber-500/5",
   },
-  design: {
-    label: "Design",
+  spec: {
+    label: "Spec",
     color: "bg-blue-500/10 text-blue-400 border-blue-500/20",
     icon: "M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42",
     glow: "shadow-blue-500/5",
   },
-  review: {
-    label: "Review",
-    color: "bg-violet-500/10 text-violet-400 border-violet-500/20",
-    icon: "M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178zM15 12a3 3 0 11-6 0 3 3 0 016 0z",
-    glow: "shadow-violet-500/5",
-  },
-  ready: {
-    label: "Ready",
+  approved: {
+    label: "Approved",
     color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
     icon: "M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
     glow: "shadow-emerald-500/5",
@@ -98,12 +95,19 @@ const healthConfig: Record<string, { label: string; dotColor: string }> = {
   off_track: { label: "Off Track", dotColor: "bg-red-400" },
 };
 
+interface ChangeLabel {
+  id: bigint;
+  name: string;
+  color: string;
+}
+
 interface Change {
   id: bigint;
   name: string;
   identifier?: string;
   stage: string;
   archivedAt?: { seconds: bigint; nanos: number };
+  labels: ChangeLabel[];
 }
 
 interface ProjectDetail {
@@ -257,6 +261,7 @@ export default function ProjectDetailClient() {
               identifier: c.identifier,
               stage: c.stage,
               archivedAt: c.archivedAt,
+              labels: (c.labels ?? []).map((l) => ({ id: l.id, name: l.name, color: l.color })),
             })),
           );
           setMemoryContent(memoryRes.memory?.content ?? "");
@@ -285,6 +290,11 @@ export default function ProjectDetailClient() {
             name: res.change!.name,
             stage: res.change!.stage,
             archivedAt: res.change!.archivedAt,
+            labels: (res.change!.labels ?? []).map((l) => ({
+              id: l.id,
+              name: l.name,
+              color: l.color,
+            })),
           },
           ...prev,
         ]);
@@ -880,6 +890,63 @@ function OverviewTab({
 
 // ─── Changes Tab ────────────────────────────────────────
 
+function ChangeRow({
+  change,
+  project,
+  t,
+}: {
+  change: Change;
+  project: Pick<ProjectDetail, "id" | "slug">;
+  t: (key: string) => string;
+}) {
+  const config = stageConfig[change.stage] ?? stageConfig.draft;
+  const maxLabels = 3;
+  const visibleLabels = change.labels.slice(0, maxLabels);
+  const extraCount = change.labels.length - maxLabels;
+
+  return (
+    <Link
+      href={toChangePath(project, change.id)}
+      className="group flex cursor-pointer items-center justify-between px-3 py-2.5 transition-colors duration-150 hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-inset"
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <span
+          className={`h-1.5 w-1.5 shrink-0 rounded-full ${config.color.split(" ")[0].replace("/10", "")}`}
+        />
+        {change.identifier && (
+          <span className="shrink-0 text-xs text-muted-foreground">{change.identifier}</span>
+        )}
+        <span className="truncate text-sm font-medium text-foreground">{change.name}</span>
+        {visibleLabels.length > 0 && (
+          <div className="flex items-center gap-1 shrink-0">
+            {visibleLabels.map((label) => (
+              <span
+                key={String(label.id)}
+                className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none"
+                style={{
+                  backgroundColor: `${label.color}18`,
+                  color: label.color,
+                }}
+              >
+                <span className="h-1 w-1 rounded-full" style={{ backgroundColor: label.color }} />
+                {label.name}
+              </span>
+            ))}
+            {extraCount > 0 && (
+              <span className="text-[10px] text-muted-foreground">+{extraCount}</span>
+            )}
+          </div>
+        )}
+      </div>
+      <span
+        className={`ml-3 inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-xs font-medium ${config.color}`}
+      >
+        {t(`stages.${change.stage}`)}
+      </span>
+    </Link>
+  );
+}
+
 function ChangesTab({
   project,
   initialChanges,
@@ -900,12 +967,25 @@ function ChangesTab({
   const { on } = useEvents();
   const [archiveFilter, setArchiveFilter] = useState<"active" | "archived">("active");
   const [stageFilters, setStageFilters] = useState<Set<string>>(new Set());
+  const [labelFilters, setLabelFilters] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<"flat" | "grouped">("flat");
+  const [orgLabels, setOrgLabels] = useState<ChangeLabel[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [activeChanges, setActiveChanges] = useState<Change[]>(initialChanges);
   const [archivedChanges, setArchivedChanges] = useState<Change[]>([]);
   const [archivedCount, setArchivedCount] = useState<number | null>(null);
   const [loadingArchived, setLoadingArchived] = useState(false);
+
+  // Load org labels
+  useEffect(() => {
+    projectClient
+      .listLabels({})
+      .then((res) => {
+        setOrgLabels(res.labels.map((l) => ({ id: l.id, name: l.name, color: l.color })));
+      })
+      .catch(() => {});
+  }, []);
 
   // Sync activeChanges when parent updates initialChanges (e.g. after create)
   useEffect(() => {
@@ -924,6 +1004,7 @@ function ChangesTab({
         name: c.name,
         stage: c.stage,
         archivedAt: c.archivedAt,
+        labels: (c.labels ?? []).map((l) => ({ id: l.id, name: l.name, color: l.color })),
       })),
     );
     setArchivedChanges(
@@ -932,6 +1013,7 @@ function ChangesTab({
         name: c.name,
         stage: c.stage,
         archivedAt: c.archivedAt,
+        labels: (c.labels ?? []).map((l) => ({ id: l.id, name: l.name, color: l.color })),
       })),
     );
     setArchivedCount(archivedRes.changes.length);
@@ -946,7 +1028,19 @@ function ChangesTab({
     });
   }, [on, reloadChanges, t]);
 
-  const stages = ["draft", "design", "review", "ready"] as const;
+  const stages = ["draft", "spec", "approved"] as const;
+
+  function toggleLabelFilter(labelId: string) {
+    setLabelFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(labelId)) {
+        next.delete(labelId);
+      } else {
+        next.add(labelId);
+      }
+      return next;
+    });
+  }
 
   function toggleStageFilter(stage: string) {
     setStageFilters((prev) => {
@@ -988,6 +1082,7 @@ function ChangesTab({
             name: c.name,
             stage: c.stage,
             archivedAt: c.archivedAt,
+            labels: (c.labels ?? []).map((l) => ({ id: l.id, name: l.name, color: l.color })),
           })),
         );
       })
@@ -1009,6 +1104,7 @@ function ChangesTab({
             name: c.name,
             stage: c.stage,
             archivedAt: c.archivedAt,
+            labels: (c.labels ?? []).map((l) => ({ id: l.id, name: l.name, color: l.color })),
           })),
         );
         setArchivedCount(res.changes.length);
@@ -1027,6 +1123,7 @@ function ChangesTab({
             name: c.name,
             stage: c.stage,
             archivedAt: c.archivedAt,
+            labels: (c.labels ?? []).map((l) => ({ id: l.id, name: l.name, color: l.color })),
           })),
         );
       } catch (err) {
@@ -1040,9 +1137,58 @@ function ChangesTab({
     stageFilters.size === 0 || archiveFilter === "archived"
       ? baseChanges
       : baseChanges.filter((c) => stageFilters.has(c.stage));
+  const filteredByLabel =
+    labelFilters.size === 0
+      ? filteredByStage
+      : filteredByStage.filter((c) => c.labels.some((l) => labelFilters.has(String(l.id))));
   const displayChanges = searchQuery.trim()
-    ? filteredByStage.filter((c) => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    : filteredByStage;
+    ? filteredByLabel.filter((c) => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : filteredByLabel;
+
+  // Grouped view: group changes by label
+  const groupedChanges = (() => {
+    if (viewMode !== "grouped") return null;
+    const groups: { label: ChangeLabel | null; changes: Change[] }[] = [];
+    const labelMap = new Map<string, Change[]>();
+    const unlabeled: Change[] = [];
+
+    for (const change of displayChanges) {
+      if (change.labels.length === 0) {
+        unlabeled.push(change);
+      } else {
+        for (const label of change.labels) {
+          const key = String(label.id);
+          if (!labelMap.has(key)) {
+            labelMap.set(key, []);
+          }
+          labelMap.get(key)!.push(change);
+        }
+      }
+    }
+
+    // Sort label groups by label name
+    const sortedEntries = [...labelMap.entries()].sort((a, b) => {
+      const labelA = displayChanges
+        .find((c) => c.labels.some((l) => String(l.id) === a[0]))
+        ?.labels.find((l) => String(l.id) === a[0]);
+      const labelB = displayChanges
+        .find((c) => c.labels.some((l) => String(l.id) === b[0]))
+        ?.labels.find((l) => String(l.id) === b[0]);
+      return (labelA?.name ?? "").localeCompare(labelB?.name ?? "");
+    });
+
+    for (const [labelId, changes] of sortedEntries) {
+      const label =
+        displayChanges.flatMap((c) => c.labels).find((l) => String(l.id) === labelId) ?? null;
+      groups.push({ label, changes });
+    }
+
+    if (unlabeled.length > 0) {
+      groups.push({ label: null, changes: unlabeled });
+    }
+
+    return groups;
+  })();
 
   return (
     <div>
@@ -1118,8 +1264,79 @@ function ChangesTab({
           </div>
         )}
 
+        {/* Label Filter Pills */}
+        {archiveFilter === "active" && orgLabels.length > 0 && (
+          <>
+            <div className="h-4 w-px bg-border/50" />
+            <div className="flex items-center gap-1">
+              <Tag className="size-3 text-muted-foreground/50" />
+              {orgLabels.map((label) => {
+                const count = activeChanges.filter((c) =>
+                  c.labels.some((l) => l.id === label.id),
+                ).length;
+                if (count === 0) return null;
+                const isSelected = labelFilters.has(String(label.id));
+                return (
+                  <button
+                    key={String(label.id)}
+                    onClick={() => toggleLabelFilter(String(label.id))}
+                    className={`cursor-pointer inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                      isSelected
+                        ? "bg-foreground/10 text-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
+                    }`}
+                  >
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: label.color }}
+                    />
+                    {label.name}
+                    <span className="text-[10px] tabular-nums opacity-60">{count}</span>
+                  </button>
+                );
+              })}
+              {labelFilters.size > 0 && (
+                <button
+                  onClick={() => setLabelFilters(new Set())}
+                  className="cursor-pointer text-[10px] text-muted-foreground hover:text-foreground px-1"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </>
+        )}
+
         {/* Spacer */}
         <div className="flex-1" />
+
+        {/* View Mode Toggle */}
+        {archiveFilter === "active" && (
+          <div className="flex items-center gap-0.5 rounded-lg bg-muted/50 p-0.5">
+            <button
+              onClick={() => setViewMode("flat")}
+              className={`cursor-pointer rounded-md p-1.5 transition-colors ${
+                viewMode === "flat"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              title={t("project.flat")}
+            >
+              <List className="size-3.5" />
+            </button>
+            <button
+              onClick={() => setViewMode("grouped")}
+              className={`cursor-pointer rounded-md p-1.5 transition-colors ${
+                viewMode === "grouped"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              title={t("project.grouped")}
+            >
+              <LayoutGrid className="size-3.5" />
+            </button>
+          </div>
+        )}
 
         {/* Search */}
         <div className="relative">
@@ -1152,7 +1369,8 @@ function ChangesTab({
           <div className="mb-5 rounded-2xl bg-primary/5 p-5">
             <FileText className="size-10 text-primary/40" />
           </div>
-          {(stageFilters.size > 0 || searchQuery.trim()) && baseChanges.length > 0 ? (
+          {(stageFilters.size > 0 || labelFilters.size > 0 || searchQuery.trim()) &&
+          baseChanges.length > 0 ? (
             <p className="text-sm font-medium text-foreground/70">
               {t("project.noMatchingChanges")}
             </p>
@@ -1167,37 +1385,48 @@ function ChangesTab({
             </>
           )}
         </div>
+      ) : viewMode === "grouped" && groupedChanges ? (
+        <div className="space-y-4">
+          {groupedChanges.map((group, gi) => (
+            <div
+              key={group.label ? String(group.label.id) : "unlabeled"}
+              className="rounded-xl border border-border/30 overflow-hidden"
+            >
+              {/* Group Header */}
+              <div className="flex items-center gap-2 border-b border-border/20 bg-muted/30 px-4 py-2">
+                {group.label ? (
+                  <>
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: group.label.color }}
+                    />
+                    <span className="text-xs font-semibold text-foreground">
+                      {group.label.name}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-xs font-semibold text-muted-foreground">
+                    {t("project.unlabeled")}
+                  </span>
+                )}
+                <span className="text-[10px] tabular-nums text-muted-foreground">
+                  {group.changes.length}
+                </span>
+              </div>
+              {/* Group Items */}
+              <div className="divide-y divide-border/20">
+                {group.changes.map((change) => (
+                  <ChangeRow key={String(change.id)} change={change} project={project} t={t} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="divide-y divide-border/30">
-          {displayChanges.map((change) => {
-            const config = stageConfig[change.stage] ?? stageConfig.draft;
-            return (
-              <Link
-                key={String(change.id)}
-                href={toChangePath(project, change.id)}
-                className="group flex cursor-pointer items-center justify-between px-3 py-2.5 transition-colors duration-150 hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-inset"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span
-                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${config.color.split(" ")[0].replace("/10", "")}`}
-                  />
-                  {change.identifier && (
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {change.identifier}
-                    </span>
-                  )}
-                  <span className="truncate text-sm font-medium text-foreground">
-                    {change.name}
-                  </span>
-                </div>
-                <span
-                  className={`ml-3 inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-xs font-medium ${config.color}`}
-                >
-                  {t(`stages.${change.stage}`)}
-                </span>
-              </Link>
-            );
-          })}
+          {displayChanges.map((change) => (
+            <ChangeRow key={String(change.id)} change={change} project={project} t={t} />
+          ))}
         </div>
       )}
 

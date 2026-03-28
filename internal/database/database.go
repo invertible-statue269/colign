@@ -16,6 +16,7 @@ func New(dsn string, verbose bool) *bun.DB {
 	db := bun.NewDB(sqldb, pgdialect.New())
 
 	db.RegisterModel((*models.ProjectLabelAssignment)(nil))
+	db.RegisterModel((*models.ChangeLabelAssignment)(nil))
 
 	if verbose {
 		db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithVerbose(true)))

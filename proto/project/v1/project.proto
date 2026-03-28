@@ -55,6 +55,7 @@ message Change {
   optional google.protobuf.Timestamp archived_at = 7;
   int32 number = 8;
   string identifier = 9;
+  repeated ProjectLabel labels = 10;
 }
 
 // Project CRUD
@@ -168,6 +169,7 @@ message CreateChangeResponse {
 message ListChangesRequest {
   int64 project_id = 1;
   optional string filter = 2;
+  repeated int64 label_ids = 3;
 }
 
 message ListChangesResponse {
@@ -232,6 +234,24 @@ message UpdateArchivePolicyResponse {
   ArchivePolicyMsg policy = 1;
 }
 
+// Change Label management
+
+message AssignChangeLabelRequest {
+  int64 change_id = 1;
+  int64 label_id = 2;
+  int64 project_id = 3;
+}
+
+message AssignChangeLabelResponse {}
+
+message RemoveChangeLabelRequest {
+  int64 change_id = 1;
+  int64 label_id = 2;
+  int64 project_id = 3;
+}
+
+message RemoveChangeLabelResponse {}
+
 // Search
 message SearchRequest {
   string query = 1;
@@ -269,5 +289,7 @@ service ProjectService {
   rpc UnarchiveChange(UnarchiveChangeRequest) returns (UnarchiveChangeResponse) {}
   rpc GetArchivePolicy(GetArchivePolicyRequest) returns (GetArchivePolicyResponse) {}
   rpc UpdateArchivePolicy(UpdateArchivePolicyRequest) returns (UpdateArchivePolicyResponse) {}
+  rpc AssignChangeLabel(AssignChangeLabelRequest) returns (AssignChangeLabelResponse) {}
+  rpc RemoveChangeLabel(RemoveChangeLabelRequest) returns (RemoveChangeLabelResponse) {}
   rpc Search(SearchRequest) returns (SearchResponse) {}
 }

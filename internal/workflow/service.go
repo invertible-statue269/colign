@@ -82,7 +82,7 @@ func (s *Service) EvaluateAndAdvance(ctx context.Context, changeID int64, orgID 
 	}
 	_, _ = s.db.NewInsert().Model(event).Exec(ctx)
 
-	// TODO: trigger task generation when entering Ready stage
+	// TODO: trigger task generation when entering Approved stage
 
 	return true, nil
 }

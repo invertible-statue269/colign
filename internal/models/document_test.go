@@ -7,8 +7,8 @@ import (
 )
 
 func TestDocumentTypes(t *testing.T) {
-	types := []DocumentType{DocProposal, DocDesign, DocTasks}
-	expected := []string{"proposal", "design", "tasks"}
+	types := []DocumentType{DocProposal, DocSpec, DocTasks}
+	expected := []string{"proposal", "spec", "tasks"}
 
 	for i, dt := range types {
 		assert.Equal(t, expected[i], string(dt))

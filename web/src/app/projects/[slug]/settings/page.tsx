@@ -178,7 +178,7 @@ export default function ProjectSettingsPage() {
   }
 
   const showDaysInput =
-    archiveTrigger === "days_after_ready" || archiveTrigger === "tasks_done_and_days";
+    archiveTrigger === "days_after_approved" || archiveTrigger === "tasks_done_and_days";
 
   return (
     <div className="min-h-screen">
@@ -450,8 +450,8 @@ export default function ProjectSettingsPage() {
                             <SelectItem value="tasks_done" className="cursor-pointer">
                               {t("projectSettings.archiveTriggerTasksDone")}
                             </SelectItem>
-                            <SelectItem value="days_after_ready" className="cursor-pointer">
-                              {t("projectSettings.archiveTriggerDaysAfterReady")}
+                            <SelectItem value="days_after_approved" className="cursor-pointer">
+                              {t("projectSettings.archiveTriggerDaysAfterApproved")}
                             </SelectItem>
                             <SelectItem value="tasks_done_and_days" className="cursor-pointer">
                               {t("projectSettings.archiveTriggerTasksDoneAndDays")}

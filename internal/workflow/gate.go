@@ -32,16 +32,13 @@ func (g *GateChecker) Check(stage models.ChangeStage, input GateInput) []GateCon
 				Met:         input.HasProposal,
 			},
 		}
-	case models.StageDesign:
+	case models.StageSpec:
 		return []GateCondition{
 			{
-				Name:        "design",
-				Description: "Design document saved",
+				Name:        "spec",
+				Description: "Spec document saved",
 				Met:         input.HasDesign,
 			},
-		}
-	case models.StageReview:
-		return []GateCondition{
 			{
 				Name:        "approvals",
 				Description: "Required approvals received",

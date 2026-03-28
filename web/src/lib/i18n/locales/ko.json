@@ -77,6 +77,10 @@
     "noChanges": "변경 사항이 없습니다",
     "noMatchingChanges": "현재 필터에 맞는 Change가 없습니다",
     "allStages": "전체",
+    "allLabels": "전체 라벨",
+    "grouped": "그룹",
+    "flat": "목록",
+    "unlabeled": "라벨 없음",
     "createFirstChange": "첫 번째 Change를 만들어 SDD 워크플로우를 시작하세요",
     "newChangePlaceholder": "새 Change 이름 (예: add-user-auth)",
     "editProject": "프로젝트 수정",
@@ -101,8 +105,7 @@
   "change": {
     "workflow": "워크플로우",
     "proposal": "제안",
-    "design": "설계",
-    "specs": "스펙",
+    "spec": "스펙",
     "tasks": "태스크",
     "aiChat": "AI 채팅",
     "gateConditions": "게이트 조건",
@@ -127,7 +130,10 @@
     "noGateConditions": "게이트 조건이 없습니다",
     "advanceTo": "{stage}(으)로 이동",
     "advanceGateWarning": "게이트 조건이 모두 충족되지 않았습니다. 그래도 진행할까요?",
-    "advanceConfirm": "예, 진행"
+    "advanceConfirm": "예, 진행",
+    "labels": "라벨",
+    "addLabel": "라벨 추가",
+    "removeLabel": "라벨 제거"
   },
   "proposal": {
     "problem": "Problem",
@@ -136,8 +142,6 @@
     "scopePlaceholder": "무엇이 변경되나요? 새로운 기능, 수정, 제거 사항을 구체적으로 작성하세요.",
     "outOfScope": "Out of Scope",
     "outOfScopePlaceholder": "이 변경에 명시적으로 포함되지 않는 것은?",
-    "approach": "Technical Approach",
-    "approachPlaceholder": "어떻게 구현할 건가요? 핵심 기술 결정과 근거를 작성하세요.",
     "required": "필수",
     "optional": "선택",
     "collapse": "접기",
@@ -185,8 +189,7 @@
     "title": "대시보드",
     "projects": "프로젝트",
     "activeChanges": "진행 중인 변경",
-    "inReview": "리뷰 중",
-    "ready": "준비 완료",
+    "approved": "승인됨",
     "recentActivity": "최근 활동",
     "recentChanges": "최근 변경사항",
     "noActivity": "최근 활동이 없습니다",
@@ -258,9 +261,8 @@
   },
   "stages": {
     "draft": "초안",
-    "design": "설계",
-    "review": "리뷰",
-    "ready": "준비 완료"
+    "spec": "스펙",
+    "approved": "승인됨"
   },
   "ac": {
     "title": "인수 조건",
@@ -456,7 +458,7 @@
     "archiveModeAuto": "자동",
     "archiveTrigger": "보관 트리거",
     "archiveTriggerTasksDone": "모든 태스크 완료 시",
-    "archiveTriggerDaysAfterReady": "Ready 도달 후 일수",
+    "archiveTriggerDaysAfterApproved": "Approved 도달 후 일수",
     "archiveTriggerTasksDoneAndDays": "태스크 완료 및 Ready 후 일수",
     "archiveDaysDelay": "지연 일수",
     "saveArchivePolicy": "보관 정책 저장",

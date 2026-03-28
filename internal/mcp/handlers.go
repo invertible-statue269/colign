@@ -505,7 +505,7 @@ func (s *Server) handleSuggestSpec(ctx context.Context, args json.RawMessage) (a
 	return map[string]any{
 		"current_content": currentContent,
 		"doc_type":        params.DocType,
-		"suggestion":      "Review the current content and suggest improvements based on the document type. For proposals, ensure Problem, Scope, and Approach sections are clear. For designs, ensure architecture decisions and implementation steps are well-defined.",
+		"suggestion":      "Review the current content and suggest improvements based on the document type. For proposals, ensure Problem, Scope, and Out of Scope sections are clear. For specs, ensure architecture decisions and implementation steps are well-defined.",
 	}, nil
 }
 

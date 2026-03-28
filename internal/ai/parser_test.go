@@ -76,9 +76,9 @@ func TestSectionParser_PreservesEmptyLines(t *testing.T) {
 	assert.Contains(t, text, "Line 3")
 }
 
-func TestSectionParser_FourSections(t *testing.T) {
+func TestSectionParser_ThreeSections(t *testing.T) {
 	p := NewSectionParser()
-	input := "---SECTION:problem---\nP\n---SECTION:scope---\nS\n---SECTION:outOfScope---\nO\n---SECTION:approach---\nA\n"
+	input := "---SECTION:problem---\nP\n---SECTION:scope---\nS\n---SECTION:outOfScope---\nO\n"
 	chunks := p.Feed(input)
 
 	sections := map[string]string{}
@@ -88,5 +88,4 @@ func TestSectionParser_FourSections(t *testing.T) {
 	assert.Contains(t, sections["problem"], "P")
 	assert.Contains(t, sections["scope"], "S")
 	assert.Contains(t, sections["outOfScope"], "O")
-	assert.Contains(t, sections["approach"], "A")
 }

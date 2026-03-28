@@ -25,6 +25,7 @@ func setupTestDB(t *testing.T) (*bun.DB, sqlmock.Sqlmock) {
 	require.NoError(t, err)
 	db := bun.NewDB(mockDB, pgdialect.New())
 	db.RegisterModel((*models.ProjectLabelAssignment)(nil))
+	db.RegisterModel((*models.ChangeLabelAssignment)(nil))
 	t.Cleanup(func() { _ = db.Close() })
 	return db, mock
 }
@@ -47,18 +48,18 @@ func TestShouldAutoArchive(t *testing.T) {
 		assert.False(t, result)
 	})
 
-	t.Run("days_after_ready: true when enough days passed", func(t *testing.T) {
-		result := shouldAutoArchive(models.TriggerDaysAfterReady, 1, false, &readyAt)
+	t.Run("days_after_approved: true when enough days passed", func(t *testing.T) {
+		result := shouldAutoArchive(models.TriggerDaysAfterApproved, 1, false, &readyAt)
 		assert.True(t, result)
 	})
 
-	t.Run("days_after_ready: false when not enough days passed", func(t *testing.T) {
-		result := shouldAutoArchive(models.TriggerDaysAfterReady, 5, false, &readyAt)
+	t.Run("days_after_approved: false when not enough days passed", func(t *testing.T) {
+		result := shouldAutoArchive(models.TriggerDaysAfterApproved, 5, false, &readyAt)
 		assert.False(t, result)
 	})
 
-	t.Run("days_after_ready: false when readyAt is nil", func(t *testing.T) {
-		result := shouldAutoArchive(models.TriggerDaysAfterReady, 1, false, nil)
+	t.Run("days_after_approved: false when readyAt is nil", func(t *testing.T) {
+		result := shouldAutoArchive(models.TriggerDaysAfterApproved, 1, false, nil)
 		assert.False(t, result)
 	})
 
@@ -114,7 +115,7 @@ func TestArchive(t *testing.T) {
 		ctx := context.Background()
 
 		rows := sqlmock.NewRows([]string{"id", "project_id", "name", "stage", "change_type", "created_at", "updated_at", "archived_at"}).
-			AddRow(int64(1), int64(1), "Test Change", "design", "feature", time.Now(), time.Now(), nil)
+			AddRow(int64(1), int64(1), "Test Change", "spec", "feature", time.Now(), time.Now(), nil)
 		mock.ExpectQuery("SELECT").
 			WillReturnRows(rows)
 
@@ -131,7 +132,7 @@ func TestArchive(t *testing.T) {
 
 		archivedAt := time.Now()
 		rows := sqlmock.NewRows([]string{"id", "project_id", "name", "stage", "change_type", "created_at", "updated_at", "archived_at"}).
-			AddRow(int64(1), int64(1), "Test Change", "ready", "feature", time.Now(), time.Now(), archivedAt)
+			AddRow(int64(1), int64(1), "Test Change", "approved", "feature", time.Now(), time.Now(), archivedAt)
 		mock.ExpectQuery("SELECT").
 			WillReturnRows(rows)
 
@@ -147,7 +148,7 @@ func TestArchive(t *testing.T) {
 		ctx := context.Background()
 
 		rows := sqlmock.NewRows([]string{"id", "project_id", "name", "stage", "change_type", "created_at", "updated_at", "archived_at"}).
-			AddRow(int64(1), int64(1), "Test Change", "ready", "feature", time.Now(), time.Now(), nil)
+			AddRow(int64(1), int64(1), "Test Change", "approved", "feature", time.Now(), time.Now(), nil)
 		mock.ExpectQuery("SELECT").
 			WillReturnRows(rows)
 
@@ -192,7 +193,7 @@ func TestUnarchive(t *testing.T) {
 		ctx := context.Background()
 
 		rows := sqlmock.NewRows([]string{"id", "project_id", "name", "stage", "change_type", "created_at", "updated_at", "archived_at"}).
-			AddRow(int64(1), int64(1), "Test Change", "ready", "feature", time.Now(), time.Now(), nil)
+			AddRow(int64(1), int64(1), "Test Change", "approved", "feature", time.Now(), time.Now(), nil)
 		mock.ExpectQuery("SELECT").
 			WillReturnRows(rows)
 
@@ -209,7 +210,7 @@ func TestUnarchive(t *testing.T) {
 
 		archivedAt := time.Now()
 		rows := sqlmock.NewRows([]string{"id", "project_id", "name", "stage", "change_type", "created_at", "updated_at", "archived_at"}).
-			AddRow(int64(1), int64(1), "Test Change", "ready", "feature", time.Now(), time.Now(), archivedAt)
+			AddRow(int64(1), int64(1), "Test Change", "approved", "feature", time.Now(), time.Now(), archivedAt)
 		mock.ExpectQuery("SELECT").
 			WillReturnRows(rows)
 

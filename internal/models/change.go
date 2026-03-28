@@ -9,14 +9,13 @@ import (
 type ChangeStage string
 
 const (
-	StageDraft  ChangeStage = "draft"
-	StageDesign ChangeStage = "design"
-	StageReview ChangeStage = "review"
-	StageReady  ChangeStage = "ready"
+	StageDraft    ChangeStage = "draft"
+	StageSpec     ChangeStage = "spec"
+	StageApproved ChangeStage = "approved"
 )
 
 func StageOrder() []ChangeStage {
-	return []ChangeStage{StageDraft, StageDesign, StageReview, StageReady}
+	return []ChangeStage{StageDraft, StageSpec, StageApproved}
 }
 
 type ChangeType string
@@ -40,5 +39,15 @@ type Change struct {
 	UpdatedAt  time.Time   `bun:"updated_at,notnull,default:current_timestamp"`
 	ArchivedAt *time.Time  `bun:"archived_at"`
 
-	Project *Project `bun:"rel:belongs-to,join:project_id=id"`
+	Project *Project       `bun:"rel:belongs-to,join:project_id=id"`
+	Labels  []ProjectLabel `bun:"m2m:change_label_assignments,join:Change=Label"`
+}
+
+type ChangeLabelAssignment struct {
+	bun.BaseModel `bun:"table:change_label_assignments"`
+
+	ChangeID int64         `bun:"change_id,pk"`
+	LabelID  int64         `bun:"label_id,pk"`
+	Change   *Change       `bun:"rel:belongs-to,join:change_id=id"`
+	Label    *ProjectLabel `bun:"rel:belongs-to,join:label_id=id"`
 }

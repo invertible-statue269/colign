@@ -13,7 +13,7 @@ func TestProposalSystemPrompt_WithoutContext(t *testing.T) {
 	assert.Contains(t, prompt, "---SECTION:problem---")
 	assert.Contains(t, prompt, "---SECTION:scope---")
 	assert.Contains(t, prompt, "---SECTION:outOfScope---")
-	assert.Contains(t, prompt, "---SECTION:approach---")
+	assert.NotContains(t, prompt, "---SECTION:approach---")
 	assert.NotContains(t, prompt, "Project context:")
 }
 

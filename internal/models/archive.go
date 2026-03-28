@@ -16,9 +16,9 @@ const (
 type ArchiveTrigger string
 
 const (
-	TriggerTasksDone        ArchiveTrigger = "tasks_done"
-	TriggerDaysAfterReady   ArchiveTrigger = "days_after_ready"
-	TriggerTasksDoneAndDays ArchiveTrigger = "tasks_done_and_days"
+	TriggerTasksDone         ArchiveTrigger = "tasks_done"
+	TriggerDaysAfterApproved ArchiveTrigger = "days_after_approved"
+	TriggerTasksDoneAndDays  ArchiveTrigger = "tasks_done_and_days"
 )
 
 type ArchivePolicy struct {

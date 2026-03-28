@@ -614,7 +614,7 @@ func (s *Service) CreateChange(ctx context.Context, projectID int64, name string
 	return change, nil
 }
 
-func (s *Service) ListChanges(ctx context.Context, projectID int64, filter string, orgID int64) ([]models.Change, error) {
+func (s *Service) ListChanges(ctx context.Context, projectID int64, filter string, orgID int64, labelIDs []int64) ([]models.Change, error) {
 	exists, err := s.db.NewSelect().Model((*models.Project)(nil)).
 		Where("id = ?", projectID).
 		Where("organization_id = ?", orgID).
@@ -628,21 +628,32 @@ func (s *Service) ListChanges(ctx context.Context, projectID int64, filter strin
 
 	var changes []models.Change
 	q := s.db.NewSelect().Model(&changes).
-		Where("project_id = ?", projectID).
-		OrderExpr("created_at DESC")
+		Where("ch.project_id = ?", projectID).
+		OrderExpr("ch.created_at DESC")
 
 	switch filter {
 	case "archived":
-		q = q.Where("archived_at IS NOT NULL")
+		q = q.Where("ch.archived_at IS NOT NULL")
 	case "all":
 		// no filter
 	default: // "active" or empty
-		q = q.Where("archived_at IS NULL")
+		q = q.Where("ch.archived_at IS NULL")
+	}
+
+	if len(labelIDs) > 0 {
+		q = q.Join("JOIN change_label_assignments AS cla ON cla.change_id = ch.id").
+			Where("cla.label_id IN (?)", bun.List(labelIDs)).
+			GroupExpr("ch.id")
 	}
 
 	if err := q.Scan(ctx); err != nil {
 		return nil, err
 	}
+
+	if err := s.loadChangeLabels(ctx, changes); err != nil {
+		return nil, err
+	}
+
 	return changes, nil
 }
 
@@ -659,7 +670,115 @@ func (s *Service) GetChange(ctx context.Context, id int64, orgID int64) (*models
 		}
 		return nil, err
 	}
+
+	changes := []models.Change{*change}
+	if err := s.loadChangeLabels(ctx, changes); err != nil {
+		return nil, err
+	}
+	change.Labels = changes[0].Labels
+
 	return change, nil
+}
+
+// loadChangeLabels batch-loads labels for a slice of changes (N+1 prevention).
+func (s *Service) loadChangeLabels(ctx context.Context, changes []models.Change) error {
+	if len(changes) == 0 {
+		return nil
+	}
+
+	changeIDs := make([]int64, len(changes))
+	for i, c := range changes {
+		changeIDs[i] = c.ID
+	}
+
+	var assignments []struct {
+		ChangeID int64 `bun:"change_id"`
+		LabelID  int64 `bun:"label_id"`
+		Name     string
+		Color    string
+	}
+	err := s.db.NewSelect().
+		TableExpr("change_label_assignments AS cla").
+		Join("JOIN project_labels AS pl ON pl.id = cla.label_id").
+		ColumnExpr("cla.change_id, cla.label_id, pl.name, pl.color").
+		Where("cla.change_id IN (?)", bun.List(changeIDs)).
+		OrderExpr("pl.name ASC").
+		Scan(ctx, &assignments)
+	if err != nil {
+		return err
+	}
+
+	labelMap := make(map[int64][]models.ProjectLabel)
+	for _, a := range assignments {
+		labelMap[a.ChangeID] = append(labelMap[a.ChangeID], models.ProjectLabel{
+			ID:    a.LabelID,
+			Name:  a.Name,
+			Color: a.Color,
+		})
+	}
+
+	for i := range changes {
+		changes[i].Labels = labelMap[changes[i].ID]
+	}
+	return nil
+}
+
+func (s *Service) AssignChangeLabel(ctx context.Context, changeID, labelID, orgID int64) error {
+	// Verify change belongs to an org project
+	exists, err := s.db.NewSelect().
+		TableExpr("changes AS ch").
+		Join("JOIN projects AS p ON p.id = ch.project_id").
+		Where("ch.id = ?", changeID).
+		Where("p.organization_id = ?", orgID).
+		Exists(ctx)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return ErrProjectNotFound
+	}
+
+	// Verify label belongs to org
+	exists, err = s.db.NewSelect().Model((*models.ProjectLabel)(nil)).
+		Where("id = ?", labelID).
+		Where("organization_id = ?", orgID).
+		Exists(ctx)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return ErrProjectNotFound
+	}
+
+	assignment := &models.ChangeLabelAssignment{
+		ChangeID: changeID,
+		LabelID:  labelID,
+	}
+	_, err = s.db.NewInsert().Model(assignment).
+		On("CONFLICT (change_id, label_id) DO NOTHING").
+		Exec(ctx)
+	return err
+}
+
+func (s *Service) RemoveChangeLabel(ctx context.Context, changeID, labelID, orgID int64) error {
+	exists, err := s.db.NewSelect().
+		TableExpr("changes AS ch").
+		Join("JOIN projects AS p ON p.id = ch.project_id").
+		Where("ch.id = ?", changeID).
+		Where("p.organization_id = ?", orgID).
+		Exists(ctx)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return ErrProjectNotFound
+	}
+
+	_, err = s.db.NewDelete().Model((*models.ChangeLabelAssignment)(nil)).
+		Where("change_id = ?", changeID).
+		Where("label_id = ?", labelID).
+		Exec(ctx)
+	return err
 }
 
 // GetChangeOG returns minimal change info for Open Graph metadata without auth.

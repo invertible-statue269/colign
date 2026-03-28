@@ -33,15 +33,13 @@ interface WorkflowPanelProps {
 
 const stageConfig: Record<string, { label: string; color: string }> = {
   draft: { label: "Draft", color: "text-yellow-400" },
-  design: { label: "Design", color: "text-blue-400" },
-  review: { label: "Review", color: "text-purple-400" },
-  ready: { label: "Ready", color: "text-emerald-400" },
+  spec: { label: "Spec", color: "text-blue-400" },
+  approved: { label: "Approved", color: "text-emerald-400" },
 };
 
 const nextStageLabel: Record<string, string> = {
-  draft: "Design",
-  design: "Review",
-  review: "Ready",
+  draft: "Spec",
+  spec: "Approved",
 };
 
 export function WorkflowPanel({
@@ -114,12 +112,12 @@ export function WorkflowPanel({
             </ul>
             <Separator className="my-5" />
             <div className="flex flex-wrap gap-2">
-              {stage !== "ready" && (
+              {stage !== "approved" && (
                 <Button onClick={onAdvance} size="sm" className="cursor-pointer">
                   Advance to {nextStageLabel[stage] ?? "next"}
                 </Button>
               )}
-              {stage === "review" && (
+              {stage === "spec" && (
                 <>
                   <Button
                     onClick={onApprove}

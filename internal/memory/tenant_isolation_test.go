@@ -18,6 +18,7 @@ func setupTestDB(t *testing.T) (*bun.DB, sqlmock.Sqlmock) {
 	require.NoError(t, err)
 	db := bun.NewDB(mockDB, pgdialect.New())
 	db.RegisterModel((*models.ProjectLabelAssignment)(nil))
+	db.RegisterModel((*models.ChangeLabelAssignment)(nil))
 	t.Cleanup(func() { _ = db.Close() })
 	return db, mock
 }

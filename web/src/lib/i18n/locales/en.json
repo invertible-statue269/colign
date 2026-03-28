@@ -77,6 +77,10 @@
     "noChanges": "No changes yet",
     "noMatchingChanges": "No changes match the current filter",
     "allStages": "All",
+    "allLabels": "All Labels",
+    "grouped": "Grouped",
+    "flat": "List",
+    "unlabeled": "Unlabeled",
     "createFirstChange": "Create your first change to start the SDD workflow",
     "newChangePlaceholder": "New change name (e.g., add-user-auth)",
     "editProject": "Edit project",
@@ -101,8 +105,7 @@
   "change": {
     "workflow": "Workflow",
     "proposal": "Proposal",
-    "design": "Design",
-    "specs": "Specs",
+    "spec": "Spec",
     "tasks": "Tasks",
     "aiChat": "AI Chat",
     "gateConditions": "Gate Conditions",
@@ -127,7 +130,10 @@
     "noGateConditions": "No gate conditions",
     "advanceTo": "Advance to {stage}",
     "advanceGateWarning": "Gate conditions are not fully met. Advance anyway?",
-    "advanceConfirm": "Yes, advance"
+    "advanceConfirm": "Yes, advance",
+    "labels": "Labels",
+    "addLabel": "Add label",
+    "removeLabel": "Remove label"
   },
   "proposal": {
     "problem": "Problem",
@@ -136,8 +142,6 @@
     "scopePlaceholder": "What will change? List specific capabilities, modifications, or removals.",
     "outOfScope": "Out of Scope",
     "outOfScopePlaceholder": "What is explicitly NOT part of this change?",
-    "approach": "Technical Approach",
-    "approachPlaceholder": "How will this be implemented? Key technical decisions and rationale.",
     "required": "Required",
     "optional": "Optional",
     "collapse": "Collapse",
@@ -185,8 +189,7 @@
     "title": "Dashboard",
     "projects": "Projects",
     "activeChanges": "Active Changes",
-    "inReview": "In Review",
-    "ready": "Ready",
+    "approved": "Approved",
     "recentActivity": "Recent Activity",
     "recentChanges": "Recent Changes",
     "noActivity": "No recent activity",
@@ -258,9 +261,8 @@
   },
   "stages": {
     "draft": "Draft",
-    "design": "Design",
-    "review": "Review",
-    "ready": "Ready"
+    "spec": "Spec",
+    "approved": "Approved"
   },
   "ac": {
     "title": "Acceptance Criteria",
@@ -456,7 +458,7 @@
     "archiveModeAuto": "Automatic",
     "archiveTrigger": "Archive Trigger",
     "archiveTriggerTasksDone": "When all tasks are done",
-    "archiveTriggerDaysAfterReady": "Days after reaching Ready",
+    "archiveTriggerDaysAfterApproved": "Days after reaching Approved",
     "archiveTriggerTasksDoneAndDays": "Tasks done and days after Ready",
     "archiveDaysDelay": "Days Delay",
     "saveArchivePolicy": "Save Archive Policy",

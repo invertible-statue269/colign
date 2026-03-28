@@ -6,7 +6,7 @@ import (
 
 // SectionChunk represents a piece of text belonging to a named section.
 type SectionChunk struct {
-	Section string // "problem", "scope", "outOfScope", "approach"
+	Section string // "problem", "scope", "outOfScope"
 	Text    string
 }
 

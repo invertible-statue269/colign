@@ -14,10 +14,9 @@ func TestShouldTriggerTaskGeneration(t *testing.T) {
 		to      models.ChangeStage
 		trigger bool
 	}{
-		{models.StageReview, models.StageReady, true},
-		{models.StageDraft, models.StageDesign, false},
-		{models.StageDesign, models.StageReview, false},
-		{models.StageReady, models.StageReview, false}, // revert
+		{models.StageSpec, models.StageApproved, true},
+		{models.StageDraft, models.StageSpec, false},
+		{models.StageApproved, models.StageSpec, false}, // revert
 	}
 
 	for _, tt := range tests {

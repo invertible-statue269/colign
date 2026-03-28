@@ -59,27 +59,27 @@ func ListTools() []Tool {
 		},
 		{
 			Name:        "read_spec",
-			Description: "Read a spec document for a change. For proposals, the content field is a JSON string with keys: problem, scope, outOfScope, approach.",
+			Description: "Read a spec document for a change. For proposals, the content field is a JSON string with keys: problem, scope, outOfScope.",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]Property{
 					"change_id":  {Type: "integer", Description: "Change ID"},
 					"project_id": {Type: "integer", Description: "Project ID"},
-					"doc_type":   {Type: "string", Description: "Document type: proposal, design, spec, tasks"},
+					"doc_type":   {Type: "string", Description: "Document type: proposal, spec, tasks"},
 				},
 				Required: []string{"change_id", "project_id", "doc_type"},
 			},
 		},
 		{
 			Name:        "write_spec",
-			Description: "Write or update a spec document for a change. For proposals, content must be a JSON string with keys: problem (required), scope (required), outOfScope (optional), approach (optional). Example: {\"problem\":\"...\",\"scope\":\"...\",\"outOfScope\":\"...\",\"approach\":\"...\"}. For other doc types, content is plain markdown.",
+			Description: "Write or update a spec document for a change. For proposals, content must be a JSON string with keys: problem (required), scope (required), outOfScope (optional). Example: {\"problem\":\"...\",\"scope\":\"...\",\"outOfScope\":\"...\"}. For other doc types, content is plain markdown.",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]Property{
 					"change_id":  {Type: "integer", Description: "Change ID"},
 					"project_id": {Type: "integer", Description: "Project ID"},
-					"doc_type":   {Type: "string", Description: "Document type: proposal, design, spec, tasks"},
-					"content":    {Type: "string", Description: "For proposal: JSON with problem, scope, outOfScope, approach. For others: markdown text."},
+					"doc_type":   {Type: "string", Description: "Document type: proposal, spec, tasks"},
+					"content":    {Type: "string", Description: "For proposal: JSON with problem, scope, outOfScope. For others: markdown text."},
 				},
 				Required: []string{"change_id", "project_id", "doc_type", "content"},
 			},
@@ -243,7 +243,7 @@ func ListTools() []Tool {
 		},
 		{
 			Name:        "advance_stage",
-			Description: "Advance a change to the next workflow stage (draft -> design -> review -> ready)",
+			Description: "Advance a change to the next workflow stage (draft -> spec -> approved)",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]Property{
@@ -361,7 +361,7 @@ func ListTools() []Tool {
 		},
 		{
 			Name:        "approve_change",
-			Description: "Approve a change in review stage. If approval policy is met, the change advances automatically.",
+			Description: "Approve a change in spec stage. If approval policy is met, the change advances automatically.",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]Property{
@@ -374,7 +374,7 @@ func ListTools() []Tool {
 		},
 		{
 			Name:        "reject_change",
-			Description: "Request changes on a review, sending the change back to design stage.",
+			Description: "Request changes on a review, sending the change back to draft stage.",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]Property{

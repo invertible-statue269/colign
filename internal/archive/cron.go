@@ -33,11 +33,11 @@ func (s *Service) StartCron(ctx context.Context) {
 func (s *Service) runAutoArchiveScan(ctx context.Context) {
 	var changes []models.Change
 	err := s.db.NewSelect().Model(&changes).
-		Where("stage = ?", models.StageReady).
+		Where("stage = ?", models.StageApproved).
 		Where("archived_at IS NULL").
 		Scan(ctx)
 	if err != nil {
-		slog.Error("archive cron: failed to list ready changes", "error", err)
+		slog.Error("archive cron: failed to list approved changes", "error", err)
 		return
 	}
 

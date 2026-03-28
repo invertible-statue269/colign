@@ -40,38 +40,32 @@ const stageConfig: Record<
     activeColor: "border-yellow-400 bg-yellow-400/10",
     icon: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z",
   },
-  design: {
-    label: "Design",
+  spec: {
+    label: "Spec",
     color: "text-blue-400",
     activeColor: "border-blue-400 bg-blue-400/10",
     icon: "M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z",
   },
-  review: {
-    label: "Review",
-    color: "text-purple-400",
-    activeColor: "border-purple-400 bg-purple-400/10",
-    icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-  ready: {
-    label: "Ready",
+  approved: {
+    label: "Approved",
     color: "text-emerald-400",
     activeColor: "border-emerald-400 bg-emerald-400/10",
     icon: "M5 13l4 4L19 7",
   },
 };
 
-const stages = ["draft", "design", "review", "ready"];
+const stages = ["draft", "spec", "approved"];
 
-type TabId = "proposal" | "design" | "tasks" | "history";
+type TabId = "proposal" | "spec" | "tasks" | "history";
 
 const tabI18nKeys: Record<TabId, string> = {
   proposal: "change.proposal",
-  design: "change.design",
+  spec: "change.spec",
   tasks: "change.tasks",
   history: "change.history",
 };
 
-const validTabs: TabId[] = ["proposal", "design", "tasks", "history"];
+const validTabs: TabId[] = ["proposal", "spec", "tasks", "history"];
 
 export default function ChangeDetailClient() {
   const params = useParams();
@@ -119,6 +113,13 @@ export default function ChangeDetailClient() {
     undefined,
   );
   const [archiving, setArchiving] = useState(false);
+  const [changeLabels, setChangeLabels] = useState<
+    Array<{ id: bigint; name: string; color: string }>
+  >([]);
+  const [orgLabels, setOrgLabels] = useState<Array<{ id: bigint; name: string; color: string }>>(
+    [],
+  );
+  const [labelDropdownOpen, setLabelDropdownOpen] = useState(false);
 
   const prevStageRef = useRef(stage);
 
@@ -167,6 +168,17 @@ export default function ChangeDetailClient() {
       setChangeName(changeRes.change?.name ?? "");
       setChangeIdentifier(changeRes.change?.identifier ?? "");
       setArchivedAt(changeRes.change?.archivedAt);
+      setChangeLabels(
+        (changeRes.change?.labels ?? []).map((l) => ({ id: l.id, name: l.name, color: l.color })),
+      );
+
+      // Load org labels for the label picker
+      projectClient
+        .listLabels({})
+        .then((res) => {
+          setOrgLabels(res.labels.map((l) => ({ id: l.id, name: l.name, color: l.color })));
+        })
+        .catch(() => {});
     } catch (err) {
       showError(t("toast.loadFailed"), err);
     } finally {
@@ -186,6 +198,27 @@ export default function ChangeDetailClient() {
     }
   }
 
+  async function handleAssignLabel(labelId: bigint) {
+    try {
+      await projectClient.assignChangeLabel({ changeId, labelId, projectId });
+      const label = orgLabels.find((l) => l.id === labelId);
+      if (label) {
+        setChangeLabels((prev) => [...prev, label]);
+      }
+    } catch (err) {
+      showError(t("toast.loadFailed"), err);
+    }
+  }
+
+  async function handleRemoveLabel(labelId: bigint) {
+    try {
+      await projectClient.removeChangeLabel({ changeId, labelId, projectId });
+      setChangeLabels((prev) => prev.filter((l) => l.id !== labelId));
+    } catch (err) {
+      showError(t("toast.loadFailed"), err);
+    }
+  }
+
   async function handleUnarchive() {
     setArchiving(true);
     try {
@@ -197,6 +230,16 @@ export default function ChangeDetailClient() {
       setArchiving(false);
     }
   }
+
+  // Close label dropdown on click outside
+  useEffect(() => {
+    if (!labelDropdownOpen) return;
+    function handleClick() {
+      setLabelDropdownOpen(false);
+    }
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, [labelDropdownOpen]);
 
   useEffect(() => {
     loadAll();
@@ -485,7 +528,7 @@ export default function ChangeDetailClient() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {stage !== "ready" && !archivedAt && (
+                  {stage !== "approved" && !archivedAt && (
                     <Button
                       onClick={handleAdvance}
                       size="sm"
@@ -495,7 +538,7 @@ export default function ChangeDetailClient() {
                       {t("change.advanceTo", { stage: t(`stages.${stages[currentIdx + 1]}`) })}
                     </Button>
                   )}
-                  {stage === "ready" && !archivedAt && (
+                  {stage === "approved" && !archivedAt && (
                     <Button
                       onClick={handleArchive}
                       size="sm"
@@ -549,6 +592,77 @@ export default function ChangeDetailClient() {
             </div>
           </div>
 
+          {/* Labels */}
+          {!loading && (
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              {changeLabels.map((label) => (
+                <span
+                  key={String(label.id)}
+                  className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
+                  style={{
+                    backgroundColor: `${label.color}18`,
+                    color: label.color,
+                  }}
+                >
+                  <span
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ backgroundColor: label.color }}
+                  />
+                  {label.name}
+                  <button
+                    onClick={() => handleRemoveLabel(label.id)}
+                    className="ml-0.5 cursor-pointer opacity-60 hover:opacity-100 transition-opacity"
+                    title={t("change.removeLabel")}
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+              <div className="relative">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLabelDropdownOpen((v) => !v);
+                  }}
+                  className="cursor-pointer inline-flex items-center gap-1 rounded-full border border-dashed border-border/50 px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+                >
+                  + {t("change.addLabel")}
+                </button>
+                {labelDropdownOpen && (
+                  <div className="absolute left-0 top-full z-30 mt-1 min-w-[180px] rounded-lg border border-border/40 bg-popover p-1 shadow-lg">
+                    {orgLabels.filter((ol) => !changeLabels.some((cl) => cl.id === ol.id))
+                      .length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">
+                        {changeLabels.length === 0
+                          ? "No labels in organization"
+                          : "All labels assigned"}
+                      </div>
+                    ) : (
+                      orgLabels
+                        .filter((ol) => !changeLabels.some((cl) => cl.id === ol.id))
+                        .map((label) => (
+                          <button
+                            key={String(label.id)}
+                            onClick={() => {
+                              handleAssignLabel(label.id);
+                              setLabelDropdownOpen(false);
+                            }}
+                            className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 text-left text-xs transition-colors hover:bg-accent"
+                          >
+                            <span
+                              className="h-2 w-2 shrink-0 rounded-full"
+                              style={{ backgroundColor: label.color }}
+                            />
+                            {label.name}
+                          </button>
+                        ))
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Tab Navigation — sticky */}
           <div className="sticky top-0 z-20 -mx-6 mb-4 border-b border-border/40 bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/80">
             <div className="flex gap-1 overflow-x-auto">
@@ -577,11 +691,11 @@ export default function ChangeDetailClient() {
               members={members}
             />
           )}
-          {activeTab === "design" && projectId > 0 && (
+          {activeTab === "spec" && projectId > 0 && (
             <DocumentTab
               changeId={changeId}
               projectId={projectId}
-              docType="design"
+              docType="spec"
               members={members}
             />
           )}

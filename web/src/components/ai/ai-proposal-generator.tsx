@@ -14,14 +14,12 @@ interface ProposalSections {
   problem: string;
   scope: string;
   outOfScope: string;
-  approach: string;
 }
 
 const EMPTY_SECTIONS: ProposalSections = {
   problem: "",
   scope: "",
   outOfScope: "",
-  approach: "",
 };
 
 interface AIProposalGeneratorProps {
@@ -176,9 +174,7 @@ export function AIProposalGenerator({
   if (hasExistingContent) {
     return (
       <div className="flex items-center justify-end">
-        {errorMessage && (
-          <span className="mr-2 text-xs text-destructive">{errorMessage}</span>
-        )}
+        {errorMessage && <span className="mr-2 text-xs text-destructive">{errorMessage}</span>}
         <Button size="sm" variant="ghost" onClick={handleGenerate}>
           <RefreshCw className="size-3.5" />
           {t("ai.regenerateProposal")}

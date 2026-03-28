@@ -38,7 +38,6 @@ interface ProposalSections {
   problem: string;
   scope: string;
   outOfScope: string;
-  approach: string;
   designLinks?: string[];
 }
 
@@ -46,11 +45,10 @@ const EMPTY_SECTIONS: ProposalSections = {
   problem: "",
   scope: "",
   outOfScope: "",
-  approach: "",
   designLinks: [],
 };
 
-type TextSectionKey = "problem" | "scope" | "outOfScope" | "approach";
+type TextSectionKey = "problem" | "scope" | "outOfScope";
 
 interface SectionConfig {
   key: TextSectionKey;
@@ -76,12 +74,6 @@ const SECTIONS: SectionConfig[] = [
     key: "outOfScope",
     i18nKey: "proposal.outOfScope",
     placeholderKey: "proposal.outOfScopePlaceholder",
-    required: false,
-  },
-  {
-    key: "approach",
-    i18nKey: "proposal.approach",
-    placeholderKey: "proposal.approachPlaceholder",
     required: false,
   },
 ];
@@ -112,7 +104,6 @@ function parseContent(content: string): ProposalSections {
         problem: normalizeSectionContent(parsed.problem ?? ""),
         scope: normalizeSectionContent(parsed.scope ?? ""),
         outOfScope: normalizeSectionContent(parsed.outOfScope ?? ""),
-        approach: normalizeSectionContent(parsed.approach ?? ""),
       };
     }
   } catch {
@@ -152,7 +143,6 @@ export function StructuredProposal({
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
     outOfScope: true,
-    approach: true,
   });
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const localRevisionRef = useRef(0);
@@ -169,7 +159,6 @@ export function StructuredProposal({
         setSections(parsed);
         setCollapsed({
           outOfScope: !getPlainText(parsed.outOfScope),
-          approach: !getPlainText(parsed.approach),
         });
       } else {
         setSections(EMPTY_SECTIONS);
@@ -283,32 +272,23 @@ export function StructuredProposal({
     );
   }
 
-  const isReviewMode = currentStage === "review" || currentStage === "ready";
+  const isReviewMode = currentStage === "approved";
 
   const isProposalEmpty =
     !getPlainText(sections.problem) &&
     !getPlainText(sections.scope) &&
-    !getPlainText(sections.outOfScope) &&
-    !getPlainText(sections.approach);
+    !getPlainText(sections.outOfScope);
 
-  function handleAIApply(applied: {
-    problem: string;
-    scope: string;
-    outOfScope: string;
-    approach: string;
-  }) {
+  function handleAIApply(applied: { problem: string; scope: string; outOfScope: string }) {
     setSections((prev) => ({
       ...prev,
       problem: normalizeSectionContent(applied.problem),
       scope: normalizeSectionContent(applied.scope),
       outOfScope: normalizeSectionContent(applied.outOfScope),
-      approach: normalizeSectionContent(applied.approach),
     }));
     localRevisionRef.current += 1;
-    // Expand optional sections that now have content
     setCollapsed({
       outOfScope: !applied.outOfScope.trim(),
-      approach: !applied.approach.trim(),
     });
     save();
   }

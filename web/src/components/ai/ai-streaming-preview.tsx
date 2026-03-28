@@ -3,17 +3,16 @@
 import { useI18n } from "@/lib/i18n";
 
 interface AIStreamingPreviewProps {
-  sections: { problem?: string; scope?: string; outOfScope?: string; approach?: string };
+  sections: { problem?: string; scope?: string; outOfScope?: string };
   isStreaming: boolean;
 }
 
-const SECTION_KEYS = ["problem", "scope", "outOfScope", "approach"] as const;
+const SECTION_KEYS = ["problem", "scope", "outOfScope"] as const;
 
 const SECTION_I18N: Record<string, string> = {
   problem: "proposal.problem",
   scope: "proposal.scope",
   outOfScope: "proposal.outOfScope",
-  approach: "proposal.approach",
 };
 
 export function AIStreamingPreview({ sections, isStreaming }: AIStreamingPreviewProps) {
@@ -40,9 +39,7 @@ export function AIStreamingPreview({ sections, isStreaming }: AIStreamingPreview
               {showCursor && (
                 <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-primary align-middle" />
               )}
-              {!text && !isStreaming && (
-                <span className="text-muted-foreground/40">—</span>
-              )}
+              {!text && !isStreaming && <span className="text-muted-foreground/40">—</span>}
             </div>
           </div>
         );

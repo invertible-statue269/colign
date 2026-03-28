@@ -16,12 +16,18 @@ import { MentionTextarea, type MentionMember } from "@/components/comment/mentio
 interface DocumentTabProps {
   changeId: bigint;
   projectId: bigint;
-  docType: "proposal" | "design" | "spec";
+  docType: "proposal" | "spec";
   currentStage?: string;
   members?: MentionMember[];
 }
 
-export function DocumentTab({ changeId, projectId, docType, currentStage, members = [] }: DocumentTabProps) {
+export function DocumentTab({
+  changeId,
+  projectId,
+  docType,
+  currentStage,
+  members = [],
+}: DocumentTabProps) {
   const { t } = useI18n();
   const { on } = useEvents();
   const [content, setContent] = useState("");
@@ -229,7 +235,7 @@ export function DocumentTab({ changeId, projectId, docType, currentStage, member
         <AcceptanceCriteria
           changeId={changeId}
           projectId={projectId}
-          reviewMode={currentStage === "review" || currentStage === "ready"}
+          reviewMode={currentStage === "approved"}
         />
       )}
     </div>

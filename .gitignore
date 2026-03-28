@@ -1,6 +1,9 @@
 # OpenSpec
 openspec/
 
+# Claude plugin
+.claude-plugin/
+
 # Go
 bin/
 .gocache/

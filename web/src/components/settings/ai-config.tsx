@@ -17,9 +17,29 @@ import { aiConfigClient } from "@/lib/aiconfig";
 import { useI18n } from "@/lib/i18n";
 import { showError, showSuccess } from "@/lib/toast";
 
-const MODELS_BY_PROVIDER: Record<string, string[]> = {
-  openai: ["gpt-4o", "gpt-4o-mini"],
-  anthropic: ["claude-sonnet-4-20250514", "claude-haiku-4-5-20251001"],
+type ModelOption = {
+  value: string;
+  label: string;
+};
+
+const MODEL_OPTIONS_BY_PROVIDER: Record<string, ModelOption[]> = {
+  openai: [
+    { value: "gpt-5.4", label: "GPT-5.4" },
+    { value: "gpt-5.4-mini", label: "GPT-5.4 mini" },
+    { value: "gpt-5.4-nano", label: "GPT-5.4 nano" },
+    { value: "gpt-4o", label: "GPT-4o" },
+    { value: "gpt-4o-mini", label: "GPT-4o mini" },
+  ],
+  anthropic: [
+    { value: "claude-opus-4-6", label: "Claude Opus 4.6" },
+    { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
+    { value: "claude-opus-4-1-20250805", label: "Claude Opus 4.1" },
+    { value: "claude-opus-4-20250514", label: "Claude Opus 4" },
+    { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
+    { value: "claude-3-7-sonnet-20250219", label: "Claude Sonnet 3.7" },
+    { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" },
+    { value: "claude-3-5-haiku-20241022", label: "Claude Haiku 3.5" },
+  ],
 };
 
 interface AIConfigSettingsProps {
@@ -58,7 +78,7 @@ export function AIConfigSettings({ projectId }: AIConfigSettingsProps) {
       .finally(() => {
         setLoading(false);
       });
-  }, [projectId]);
+  }, [projectId, t]);
 
   function handleProviderChange(value: string | null) {
     if (!value) return;
@@ -66,7 +86,11 @@ export function AIConfigSettings({ projectId }: AIConfigSettingsProps) {
     setModel("");
   }
 
-  const availableModels = provider ? (MODELS_BY_PROVIDER[provider] ?? []) : [];
+  const providerModels = provider ? (MODEL_OPTIONS_BY_PROVIDER[provider] ?? []) : [];
+  const availableModels =
+    model && providerModels.every((option) => option.value !== model)
+      ? [...providerModels, { value: model, label: `${model} (custom)` }]
+      : providerModels;
 
   async function handleTestConnection() {
     if (!provider || !model) return;
@@ -157,9 +181,9 @@ export function AIConfigSettings({ projectId }: AIConfigSettingsProps) {
               <SelectValue placeholder={t("aiConfig.model")} />
             </SelectTrigger>
             <SelectContent>
-              {availableModels.map((m) => (
-                <SelectItem key={m} value={m} className="cursor-pointer">
-                  {m}
+              {availableModels.map((option) => (
+                <SelectItem key={option.value} value={option.value} className="cursor-pointer">
+                  {option.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -179,10 +203,7 @@ export function AIConfigSettings({ projectId }: AIConfigSettingsProps) {
 
         {/* Include project context */}
         <div className="flex items-center gap-3">
-          <Switch
-            checked={includeProjectContext}
-            onCheckedChange={setIncludeProjectContext}
-          />
+          <Switch checked={includeProjectContext} onCheckedChange={setIncludeProjectContext} />
           <div>
             <p className="text-sm font-medium">{t("aiConfig.includeContext")}</p>
             <p className="text-xs text-muted-foreground">{t("aiConfig.includeContextHelp")}</p>

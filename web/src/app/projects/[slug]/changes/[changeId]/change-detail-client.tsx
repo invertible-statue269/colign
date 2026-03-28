@@ -265,7 +265,7 @@ export default function ChangeDetailClient() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col overflow-x-hidden">
+    <div className="flex min-h-screen flex-col">
       <Header
         breadcrumbs={[
           { label: projectName, href: toProjectPath({ id: projectId, slug: projectSlug }) },
@@ -274,9 +274,9 @@ export default function ChangeDetailClient() {
       />
 
       {/* Main Content */}
-      <div className="relative isolate flex-1 overflow-y-auto overflow-x-hidden">
-        <div className="mx-auto max-w-5xl overflow-hidden px-6 py-6">
-          <div className="sticky top-0 z-20 -mx-6 mb-6 border-b border-border/40 bg-background/95 px-6 pb-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div className="relative flex-1">
+        <div className="mx-auto max-w-5xl px-6 py-6">
+          <div className="-mx-6 overflow-x-clip px-6 pb-2">
             {/* Stage Progress — Desktop */}
             <div className="mb-4 hidden pt-2 md:block">
               <div className="flex items-start">
@@ -547,9 +547,11 @@ export default function ChangeDetailClient() {
                 </div>
               )}
             </div>
+          </div>
 
-            {/* Tab Navigation */}
-            <div className="flex gap-1 overflow-x-auto border-b border-border/50">
+          {/* Tab Navigation — sticky */}
+          <div className="sticky top-0 z-20 -mx-6 mb-4 border-b border-border/40 bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+            <div className="flex gap-1 overflow-x-auto">
               {(Object.keys(tabI18nKeys) as TabId[]).map((tabId) => (
                 <button
                   key={tabId}

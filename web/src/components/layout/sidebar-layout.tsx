@@ -53,7 +53,12 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
         router.replace("/auth");
       }
       // Network errors, server errors, etc. — notify and proceed
-      if (!(err instanceof ConnectError && (err.code === Code.Unauthenticated || err.code === Code.NotFound))) {
+      if (
+        !(
+          err instanceof ConnectError &&
+          (err.code === Code.Unauthenticated || err.code === Code.NotFound)
+        )
+      ) {
         showError("Failed to load data", err);
       }
       setVerified(true);
@@ -99,7 +104,7 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset className="overflow-x-hidden">
+      <SidebarInset>
         {/* Mobile hamburger */}
         <div className="flex items-center gap-2 border-b border-border/50 px-4 py-2 md:hidden">
           <SidebarTrigger />

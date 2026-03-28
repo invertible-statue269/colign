@@ -240,9 +240,12 @@
     "hideResolved": "해결된 코멘트 숨기기",
     "comments": "코멘트",
     "composePlaceholder": "코멘트를 남겨주세요...",
+    "mentioning": "멘션 중",
     "send": "전송",
     "hidePanel": "코멘트 숨기기",
-    "showPanel": "코멘트 보기"
+    "showPanel": "코멘트 보기",
+    "showOlder": "이전 댓글 {count}개 보기",
+    "hideOlder": "이전 댓글 접기"
   },
   "ac": {
     "title": "인수 조건",

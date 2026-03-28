@@ -9,6 +9,12 @@ export interface MentionMember {
   userEmail?: string;
 }
 
+export interface MentionSelection {
+  userId: bigint;
+  userName: string;
+  handle: string;
+}
+
 interface MentionTextareaProps {
   value: string;
   onChange: (value: string) => void;
@@ -22,6 +28,7 @@ interface MentionTextareaProps {
   onSubmit?: () => void;
   submitShortcut?: "enter" | "mod-enter";
   onEscape?: () => void;
+  onSelectedMentionsChange?: (mentions: MentionSelection[]) => void;
 }
 
 interface MentionMatch {
@@ -31,7 +38,11 @@ interface MentionMatch {
 }
 
 function normalizeHandlePart(value: string): string {
-  return value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 function getHandleBase(member: MentionMember): string {
@@ -91,10 +102,7 @@ export function getMentionHandle(member: MentionMember, members: MentionMember[]
  * Render comment body with styled mention chips.
  * Parses `@handle` patterns and matches against members list.
  */
-export function renderMentionBody(
-  body: string,
-  members: MentionMember[],
-): React.ReactNode {
+export function renderMentionBody(body: string, members: MentionMember[]): React.ReactNode {
   if (!body) return null;
 
   const handleToMember = new Map<string, MentionMember>();
@@ -124,7 +132,7 @@ export function renderMentionBody(
       parts.push(
         <span
           key={`mention-${beforeStart}`}
-          className="inline-flex items-center gap-0.5 rounded bg-primary/15 px-1 py-0.5 text-xs font-medium text-primary cursor-default"
+          className="mx-0.5 inline-flex items-center rounded-full border border-sky-400/30 bg-sky-500/12 px-2 py-0.5 align-baseline text-xs font-medium text-sky-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
           title={`@${handle}`}
         >
           @{member.userName}
@@ -202,17 +210,21 @@ export function MentionTextarea({
   onSubmit,
   submitShortcut,
   onEscape,
+  onSelectedMentionsChange,
 }: MentionTextareaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [caret, setCaret] = useState(0);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [dismissedMentionKey, setDismissedMentionKey] = useState<string | null>(null);
+  const [suggestionsPlacement, setSuggestionsPlacement] = useState<"top" | "bottom">("bottom");
   // Track selected mentions: userId → handle (from the moment of selection)
   const [selectedMentions, setSelectedMentions] = useState<Map<bigint, string>>(new Map());
   const mentionHandles = useMemo(() => buildMentionHandleMap(members), [members]);
 
   const mentionMatch = useMemo(() => getMentionMatch(value, caret), [value, caret]);
-  const mentionKey = mentionMatch ? `${mentionMatch.start}:${mentionMatch.end}:${mentionMatch.query}` : null;
+  const mentionKey = mentionMatch
+    ? `${mentionMatch.start}:${mentionMatch.end}:${mentionMatch.query}`
+    : null;
   const suggestions = useMemo(() => {
     if (!mentionMatch) return [];
     const query = mentionMatch.query.trim().toLowerCase();
@@ -231,8 +243,12 @@ export function MentionTextarea({
       .sort((a, b) => {
         const aHandle = (mentionHandles.get(a.userId) ?? getHandleBase(a)).toLowerCase();
         const bHandle = (mentionHandles.get(b.userId) ?? getHandleBase(b)).toLowerCase();
-        const aStarts = query ? aHandle.startsWith(query) || a.userName.toLowerCase().startsWith(query) : false;
-        const bStarts = query ? bHandle.startsWith(query) || b.userName.toLowerCase().startsWith(query) : false;
+        const aStarts = query
+          ? aHandle.startsWith(query) || a.userName.toLowerCase().startsWith(query)
+          : false;
+        const bStarts = query
+          ? bHandle.startsWith(query) || b.userName.toLowerCase().startsWith(query)
+          : false;
         if (aStarts !== bStarts) return aStarts ? -1 : 1;
         return aHandle.localeCompare(bHandle);
       })
@@ -242,6 +258,65 @@ export function MentionTextarea({
   const activeSuggestions = isMentionDismissed ? [] : suggestions;
   const safeHighlightedIndex =
     activeSuggestions.length === 0 ? 0 : Math.min(highlightedIndex, activeSuggestions.length - 1);
+
+  useEffect(() => {
+    if (!mentionMatch || activeSuggestions.length === 0) return;
+
+    const updatePlacement = () => {
+      const el = textareaRef.current;
+      if (!el) return;
+
+      const rect = el.getBoundingClientRect();
+      const estimatedHeight = Math.min(activeSuggestions.length, 6) * 44 + 12;
+
+      // Find the nearest scrollable/overflow-hidden ancestor to measure available space
+      let containerBottom = window.innerHeight;
+      let containerTop = 0;
+      let ancestor = el.parentElement;
+      while (ancestor) {
+        const style = getComputedStyle(ancestor);
+        const overflow = style.overflowY;
+        if (overflow === "hidden" || overflow === "auto" || overflow === "scroll") {
+          const containerRect = ancestor.getBoundingClientRect();
+          containerBottom = containerRect.bottom;
+          containerTop = containerRect.top;
+          break;
+        }
+        ancestor = ancestor.parentElement;
+      }
+
+      const spaceBelow = containerBottom - rect.bottom;
+      const spaceAbove = rect.top - containerTop;
+
+      setSuggestionsPlacement(
+        spaceBelow < estimatedHeight && spaceAbove > spaceBelow ? "top" : "bottom",
+      );
+    };
+
+    updatePlacement();
+    window.addEventListener("resize", updatePlacement);
+    window.addEventListener("scroll", updatePlacement, true);
+    return () => {
+      window.removeEventListener("resize", updatePlacement);
+      window.removeEventListener("scroll", updatePlacement, true);
+    };
+  }, [activeSuggestions.length, mentionMatch]);
+
+  useEffect(() => {
+    if (!onSelectedMentionsChange) return;
+    const resolvedMentions = Array.from(selectedMentions.entries())
+      .map(([userId, handle]) => {
+        const member = members.find((candidate) => candidate.userId === userId);
+        if (!member) return null;
+        return {
+          userId,
+          userName: member.userName,
+          handle,
+        };
+      })
+      .filter((mention): mention is MentionSelection => mention !== null);
+    onSelectedMentionsChange(resolvedMentions);
+  }, [members, onSelectedMentionsChange, selectedMentions]);
 
   // Prune mentions whose @handle no longer appears in the text, and notify parent
   const syncMentions = useCallback(
@@ -269,8 +344,11 @@ export function MentionTextarea({
   // Reset mentions when value is cleared externally (e.g. after submit)
   useEffect(() => {
     if (!value.trim() && selectedMentions.size > 0) {
-      setSelectedMentions(new Map());
-      onMentionedIdsChange?.([]);
+      const frame = requestAnimationFrame(() => {
+        setSelectedMentions(new Map());
+        onMentionedIdsChange?.([]);
+      });
+      return () => cancelAnimationFrame(frame);
     }
   }, [value, selectedMentions.size, onMentionedIdsChange]);
 
@@ -328,7 +406,9 @@ export function MentionTextarea({
       }
       if (e.key === "ArrowUp") {
         e.preventDefault();
-        setHighlightedIndex((prev) => (prev - 1 + activeSuggestions.length) % activeSuggestions.length);
+        setHighlightedIndex(
+          (prev) => (prev - 1 + activeSuggestions.length) % activeSuggestions.length,
+        );
         return;
       }
       if (e.key === "Enter" || e.key === "Tab") {
@@ -343,7 +423,13 @@ export function MentionTextarea({
       }
     }
 
-    if (submitShortcut === "enter" && e.key === "Enter" && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+    if (
+      submitShortcut === "enter" &&
+      e.key === "Enter" &&
+      !e.shiftKey &&
+      !e.metaKey &&
+      !e.ctrlKey
+    ) {
       e.preventDefault();
       onSubmit?.();
       return;
@@ -360,8 +446,51 @@ export function MentionTextarea({
     }
   }
 
+  /** Build highlighted HTML for the backdrop overlay */
+  const highlightedHtml = useMemo(() => {
+    if (!value) return "";
+    const handleToMember = new Map<string, MentionMember>();
+    for (const member of members) {
+      const handle = (mentionHandles.get(member.userId) ?? getHandleBase(member)).toLowerCase();
+      if (handle && !handleToMember.has(handle)) {
+        handleToMember.set(handle, member);
+      }
+    }
+    // Escape HTML then highlight @handles
+    const escaped = value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const html = escaped.replace(/(^|\s)@([^\s@]+)/g, (_full, prefix, handle) => {
+      const member = handleToMember.get(handle.toLowerCase());
+      if (member) {
+        return `${prefix}<mark class="mention-highlight">@${handle}</mark>`;
+      }
+      return `${prefix}@${handle}`;
+    });
+    // Add trailing newline so the backdrop height matches textarea with trailing newlines
+    return html + "\n";
+  }, [value, members, mentionHandles]);
+
+  const backdropRef = useRef<HTMLDivElement>(null);
+
+  function syncScroll() {
+    const el = textareaRef.current;
+    const bd = backdropRef.current;
+    if (el && bd) {
+      bd.scrollTop = el.scrollTop;
+    }
+  }
+
   return (
     <div className="relative">
+      {/* Highlight backdrop */}
+      <div
+        ref={backdropRef}
+        aria-hidden
+        className={cn(
+          className,
+          "pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words text-transparent [&_.mention-highlight]:rounded [&_.mention-highlight]:bg-sky-500/20 [&_.mention-highlight]:text-sky-300",
+        )}
+        dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+      />
       <textarea
         ref={textareaRef}
         autoFocus={autoFocus}
@@ -375,16 +504,23 @@ export function MentionTextarea({
           syncDismissedMention(e.target.value, nextCaret);
           setCaret(nextCaret);
           syncMentions(e.target.value);
+          syncScroll();
         }}
+        onScroll={syncScroll}
         onClick={syncCaret}
         onKeyUp={syncCaret}
         onSelect={syncCaret}
         onKeyDown={handleKeyDown}
-        className={className}
+        className={cn(className, "relative bg-transparent")}
       />
       {mentionMatch && activeSuggestions.length > 0 && (
-        <div className="absolute left-0 right-0 top-full z-40 mt-1 overflow-hidden rounded-md border border-border/60 bg-popover shadow-lg">
-          <div className="max-h-56 overflow-y-auto py-1">
+        <div
+          className={cn(
+            "absolute left-0 right-0 z-40 overflow-hidden rounded-md border border-border/60 bg-popover shadow-lg",
+            suggestionsPlacement === "top" ? "bottom-full mb-1" : "top-full mt-1",
+          )}
+        >
+          <div className="scrollbar-subtle max-h-56 overflow-y-auto py-1">
             {activeSuggestions.map((member, index) => (
               <button
                 key={String(member.userId)}

@@ -68,7 +68,9 @@ export function CommentPanel({
   const [composeText, setComposeText] = useState("");
   const [replyMentionIds, setReplyMentionIds] = useState<bigint[]>([]);
   const [composeMentionIds, setComposeMentionIds] = useState<bigint[]>([]);
+  const [showAllComments, setShowAllComments] = useState(false);
   const submittingRef = useRef(false);
+  const VISIBLE_RECENT_COUNT = 5;
 
   const loadComments = useCallback(async () => {
     try {
@@ -186,18 +188,26 @@ export function CommentPanel({
     setReplyMentionIds([]);
   };
 
-  const visibleComments = showResolved
-    ? comments
-    : comments.filter((c) => !c.resolved);
+  const filteredComments = showResolved ? comments : comments.filter((c) => !c.resolved);
+
+  const hiddenCount =
+    !showAllComments && filteredComments.length > VISIBLE_RECENT_COUNT
+      ? filteredComments.length - VISIBLE_RECENT_COUNT
+      : 0;
+
+  const visibleComments =
+    hiddenCount > 0 ? filteredComments.slice(-VISIBLE_RECENT_COUNT) : filteredComments;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
         <div className="flex items-center gap-2">
           <MessageSquare className="size-4 text-muted-foreground" />
           <span className="text-sm font-medium">{t("comments.comments")}</span>
-          <span className="text-xs text-muted-foreground">({comments.filter((c) => !c.resolved).length})</span>
+          <span className="text-xs text-muted-foreground">
+            ({comments.filter((c) => !c.resolved).length})
+          </span>
         </div>
         <button
           onClick={() => setShowResolved(!showResolved)}
@@ -208,7 +218,7 @@ export function CommentPanel({
       </div>
 
       {/* Comments list */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="scrollbar-subtle min-h-0 flex-1 overflow-y-auto pr-1">
         {visibleComments.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12">
             <MessageSquare className="size-8 text-muted-foreground/30" />
@@ -216,10 +226,30 @@ export function CommentPanel({
           </div>
         ) : (
           <div className="divide-y divide-border/30">
+            {/* Show/hide older comments toggle */}
+            {hiddenCount > 0 && (
+              <button
+                onClick={() => setShowAllComments(true)}
+                className="flex w-full cursor-pointer items-center justify-center gap-1.5 py-2.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent/30 hover:text-foreground"
+              >
+                <ChevronUp className="size-3" />
+                {t("comments.showOlder", { count: hiddenCount })}
+              </button>
+            )}
+            {showAllComments && filteredComments.length > VISIBLE_RECENT_COUNT && (
+              <button
+                onClick={() => setShowAllComments(false)}
+                className="flex w-full cursor-pointer items-center justify-center gap-1.5 py-2.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent/30 hover:text-foreground"
+              >
+                <ChevronDown className="size-3" />
+                {t("comments.hideOlder")}
+              </button>
+            )}
             {visibleComments.map((comment) => {
               const id = String(comment.id);
               const isExpanded = expandedThreads.has(id);
-              const isOwner = currentUserId !== undefined && comment.userId === BigInt(currentUserId);
+              const isOwner =
+                currentUserId !== undefined && comment.userId === BigInt(currentUserId);
 
               return (
                 <div
@@ -232,9 +262,13 @@ export function CommentPanel({
                       {comment.userName.charAt(0)}
                     </div>
                     <span className="text-xs font-medium">{comment.userName}</span>
-                    <span className="text-[10px] text-muted-foreground">{timeAgo(comment.createdAt)}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {timeAgo(comment.createdAt)}
+                    </span>
                     {comment.resolved && (
-                      <span className="ml-auto text-[10px] text-emerald-400">{t("comments.resolved")}</span>
+                      <span className="ml-auto text-[10px] text-emerald-400">
+                        {t("comments.resolved")}
+                      </span>
                     )}
                   </div>
 
@@ -292,7 +326,11 @@ export function CommentPanel({
                         className="ml-auto flex cursor-pointer items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
                       >
                         {comment.replies.length} {t("comments.reply").toLowerCase()}
-                        {isExpanded ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+                        {isExpanded ? (
+                          <ChevronUp className="size-3" />
+                        ) : (
+                          <ChevronDown className="size-3" />
+                        )}
                       </button>
                     )}
                   </div>
@@ -307,7 +345,9 @@ export function CommentPanel({
                               {reply.userName.charAt(0)}
                             </div>
                             <span className="text-[10px] font-medium">{reply.userName}</span>
-                            <span className="text-[10px] text-muted-foreground">{timeAgo(reply.createdAt)}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {timeAgo(reply.createdAt)}
+                            </span>
                           </div>
                           <p className="ml-7 text-xs">{renderMentionBody(reply.body, members)}</p>
                         </div>
@@ -318,23 +358,25 @@ export function CommentPanel({
                   {/* Reply input */}
                   {replyingTo === id && !comment.resolved && (
                     <div className="mt-2 flex gap-1.5">
-                      <MentionTextarea
-                        value={replyText}
-                        onChange={setReplyText}
-                        members={members}
-                        onMentionedIdsChange={setReplyMentionIds}
-                        autoFocus
-                        rows={2}
-                        submitShortcut="enter"
-                        onSubmit={() => handleReply(comment.id)}
-                        placeholder={t("comments.replyPlaceholder")}
-                        className="flex-1 rounded-md border border-border/50 bg-transparent px-2 py-1 text-xs outline-none focus:border-primary"
-                      />
+                      <div className="min-w-0 flex-1">
+                        <MentionTextarea
+                          value={replyText}
+                          onChange={setReplyText}
+                          members={members}
+                          onMentionedIdsChange={setReplyMentionIds}
+                          autoFocus
+                          rows={2}
+                          submitShortcut="enter"
+                          onSubmit={() => handleReply(comment.id)}
+                          placeholder={t("comments.replyPlaceholder")}
+                          className="w-full rounded-md border border-border/50 bg-transparent px-2 py-1 text-xs outline-none focus:border-primary"
+                        />
+                      </div>
                       <Button
                         size="sm"
                         onClick={() => handleReply(comment.id)}
                         disabled={!replyText.trim()}
-                        className="h-7 cursor-pointer px-2"
+                        className="h-7 cursor-pointer px-2 self-start"
                       >
                         <Send className="size-3" />
                       </Button>
@@ -349,7 +391,7 @@ export function CommentPanel({
 
       {/* Compose new comment */}
       {showCompose && (
-        <div className="border-t border-border/50 px-4 py-3">
+        <div className="shrink-0 border-t border-border/50 bg-card/95 px-4 py-3 supports-backdrop-filter:backdrop-blur-xs">
           <MentionTextarea
             value={composeText}
             onChange={setComposeText}

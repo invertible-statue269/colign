@@ -270,8 +270,7 @@ export default function ProjectDetailClient() {
     load();
   }, [projectRef, router, searchParams]);
 
-  async function handleCreateChange(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleCreateChange() {
     if (!newChangeName.trim() || !project) return;
     setCreating(true);
     try {
@@ -290,12 +289,16 @@ export default function ProjectDetailClient() {
           ...prev,
         ]);
         setNewChangeName("");
+        return true;
       }
     } catch (err) {
       showError(t("toast.createFailed"), err);
+      return false;
     } finally {
       setCreating(false);
     }
+
+    return false;
   }
 
   async function handleRename() {
@@ -891,7 +894,7 @@ function ChangesTab({
   newChangeName: string;
   setNewChangeName: (v: string) => void;
   creating: boolean;
-  onCreateChange: (e: React.FormEvent) => void;
+  onCreateChange: () => Promise<boolean>;
   t: (key: string) => string;
 }) {
   const { on } = useEvents();
@@ -957,12 +960,21 @@ function ChangesTab({
     });
   }
 
-  // Close create dialog on successful creation
-  useEffect(() => {
-    if (!creating && createOpen && !newChangeName.trim()) {
+  function handleCreateOpenChange(nextOpen: boolean) {
+    if (creating) return;
+    if (!nextOpen) {
+      setNewChangeName("");
+    }
+    setCreateOpen(nextOpen);
+  }
+
+  async function handleCreateSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const created = await onCreateChange();
+    if (created) {
       setCreateOpen(false);
     }
-  }, [creating, createOpen, newChangeName]);
+  }
 
   // Fetch archived count once on mount
   useEffect(() => {
@@ -1190,13 +1202,13 @@ function ChangesTab({
       )}
 
       {/* Create Change Dialog */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog open={createOpen} onOpenChange={handleCreateOpenChange}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t("common.create")}</DialogTitle>
             <DialogDescription>{t("project.createFirstChange")}</DialogDescription>
           </DialogHeader>
-          <form onSubmit={onCreateChange}>
+          <form onSubmit={handleCreateSubmit}>
             <div className="py-2">
               <Input
                 value={newChangeName}

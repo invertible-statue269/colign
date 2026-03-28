@@ -1,0 +1,34 @@
+## Production values for colign.co
+
+imagePullSecrets:
+  - name: ghcr-login-secret
+
+api:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/gobenpark/colign
+    tag: latest
+    pullPolicy: IfNotPresent
+  migrate:
+    enabled: true
+
+web:
+  enabled: false  # TODO: build and enable later
+
+hocuspocus:
+  enabled: false  # TODO: build and enable later
+
+postgresql:
+  enabled: false
+
+redis:
+  enabled: false
+
+externalDatabase:
+  host: "192.168.0.58"
+  port: 55432
+  username: "postgres"
+  password: "1q2w3e4r"
+  database: "colign"
+  schema: "colign"
+  sslmode: "disable"

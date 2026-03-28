@@ -26,6 +26,9 @@ CREATE TABLE notifications (
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX idx_notifications_user_read ON notifications(user_id, read);
 CREATE INDEX idx_notifications_created_at ON notifications(created_at);
+CREATE INDEX idx_notifications_actor_id ON notifications(actor_id) WHERE actor_id IS NOT NULL;
+CREATE INDEX idx_notifications_change_id ON notifications(change_id) WHERE change_id IS NOT NULL;
+CREATE INDEX idx_notifications_project_id ON notifications(project_id) WHERE project_id IS NOT NULL;
 
 -- Add change_type to changes
 ALTER TABLE changes ADD COLUMN change_type TEXT NOT NULL DEFAULT 'feature';

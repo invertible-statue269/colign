@@ -137,7 +137,12 @@ interface StructuredProposalProps {
   members?: MentionMember[];
 }
 
-export function StructuredProposal({ changeId, projectId, currentStage, members = [] }: StructuredProposalProps) {
+export function StructuredProposal({
+  changeId,
+  projectId,
+  currentStage,
+  members = [],
+}: StructuredProposalProps) {
   const { t } = useI18n();
   const { on } = useEvents();
   const payload = typeof window !== "undefined" ? getTokenPayload() : null;
@@ -256,7 +261,10 @@ export function StructuredProposal({ changeId, projectId, currentStage, members 
   function removeDesignLink(index: number) {
     localRevisionRef.current += 1;
     setSections((prev) => {
-      const updated = { ...prev, designLinks: (prev.designLinks || []).filter((_, i) => i !== index) };
+      const updated = {
+        ...prev,
+        designLinks: (prev.designLinks || []).filter((_, i) => i !== index),
+      };
       sectionsRef.current = updated;
       return updated;
     });
@@ -283,7 +291,12 @@ export function StructuredProposal({ changeId, projectId, currentStage, members 
     !getPlainText(sections.outOfScope) &&
     !getPlainText(sections.approach);
 
-  function handleAIApply(applied: { problem: string; scope: string; outOfScope: string; approach: string }) {
+  function handleAIApply(applied: {
+    problem: string;
+    scope: string;
+    outOfScope: string;
+    approach: string;
+  }) {
     setSections((prev) => ({
       ...prev,
       problem: normalizeSectionContent(applied.problem),
@@ -301,92 +314,95 @@ export function StructuredProposal({ changeId, projectId, currentStage, members 
   }
 
   return (
-    <div className="flex gap-4 py-4">
+    <div className="flex items-stretch gap-4 py-4">
       <div className="min-w-0 flex-1 space-y-4">
-      {!isReviewMode && (
-        <AIProposalGenerator
-          changeId={changeId}
-          onApply={handleAIApply}
-          hasExistingContent={!isProposalEmpty}
-        />
-      )}
-      {SECTIONS.map((section) => {
-        const plainText = getPlainText(sections[section.key]);
-        const isCollapsed = !section.required && !!collapsed[section.key];
-        const hasContent = !!plainText;
+        {!isReviewMode && (
+          <AIProposalGenerator
+            changeId={changeId}
+            onApply={handleAIApply}
+            hasExistingContent={!isProposalEmpty}
+          />
+        )}
+        {SECTIONS.map((section) => {
+          const plainText = getPlainText(sections[section.key]);
+          const isCollapsed = !section.required && !!collapsed[section.key];
+          const hasContent = !!plainText;
 
-        return (
-          <div
-            key={section.key}
-            className="rounded-xl border border-border/40 bg-card/50 transition-colors"
-          >
-            {/* Section header */}
-            <button
-              onClick={() => !section.required && toggleCollapse(section.key)}
-              className={`flex w-full items-center justify-between px-5 py-3 ${
-                section.required ? "" : "cursor-pointer"
-              }`}
+          return (
+            <div
+              key={section.key}
+              className="rounded-xl border border-border/40 bg-card/50 transition-colors"
             >
-              <div className="flex items-center gap-2.5">
-                {!section.required &&
-                  (isCollapsed ? (
-                    <ChevronRight className="size-3.5 text-muted-foreground/50" />
+              {/* Section header */}
+              <button
+                onClick={() => !section.required && toggleCollapse(section.key)}
+                className={`flex w-full items-center justify-between px-5 py-3 ${
+                  section.required ? "" : "cursor-pointer"
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  {!section.required &&
+                    (isCollapsed ? (
+                      <ChevronRight className="size-3.5 text-muted-foreground/50" />
+                    ) : (
+                      <ChevronDown className="size-3.5 text-muted-foreground/50" />
+                    ))}
+                  <span className="text-sm font-medium">{t(section.i18nKey)}</span>
+                  {section.required ? (
+                    <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                      {t("proposal.required")}
+                    </span>
                   ) : (
-                    <ChevronDown className="size-3.5 text-muted-foreground/50" />
-                  ))}
-                <span className="text-sm font-medium">{t(section.i18nKey)}</span>
-                {section.required ? (
-                  <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                    {t("proposal.required")}
-                  </span>
-                ) : (
-                  <span className="rounded bg-muted/80 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                    {t("proposal.optional")}
-                  </span>
-                )}
-                {hasContent && <div className="h-1.5 w-1.5 rounded-full bg-emerald-400" />}
-              </div>
-            </button>
+                    <span className="rounded bg-muted/80 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      {t("proposal.optional")}
+                    </span>
+                  )}
+                  {hasContent && <div className="h-1.5 w-1.5 rounded-full bg-emerald-400" />}
+                </div>
+              </button>
 
-            {/* Section body */}
-            {(!isCollapsed || section.required) && (
-              <div className="border-t border-border/30 px-5 py-4">
-                <ProposalSectionEditor
-                  content={sections[section.key]}
-                  onChange={(value) => updateSection(section.key, value)}
-                  placeholder={t(section.placeholderKey)}
-                  readOnly={isReviewMode}
-                  plainTextLength={plainText.length}
-                />
-              </div>
-            )}
-          </div>
-        );
-      })}
+              {/* Section body */}
+              {(!isCollapsed || section.required) && (
+                <div className="border-t border-border/30 px-5 py-4">
+                  <ProposalSectionEditor
+                    content={sections[section.key]}
+                    onChange={(value) => updateSection(section.key, value)}
+                    placeholder={t(section.placeholderKey)}
+                    readOnly={isReviewMode}
+                    plainTextLength={plainText.length}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
 
-      {/* Design Links */}
-      <DesignLinksSection
-        links={sections.designLinks || []}
-        onAdd={addDesignLink}
-        onRemove={removeDesignLink}
-        readOnly={isReviewMode}
-        t={t}
-      />
+        {/* Design Links */}
+        <DesignLinksSection
+          links={sections.designLinks || []}
+          onAdd={addDesignLink}
+          onRemove={removeDesignLink}
+          readOnly={isReviewMode}
+          t={t}
+        />
 
-      {/* Acceptance Criteria */}
-      <AcceptanceCriteria
-        changeId={changeId}
-        projectId={projectId}
-        reviewMode={isReviewMode}
-        hasProposal={!!(getPlainText(sections.problem) || getPlainText(sections.scope))}
-      />
+        {/* Acceptance Criteria */}
+        <AcceptanceCriteria
+          changeId={changeId}
+          projectId={projectId}
+          reviewMode={isReviewMode}
+          hasProposal={!!(getPlainText(sections.problem) || getPlainText(sections.scope))}
+        />
       </div>
 
       {/* Comment Panel — desktop */}
-      <div className="hidden shrink-0 md:block">
-        <div className="sticky top-56">
+      <div className="hidden shrink-0 self-stretch md:block">
+        <div className="sticky top-4">
           {commentsOpen ? (
-            <div className="w-80 rounded-xl border border-border/40 bg-card/50" style={{ maxHeight: "calc(100vh - 15rem)" }}>
+            <div
+              className="flex w-80 flex-col overflow-hidden rounded-xl border border-border/40 bg-card/50"
+              style={{ maxHeight: "calc(100svh - 2rem)" }}
+            >
               <div className="flex items-center justify-end border-b border-border/50 px-2 py-1">
                 <button
                   onClick={() => setCommentsOpen(false)}
@@ -464,10 +480,7 @@ function ProposalSectionEditor({
   plainTextLength,
 }: ProposalSectionEditorProps) {
   const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Placeholder.configure({ placeholder }),
-    ],
+    extensions: [StarterKit, Placeholder.configure({ placeholder })],
     content: content || undefined,
     editable: !readOnly,
     immediatelyRender: false,
@@ -568,7 +581,9 @@ function ProposalSectionEditor({
         <EditorContent
           editor={editor}
           className={`prose max-w-none px-4 py-3 text-sm dark:prose-invert [&_.ProseMirror]:min-h-[7rem] [&_.ProseMirror]:leading-relaxed [&_.ProseMirror]:outline-none [&_.ProseMirror_h2]:mt-5 [&_.ProseMirror_h2]:mb-2 [&_.ProseMirror_h2]:text-lg [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_h3]:mt-4 [&_.ProseMirror_h3]:mb-2 [&_.ProseMirror_h3]:text-base [&_.ProseMirror_h3]:font-semibold [&_.ProseMirror_ul]:my-2 [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_li]:my-1 [&_.ProseMirror_code]:rounded [&_.ProseMirror_code]:bg-muted [&_.ProseMirror_code]:px-1 [&_.ProseMirror_code]:py-0.5 [&_.ProseMirror_pre]:overflow-x-auto [&_.ProseMirror_pre]:rounded-lg [&_.ProseMirror_pre]:bg-muted/70 [&_.ProseMirror_pre]:p-3 [&_.ProseMirror_p.is-editor-empty:first-child::before]:pointer-events-none [&_.ProseMirror_p.is-editor-empty:first-child::before]:float-left [&_.ProseMirror_p.is-editor-empty:first-child::before]:h-0 [&_.ProseMirror_p.is-editor-empty:first-child::before]:text-muted-foreground/40 [&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)] ${
-            shouldScroll ? "[&_.ProseMirror]:max-h-[32rem] [&_.ProseMirror]:overflow-y-auto [&_.ProseMirror]:pr-2" : ""
+            shouldScroll
+              ? "[&_.ProseMirror]:max-h-[32rem] [&_.ProseMirror]:overflow-y-auto [&_.ProseMirror]:pr-2"
+              : ""
           }`}
         />
       </div>
@@ -657,7 +672,7 @@ function DesignLinksSection({ links, onAdd, onRemove, readOnly, t }: DesignLinks
         {links.map((link, index) => {
           const type = getLinkType(link);
           const embedUrl = getFigmaEmbedUrl(link);
-          const isExpanded = expanded[index] ?? (type === "figma");
+          const isExpanded = expanded[index] ?? type === "figma";
 
           return (
             <div key={index} className="space-y-2">
@@ -705,11 +720,7 @@ function DesignLinksSection({ links, onAdd, onRemove, readOnly, t }: DesignLinks
               {/* Figma embed preview */}
               {embedUrl && isExpanded && (
                 <div className="overflow-hidden rounded-lg border border-border/30">
-                  <iframe
-                    src={embedUrl}
-                    className="h-[450px] w-full"
-                    allowFullScreen
-                  />
+                  <iframe src={embedUrl} className="h-[450px] w-full" allowFullScreen />
                 </div>
               )}
             </div>

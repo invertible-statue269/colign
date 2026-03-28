@@ -12,5 +12,5 @@ CREATE TABLE api_tokens (
 );
 
 CREATE INDEX idx_api_tokens_user_id ON api_tokens(user_id);
-CREATE INDEX idx_api_tokens_token_hash ON api_tokens(token_hash);
+-- token_hash UNIQUE already creates B-tree index, no separate index needed
 CREATE INDEX idx_api_tokens_oauth_client ON api_tokens(user_id, org_id, token_type, oauth_client_id);

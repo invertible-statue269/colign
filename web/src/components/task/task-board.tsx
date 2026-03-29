@@ -152,44 +152,47 @@ export function TaskBoard({ changeId, projectId, members }: TaskBoardProps) {
     [changeId, projectId],
   );
 
-  const handleUpdate = useCallback(async (id: bigint, fields: Record<string, unknown>) => {
-    // Snapshot for rollback
-    let prevTasks: TaskType[] = [];
-    setTasks((prev) => {
-      prevTasks = prev;
-      return prev.map((t) => (t.id === id ? { ...t, ...(fields as Partial<TaskType>) } : t));
-    });
+  const handleUpdate = useCallback(
+    async (id: bigint, fields: Record<string, unknown>) => {
+      // Snapshot for rollback
+      let prevTasks: TaskType[] = [];
+      setTasks((prev) => {
+        prevTasks = prev;
+        return prev.map((t) => (t.id === id ? { ...t, ...(fields as Partial<TaskType>) } : t));
+      });
 
-    const req: {
-      id: bigint;
-      title?: string;
-      description?: string;
-      status?: string;
-      specRef?: string;
-      assigneeId?: bigint;
-      clearAssignee?: boolean;
-    } = { id };
+      const req: {
+        id: bigint;
+        title?: string;
+        description?: string;
+        status?: string;
+        specRef?: string;
+        assigneeId?: bigint;
+        clearAssignee?: boolean;
+      } = { id };
 
-    if ("title" in fields) req.title = fields.title as string;
-    if ("description" in fields) req.description = fields.description as string;
-    if ("status" in fields) req.status = fields.status as string;
-    if ("specRef" in fields) req.specRef = fields.specRef as string;
-    if ("assigneeId" in fields) {
-      const val = fields.assigneeId;
-      if (val == null) {
-        req.clearAssignee = true;
-      } else {
-        req.assigneeId = val as bigint;
+      if ("title" in fields) req.title = fields.title as string;
+      if ("description" in fields) req.description = fields.description as string;
+      if ("status" in fields) req.status = fields.status as string;
+      if ("specRef" in fields) req.specRef = fields.specRef as string;
+      if ("assigneeId" in fields) {
+        const val = fields.assigneeId;
+        if (val == null) {
+          req.clearAssignee = true;
+        } else {
+          req.assigneeId = val as bigint;
+        }
       }
-    }
 
-    try {
-      await taskClient.updateTask({ ...req, projectId });
-    } catch (err) {
-      showError(t("toast.taskUpdateFailed"), err);
-      setTasks(prevTasks);
-    }
-  }, [projectId]);
+      try {
+        await taskClient.updateTask({ ...req, projectId });
+      } catch (err) {
+        showError(t("toast.taskUpdateFailed"), err);
+        setTasks(prevTasks);
+      }
+    },
+    [projectId],
+  );
 
   const handleUndo = useCallback(() => {
     if (!pendingDelete) return;
@@ -238,6 +241,7 @@ export function TaskBoard({ changeId, projectId, members }: TaskBoardProps) {
       try {
         await taskClient.reorderTasks({
           changeId,
+          projectId,
           items: items.map((i) => ({
             id: i.id,
             status: i.status,

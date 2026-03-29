@@ -197,6 +197,8 @@
     "title": "대시보드",
     "projects": "프로젝트",
     "activeChanges": "진행 중인 변경",
+    "draft": "초안",
+    "spec": "설계",
     "approved": "승인됨",
     "recentActivity": "최근 활동",
     "recentChanges": "최근 변경사항",

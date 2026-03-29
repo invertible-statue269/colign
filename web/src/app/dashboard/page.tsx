@@ -7,7 +7,7 @@ import { useI18n } from "@/lib/i18n";
 import { useOrg } from "@/lib/org-context";
 import { projectClient } from "@/lib/project";
 import { toChangePath, toProjectPath } from "@/lib/project-ref";
-import { FolderKanban, GitBranch, CheckCircle2, ChevronRight } from "lucide-react";
+import { FolderKanban, PenLine, FileText, CheckCircle2, ChevronRight } from "lucide-react";
 import { showError } from "@/lib/toast";
 
 interface Project {
@@ -106,9 +106,8 @@ export default function DashboardPage() {
     load();
   }, [currentOrg]);
 
-  const activeChanges = allChanges.filter(
-    (c) => c.change.stage === "draft" || c.change.stage === "spec",
-  );
+  const draftChanges = allChanges.filter((c) => c.change.stage === "draft");
+  const specChanges = allChanges.filter((c) => c.change.stage === "spec");
   const approvedChanges = allChanges.filter((c) => c.change.stage === "approved");
 
   // Sort by most recently updated
@@ -135,19 +134,23 @@ export default function DashboardPage() {
       iconColor: "text-primary",
     },
     {
-      value: activeChanges.length,
-      label: t("dashboard.activeChanges"),
-      sub: `${activeChanges.filter((c) => c.change.stage === "draft").length} draft, ${activeChanges.filter((c) => c.change.stage === "spec").length} spec`,
-      icon: GitBranch,
+      value: draftChanges.length,
+      label: t("dashboard.draft"),
+      sub: `${draftChanges.map((c) => c.projectName).filter((v, i, a) => a.indexOf(v) === i).length} projects`,
+      icon: PenLine,
+      iconColor: "text-amber-400",
+    },
+    {
+      value: specChanges.length,
+      label: t("dashboard.spec"),
+      sub: `${specChanges.map((c) => c.projectName).filter((v, i, a) => a.indexOf(v) === i).length} projects`,
+      icon: FileText,
       iconColor: "text-blue-400",
     },
     {
       value: approvedChanges.length,
       label: t("dashboard.approved"),
-      sub:
-        approvedChanges.length > 0
-          ? `${approvedChanges.map((c) => c.projectName).filter((v, i, a) => a.indexOf(v) === i).length} projects`
-          : "All clear",
+      sub: `${approvedChanges.map((c) => c.projectName).filter((v, i, a) => a.indexOf(v) === i).length} projects`,
       icon: CheckCircle2,
       iconColor: "text-emerald-400",
     },

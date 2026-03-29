@@ -197,6 +197,8 @@
     "title": "Dashboard",
     "projects": "Projects",
     "activeChanges": "Active Changes",
+    "draft": "Draft",
+    "spec": "Spec",
     "approved": "Approved",
     "recentActivity": "Recent Activity",
     "recentChanges": "Recent Changes",

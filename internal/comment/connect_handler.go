@@ -147,6 +147,7 @@ func commentToProto(c *models.Comment) *commentv1.Comment {
 	}
 	if c.User != nil {
 		proto.UserName = c.User.Name
+		proto.UserAvatarUrl = c.User.AvatarURL
 	}
 
 	proto.Replies = make([]*commentv1.Reply, len(c.Replies))
@@ -167,6 +168,7 @@ func replyToProto(r *models.CommentReply) *commentv1.Reply {
 	}
 	if r.User != nil {
 		proto.UserName = r.User.Name
+		proto.UserAvatarUrl = r.User.AvatarURL
 	}
 	return proto
 }

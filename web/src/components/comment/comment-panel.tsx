@@ -7,6 +7,7 @@ import { commentClient } from "@/lib/comment";
 import { MessageSquare, Check, Trash2, ChevronDown, ChevronUp, Send } from "lucide-react";
 import { showError } from "@/lib/toast";
 import { MentionTextarea, renderMentionBody, type MentionMember } from "./mention-textarea";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 interface CommentData {
   id: bigint;
@@ -14,6 +15,7 @@ interface CommentData {
   body: string;
   userId: bigint;
   userName: string;
+  userAvatarUrl: string;
   resolved: boolean;
   replies: ReplyData[];
   createdAt: Date;
@@ -24,6 +26,7 @@ interface ReplyData {
   body: string;
   userId: bigint;
   userName: string;
+  userAvatarUrl: string;
   createdAt: Date;
 }
 
@@ -82,12 +85,14 @@ export function CommentPanel({
           body: c.body,
           userId: c.userId,
           userName: c.userName,
+          userAvatarUrl: c.userAvatarUrl,
           resolved: c.resolved,
           replies: c.replies.map((r) => ({
             id: r.id,
             body: r.body,
             userId: r.userId,
             userName: r.userName,
+            userAvatarUrl: r.userAvatarUrl,
             createdAt: r.createdAt ? new Date(Number(r.createdAt.seconds) * 1000) : new Date(),
           })),
           createdAt: c.createdAt ? new Date(Number(c.createdAt.seconds) * 1000) : new Date(),
@@ -258,9 +263,12 @@ export function CommentPanel({
                 >
                   {/* Comment header */}
                   <div className="flex items-center gap-2">
-                    <div className="flex size-6 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-primary uppercase">
-                      {comment.userName.charAt(0)}
-                    </div>
+                    <Avatar size="sm">
+                      {comment.userAvatarUrl && (
+                        <AvatarImage src={comment.userAvatarUrl} alt={comment.userName} />
+                      )}
+                      <AvatarFallback>{comment.userName.charAt(0).toUpperCase()}</AvatarFallback>
+                    </Avatar>
                     <span className="text-xs font-medium">{comment.userName}</span>
                     <span className="text-[10px] text-muted-foreground">
                       {timeAgo(comment.createdAt)}
@@ -341,9 +349,14 @@ export function CommentPanel({
                       {comment.replies.map((reply) => (
                         <div key={String(reply.id)}>
                           <div className="flex items-center gap-2">
-                            <div className="flex size-5 items-center justify-center rounded-full bg-muted text-[9px] font-bold uppercase">
-                              {reply.userName.charAt(0)}
-                            </div>
+                            <Avatar size="sm">
+                              {reply.userAvatarUrl && (
+                                <AvatarImage src={reply.userAvatarUrl} alt={reply.userName} />
+                              )}
+                              <AvatarFallback>
+                                {reply.userName.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
                             <span className="text-[10px] font-medium">{reply.userName}</span>
                             <span className="text-[10px] text-muted-foreground">
                               {timeAgo(reply.createdAt)}

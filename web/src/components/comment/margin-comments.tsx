@@ -7,6 +7,7 @@ import { Check, Trash2, Send, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { showError } from "@/lib/toast";
 import { MentionTextarea, renderMentionBody, type MentionMember } from "./mention-textarea";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 interface CommentData {
   id: bigint;
@@ -14,6 +15,7 @@ interface CommentData {
   body: string;
   userId: bigint;
   userName: string;
+  userAvatarUrl: string;
   resolved: boolean;
   replies: ReplyData[];
   createdAt: Date;
@@ -24,6 +26,7 @@ interface ReplyData {
   body: string;
   userId: bigint;
   userName: string;
+  userAvatarUrl: string;
   createdAt: Date;
 }
 
@@ -81,12 +84,14 @@ export function MarginComments({
           body: c.body,
           userId: c.userId,
           userName: c.userName,
+          userAvatarUrl: c.userAvatarUrl,
           resolved: c.resolved,
           replies: c.replies.map((r) => ({
             id: r.id,
             body: r.body,
             userId: r.userId,
             userName: r.userName,
+            userAvatarUrl: r.userAvatarUrl,
             createdAt: r.createdAt ? new Date(Number(r.createdAt.seconds) * 1000) : new Date(),
           })),
           createdAt: c.createdAt ? new Date(Number(c.createdAt.seconds) * 1000) : new Date(),
@@ -270,9 +275,12 @@ export function MarginComments({
             >
               {/* Collapsed: avatar + first line */}
               <div className="flex items-center gap-2">
-                <div className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[9px] font-bold text-primary uppercase">
-                  {comment.userName.charAt(0)}
-                </div>
+                <Avatar size="sm">
+                  {comment.userAvatarUrl && (
+                    <AvatarImage src={comment.userAvatarUrl} alt={comment.userName} />
+                  )}
+                  <AvatarFallback>{comment.userName.charAt(0).toUpperCase()}</AvatarFallback>
+                </Avatar>
                 <span className="font-medium text-foreground/80">{comment.userName}</span>
                 <span className="text-muted-foreground">{timeAgo(comment.createdAt)}</span>
               </div>
@@ -310,7 +318,9 @@ export function MarginComments({
                               {timeAgo(reply.createdAt)}
                             </span>
                           </div>
-                          <p className="text-foreground/80">{renderMentionBody(reply.body, members)}</p>
+                          <p className="text-foreground/80">
+                            {renderMentionBody(reply.body, members)}
+                          </p>
                         </div>
                       ))}
                     </div>

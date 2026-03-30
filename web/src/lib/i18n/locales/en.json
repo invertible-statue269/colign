@@ -439,6 +439,7 @@
     "pendingInvitations": "Pending Invitations",
     "saveDomains": "Save Domains",
     "domainsUpdated": "Allowed domains updated",
+    "invalidEmail": "Please enter a valid email address",
     "invitationSent": "Invitation sent!",
     "revokeInvitation": "Revoke",
     "noMembers": "No members yet. Invite someone to get started.",

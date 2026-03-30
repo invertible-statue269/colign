@@ -33,8 +33,11 @@ func (h *OAuthHandler) Redirect(w http.ResponseWriter, r *http.Request) {
 		Name:     "oauth_state",
 		Value:    state,
 		Path:     "/",
+		Domain:   h.cookieOpts.Domain,
 		MaxAge:   600,
 		HttpOnly: true,
+		Secure:   h.cookieOpts.Secure,
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	url, err := h.service.GetAuthURL(provider, state)

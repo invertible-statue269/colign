@@ -112,13 +112,9 @@ export default function AuthPage() {
     }
   }
 
-  async function handleOAuth(provider: string) {
-    try {
-      const res = await authClient.getOAuthURL({ provider });
-      window.location.href = res.url;
-    } catch {
-      setError("OAuth failed");
-    }
+  function handleOAuth(provider: string) {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+    window.location.href = `${apiUrl}/api/auth/${provider}`;
   }
 
   return (

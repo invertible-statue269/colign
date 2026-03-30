@@ -439,6 +439,7 @@
     "pendingInvitations": "대기 중인 초대",
     "saveDomains": "도메인 저장",
     "domainsUpdated": "허용 도메인이 업데이트되었습니다",
+    "invalidEmail": "올바른 이메일 주소를 입력하세요",
     "invitationSent": "초대가 전송되었습니다!",
     "revokeInvitation": "취소",
     "noMembers": "아직 멤버가 없습니다. 누군가를 초대하세요.",

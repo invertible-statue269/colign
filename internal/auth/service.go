@@ -170,6 +170,11 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*TokenPair, erro
 		return nil, ErrInvalidCredentials
 	}
 
+	// Accept pending invitations on every login
+	if s.orgJoiner != nil {
+		s.orgJoiner.AutoJoinOrgs(ctx, user.ID, req.Email)
+	}
+
 	// Get user's first organization, or create one if none exists
 	orgID, err := s.getOrCreateDefaultOrg(ctx, user)
 	if err != nil {

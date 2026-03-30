@@ -159,7 +159,12 @@ export function OrgMembers() {
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
-    if (!inviteEmail.trim()) return;
+    const email = inviteEmail.trim();
+    if (!email) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError(t("org.invalidEmail"));
+      return;
+    }
     setInviting(true);
     setError("");
     setSuccess("");

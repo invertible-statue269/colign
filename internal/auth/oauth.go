@@ -222,6 +222,10 @@ func (s *OAuthService) findOrCreateUser(ctx context.Context, provider string, in
 			account.ExpiresAt = token.Expiry.Unix()
 		}
 		_, _ = s.db.NewUpdate().Model(account).WherePK().Exec(ctx)
+		// Accept pending invitations on every login
+		if s.orgJoiner != nil {
+			s.orgJoiner.AutoJoinOrgs(ctx, account.User.ID, account.User.Email)
+		}
 		orgID := s.getDefaultOrgID(ctx, account.User.ID)
 		return account.User, orgID, nil
 	}
@@ -265,12 +269,14 @@ func (s *OAuthService) findOrCreateUser(ctx context.Context, provider string, in
 		return nil, 0, err
 	}
 
+	// Accept pending invitations on every login
+	if s.orgJoiner != nil {
+		s.orgJoiner.AutoJoinOrgs(ctx, user.ID, info.Email)
+	}
+
 	var orgID int64
 	if isNewUser {
-		// Try auto-joining existing orgs via domain or invitation
-		if s.orgJoiner != nil {
-			orgID, _ = s.orgJoiner.AutoJoinOrgs(ctx, user.ID, info.Email)
-		}
+		orgID = s.getDefaultOrgID(ctx, user.ID)
 
 		// If no org was joined, create a personal workspace
 		if orgID == 0 {

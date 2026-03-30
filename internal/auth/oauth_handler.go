@@ -26,7 +26,10 @@ func (h *OAuthHandler) Redirect(w http.ResponseWriter, r *http.Request) {
 	provider := r.PathValue("provider")
 
 	stateBytes := make([]byte, 16)
-	_, _ = rand.Read(stateBytes)
+	if _, err := rand.Read(stateBytes); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	state := hex.EncodeToString(stateBytes)
 
 	http.SetCookie(w, &http.Cookie{
@@ -55,7 +58,7 @@ func (h *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	state := r.URL.Query().Get("state")
 
 	cookie, err := r.Cookie("oauth_state")
-	if err != nil || cookie.Value != state {
+	if err != nil || cookie.Value == "" || cookie.Value != state {
 		http.Error(w, "invalid state", http.StatusBadRequest)
 		return
 	}

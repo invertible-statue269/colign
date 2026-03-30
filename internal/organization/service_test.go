@@ -3,6 +3,7 @@ package organization
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -99,5 +100,113 @@ func TestDelete_NotMember(t *testing.T) {
 
 	_, err := svc.Delete(ctx, 1, 10)
 	require.ErrorIs(t, err, ErrOrgNotFound)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// ---------------------------------------------------------------------------
+// AcceptPendingInvitations
+// ---------------------------------------------------------------------------
+
+func TestAcceptPendingInvitations_NoPendingInvitations(t *testing.T) {
+	db, mock := setupTestDB(t)
+	svc := NewService(db)
+	ctx := context.Background()
+
+	// FindPendingInvitationsByEmail returns empty set
+	mock.ExpectQuery("SELECT").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "organization_id", "email", "role", "token", "invited_by", "status", "expires_at", "created_at"}))
+
+	orgID, err := svc.AcceptPendingInvitations(ctx, 1, "alice@example.com")
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), orgID)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAcceptPendingInvitations_AcceptsSingleInvitation(t *testing.T) {
+	db, mock := setupTestDB(t)
+	svc := NewService(db)
+	ctx := context.Background()
+
+	// FindPendingInvitationsByEmail returns one invitation
+	mock.ExpectQuery("SELECT").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "organization_id", "email", "role", "token", "invited_by", "status", "expires_at", "created_at"}).
+			AddRow(int64(100), int64(5), "alice@example.com", "member", "tok-abc", int64(2), "pending", "2099-01-01 00:00:00", "2025-01-01 00:00:00"))
+
+	// Insert organization member (ON CONFLICT DO UPDATE)
+	mock.ExpectQuery("INSERT").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(1)))
+
+	// Update invitation status to accepted
+	mock.ExpectExec("UPDATE").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	orgID, err := svc.AcceptPendingInvitations(ctx, 1, "alice@example.com")
+	require.NoError(t, err)
+	assert.Equal(t, int64(5), orgID)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAcceptPendingInvitations_AcceptsMultipleInvitations(t *testing.T) {
+	db, mock := setupTestDB(t)
+	svc := NewService(db)
+	ctx := context.Background()
+
+	// FindPendingInvitationsByEmail returns two invitations
+	mock.ExpectQuery("SELECT").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "organization_id", "email", "role", "token", "invited_by", "status", "expires_at", "created_at"}).
+			AddRow(int64(100), int64(5), "alice@example.com", "member", "tok-1", int64(2), "pending", "2099-01-01 00:00:00", "2025-01-01 00:00:00").
+			AddRow(int64(101), int64(8), "alice@example.com", "admin", "tok-2", int64(3), "pending", "2099-01-01 00:00:00", "2025-01-01 00:00:00"))
+
+	// First invitation: insert member + update status
+	mock.ExpectQuery("INSERT").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(1)))
+	mock.ExpectExec("UPDATE").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	// Second invitation: insert member + update status
+	mock.ExpectQuery("INSERT").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(2)))
+	mock.ExpectExec("UPDATE").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	orgID, err := svc.AcceptPendingInvitations(ctx, 1, "alice@example.com")
+	require.NoError(t, err)
+	// Returns the first org ID joined
+	assert.Equal(t, int64(5), orgID)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAcceptPendingInvitations_DBErrorOnFindInvitations(t *testing.T) {
+	db, mock := setupTestDB(t)
+	svc := NewService(db)
+	ctx := context.Background()
+
+	// FindPendingInvitationsByEmail returns a DB error
+	dbErr := errors.New("connection refused")
+	mock.ExpectQuery("SELECT").
+		WillReturnError(dbErr)
+
+	orgID, err := svc.AcceptPendingInvitations(ctx, 1, "alice@example.com")
+	require.Error(t, err)
+	assert.Equal(t, int64(0), orgID)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAcceptPendingInvitations_DoesNotDoDomainAutoJoin(t *testing.T) {
+	db, mock := setupTestDB(t)
+	svc := NewService(db)
+	ctx := context.Background()
+
+	// AcceptPendingInvitations should ONLY query org_invitations, never organizations.
+	// With no pending invitations, only one SELECT should fire.
+	mock.ExpectQuery("SELECT").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "organization_id", "email", "role", "token", "invited_by", "status", "expires_at", "created_at"}))
+
+	orgID, err := svc.AcceptPendingInvitations(ctx, 1, "alice@corp.com")
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), orgID)
+
+	// If domain auto-join were running, there would be a second SELECT
+	// against organizations with allowed_domains. Verify only 1 query ran.
 	require.NoError(t, mock.ExpectationsWereMet())
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -221,10 +222,14 @@ func (s *OAuthService) findOrCreateUser(ctx context.Context, provider string, in
 		if !token.Expiry.IsZero() {
 			account.ExpiresAt = token.Expiry.Unix()
 		}
-		_, _ = s.db.NewUpdate().Model(account).WherePK().Exec(ctx)
+		if _, err := s.db.NewUpdate().Model(account).WherePK().Exec(ctx); err != nil {
+			slog.Warn("failed to update oauth account tokens", "account_id", account.ID, "error", err)
+		}
 		// Accept pending invitations on every login (without domain-based auto-join)
 		if s.orgJoiner != nil {
-			s.orgJoiner.AcceptPendingInvitations(ctx, account.User.ID, account.User.Email)
+			if _, err := s.orgJoiner.AcceptPendingInvitations(ctx, account.User.ID, account.User.Email); err != nil {
+				slog.Warn("failed to accept pending invitations on oauth login", "user_id", account.User.ID, "error", err)
+			}
 		}
 		orgID := s.getDefaultOrgID(ctx, account.User.ID)
 		return account.User, orgID, nil
@@ -272,9 +277,13 @@ func (s *OAuthService) findOrCreateUser(ctx context.Context, provider string, in
 	// For new users: domain auto-join + invitations; for existing users: invitations only
 	if s.orgJoiner != nil {
 		if isNewUser {
-			s.orgJoiner.AutoJoinOrgs(ctx, user.ID, info.Email)
+			if _, err := s.orgJoiner.AutoJoinOrgs(ctx, user.ID, info.Email); err != nil {
+				slog.Warn("failed to auto-join orgs for new oauth user", "user_id", user.ID, "error", err)
+			}
 		} else {
-			s.orgJoiner.AcceptPendingInvitations(ctx, user.ID, info.Email)
+			if _, err := s.orgJoiner.AcceptPendingInvitations(ctx, user.ID, info.Email); err != nil {
+				slog.Warn("failed to accept pending invitations on oauth login", "user_id", user.ID, "error", err)
+			}
 		}
 	}
 

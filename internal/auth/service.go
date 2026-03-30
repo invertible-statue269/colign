@@ -7,9 +7,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"time"
-
+	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/uptrace/bun"
 	"golang.org/x/crypto/bcrypt"
@@ -121,7 +121,11 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*TokenPair
 	// Try auto-joining existing orgs via domain or invitation
 	var orgID int64
 	if s.orgJoiner != nil {
-		orgID, _ = s.orgJoiner.AutoJoinOrgs(ctx, user.ID, req.Email)
+		var joinErr error
+		orgID, joinErr = s.orgJoiner.AutoJoinOrgs(ctx, user.ID, req.Email)
+		if joinErr != nil {
+			slog.Warn("failed to auto-join orgs on register", "user_id", user.ID, "error", joinErr)
+		}
 	}
 
 	// If no org was joined, create a personal workspace
@@ -175,7 +179,9 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*TokenPair, erro
 
 	// Accept pending invitations on every login (without domain-based auto-join)
 	if s.orgJoiner != nil {
-		s.orgJoiner.AcceptPendingInvitations(ctx, user.ID, req.Email)
+		if _, err := s.orgJoiner.AcceptPendingInvitations(ctx, user.ID, req.Email); err != nil {
+			slog.Warn("failed to accept pending invitations on login", "user_id", user.ID, "error", err)
+		}
 	}
 
 	// Get user's first organization, or create one if none exists

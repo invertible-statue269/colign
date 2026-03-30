@@ -136,7 +136,7 @@ func (h *ConnectHandler) OAuthCallback(ctx context.Context, req *connect.Request
 	// Validate OAuth state against cookie
 	cookieReq := &http.Request{Header: http.Header{"Cookie": req.Header().Values("Cookie")}}
 	stateCookie, err := cookieReq.Cookie("oauth_state")
-	if err != nil || stateCookie.Value != req.Msg.State {
+	if err != nil || stateCookie.Value == "" || stateCookie.Value != req.Msg.State {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid oauth state"))
 	}
 

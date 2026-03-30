@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -304,7 +305,7 @@ func (s *Service) AcceptPendingInvitations(ctx context.Context, userID int64, em
 
 	invitations, err := s.FindPendingInvitationsByEmail(ctx, email)
 	if err != nil {
-		return 0, nil
+		return 0, err
 	}
 	for _, inv := range invitations {
 		member := &models.OrganizationMember{
@@ -318,10 +319,12 @@ func (s *Service) AcceptPendingInvitations(ctx context.Context, userID int64, em
 			Exec(ctx); err != nil {
 			continue
 		}
-		_, _ = s.db.NewUpdate().Model(&inv).
+		if _, err := s.db.NewUpdate().Model(&inv).
 			Set("status = ?", models.InvitationStatusAccepted).
 			WherePK().
-			Exec(ctx)
+			Exec(ctx); err != nil {
+			slog.Warn("failed to mark invitation as accepted", "invitation_id", inv.ID, "error", err)
+		}
 
 		if firstOrgID == 0 {
 			firstOrgID = inv.OrganizationID
@@ -360,7 +363,7 @@ func (s *Service) AutoJoinOrgs(ctx context.Context, userID int64, email string) 
 	// 2. Accept pending invitations
 	invitations, err := s.FindPendingInvitationsByEmail(ctx, email)
 	if err != nil {
-		return firstOrgID, nil
+		return firstOrgID, err
 	}
 	for _, inv := range invitations {
 		member := &models.OrganizationMember{
@@ -374,11 +377,12 @@ func (s *Service) AutoJoinOrgs(ctx context.Context, userID int64, email string) 
 			Exec(ctx); err != nil {
 			continue
 		}
-		// Mark invitation as accepted
-		_, _ = s.db.NewUpdate().Model(&inv).
+		if _, err := s.db.NewUpdate().Model(&inv).
 			Set("status = ?", models.InvitationStatusAccepted).
 			WherePK().
-			Exec(ctx)
+			Exec(ctx); err != nil {
+			slog.Warn("failed to mark invitation as accepted", "invitation_id", inv.ID, "error", err)
+		}
 
 		if firstOrgID == 0 {
 			firstOrgID = inv.OrganizationID

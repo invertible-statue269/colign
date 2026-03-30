@@ -10,8 +10,8 @@ import { toProjectPath } from "@/lib/project-ref";
 import { Folder, Calendar, icons, type LucideIcon } from "lucide-react";
 import { showError } from "@/lib/toast";
 import { CreateProjectDialog } from "@/components/project/create-project-dialog";
-import { GettingStartedModal } from "@/components/onboarding/getting-started-modal";
-import { GettingStartedTrigger } from "@/components/onboarding/getting-started-trigger";
+import { GettingStartedModal } from "@/components/getting-started/getting-started-modal";
+import { GettingStartedTrigger } from "@/components/getting-started/getting-started-trigger";
 
 const GETTING_STARTED_FLAG = "colign:show-getting-started";
 

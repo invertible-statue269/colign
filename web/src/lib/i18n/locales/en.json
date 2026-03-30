@@ -422,23 +422,18 @@
     "networkError": "Network error. Please check your connection.",
     "retryAction": "Retry"
   },
-  "onboarding": {
-    "createWorkspace": "Create your workspace",
-    "createWorkspaceDesc": "A workspace is where your team collaborates on specs and designs.",
-    "workspaceName": "Workspace name",
-    "changeInSettings": "You can change this later in settings.",
-    "allSet": "You're all set!",
-    "workspaceReady": "Your workspace is ready. Start by creating your first project.",
-    "goToProjects": "Go to projects"
-  },
   "gettingStarted": {
     "eyebrow": "Getting Started",
     "title": "Connect Claude Code before you create your first spec",
     "description": "Install the Colign Claude Code plugin, then use the workflow skills to explore, plan, and implement against your specs.",
     "installTitle": "1. Install the Claude Code plugin",
     "installDescription": "Run these commands in Claude Code to register the Colign marketplace, install the plugin, and reload plugins.",
-    "skillsTitle": "2. Start with these skills",
-    "skillsDescription": "These are the fastest ways to verify the connection and begin working inside Colign from Claude Code.",
+    "skillsTitle": "2. Pick the workflow that matches your role",
+    "skillsDescription": "Use explore and propose for product thinking, then switch to plan and implement for delivery.",
+    "pmTitle": "PM + Designer",
+    "pmDescription": "Use these skills to understand the current state, shape the problem, and turn requirements into a proposal.",
+    "devTitle": "Developer",
+    "devDescription": "Use these skills after the proposal is ready to break work down and implement against the spec.",
     "openGuide": "Open plugin guide",
     "startInProjects": "Continue to projects",
     "openButton": "Claude Code setup"

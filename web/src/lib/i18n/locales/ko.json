@@ -422,23 +422,18 @@
     "networkError": "네트워크 오류입니다. 연결 상태를 확인하세요.",
     "retryAction": "재시도"
   },
-  "onboarding": {
-    "createWorkspace": "워크스페이스 만들기",
-    "createWorkspaceDesc": "워크스페이스는 팀이 스펙과 설계를 함께 작업하는 공간입니다.",
-    "workspaceName": "워크스페이스 이름",
-    "changeInSettings": "설정에서 나중에 변경할 수 있습니다.",
-    "allSet": "준비 완료!",
-    "workspaceReady": "워크스페이스가 준비되었습니다. 첫 번째 프로젝트를 만들어보세요.",
-    "goToProjects": "프로젝트로 이동"
-  },
   "gettingStarted": {
     "eyebrow": "시작 가이드",
     "title": "첫 스펙을 만들기 전에 Claude Code를 연결하세요",
     "description": "Colign Claude Code 플러그인을 설치한 뒤 workflow skill로 스펙 탐색, 계획, 구현까지 바로 시작할 수 있습니다.",
     "installTitle": "1. Claude Code 플러그인 설치",
     "installDescription": "Claude Code에서 아래 명령으로 Colign marketplace를 등록하고 플러그인을 설치한 뒤 다시 불러오세요.",
-    "skillsTitle": "2. 이 skill부터 써보세요",
-    "skillsDescription": "연결 확인과 첫 작업 시작에 가장 빠른 명령들입니다.",
+    "skillsTitle": "2. 역할에 맞는 workflow를 고르세요",
+    "skillsDescription": "문제 탐색과 제안은 explore, propose로 시작하고 실제 개발은 plan, implement로 이어가면 됩니다.",
+    "pmTitle": "PM + Designer",
+    "pmDescription": "현재 상태를 파악하고 문제를 정리한 뒤 요구사항을 proposal로 만드는 데 쓰는 skill입니다.",
+    "devTitle": "Developer",
+    "devDescription": "proposal이 준비된 뒤 작업을 쪼개고 스펙 기준으로 구현을 진행할 때 쓰는 skill입니다.",
     "openGuide": "플러그인 가이드 열기",
     "startInProjects": "프로젝트로 계속",
     "openButton": "Claude Code 설정"

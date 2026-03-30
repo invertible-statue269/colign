@@ -11,7 +11,7 @@ import { createClient, ConnectError, Code } from "@connectrpc/connect";
 import { AuthService } from "@/gen/proto/auth/v1/auth_pb";
 import { transport } from "@/lib/connect";
 
-const NO_SIDEBAR_PATHS = ["/auth", "/onboarding"];
+const NO_SIDEBAR_PATHS = ["/auth"];
 
 export function SidebarLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

@@ -431,6 +431,18 @@
     "workspaceReady": "Your workspace is ready. Start by creating your first project.",
     "goToProjects": "Go to projects"
   },
+  "gettingStarted": {
+    "eyebrow": "Getting Started",
+    "title": "Connect Claude Code before you create your first spec",
+    "description": "Install the Colign Claude Code plugin, then use the workflow skills to explore, plan, and implement against your specs.",
+    "installTitle": "1. Install the Claude Code plugin",
+    "installDescription": "Run these commands in Claude Code to register the Colign marketplace, install the plugin, and reload plugins.",
+    "skillsTitle": "2. Start with these skills",
+    "skillsDescription": "These are the fastest ways to verify the connection and begin working inside Colign from Claude Code.",
+    "openGuide": "Open plugin guide",
+    "startInProjects": "Continue to projects",
+    "openButton": "Claude Code setup"
+  },
   "org": {
     "members": "Organization Members",
     "membersDesc": "Manage members of your organization.",

@@ -140,7 +140,7 @@ func (h *ConnectHandler) OAuthCallback(ctx context.Context, req *connect.Request
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid oauth state"))
 	}
 
-	tokenPair, err := h.oauthService.HandleCallback(ctx, req.Msg.Provider, req.Msg.Code)
+	tokenPair, _, err := h.oauthService.HandleCallback(ctx, req.Msg.Provider, req.Msg.Code)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}

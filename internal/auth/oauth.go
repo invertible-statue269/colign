@@ -74,32 +74,36 @@ func (s *OAuthService) GetAuthURL(provider, state string) (string, error) {
 	return cfg.AuthCodeURL(state), nil
 }
 
-func (s *OAuthService) HandleCallback(ctx context.Context, provider, code string) (*TokenPair, error) {
+func (s *OAuthService) HandleCallback(ctx context.Context, provider, code string) (*TokenPair, bool, error) {
 	if !s.isProviderEnabled(provider) {
-		return nil, fmt.Errorf("provider not enabled: %s", provider)
+		return nil, false, fmt.Errorf("provider not enabled: %s", provider)
 	}
 
 	cfg, err := s.getConfig(provider)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	token, err := cfg.Exchange(ctx, code)
 	if err != nil {
-		return nil, fmt.Errorf("oauth exchange failed: %w", err)
+		return nil, false, fmt.Errorf("oauth exchange failed: %w", err)
 	}
 
 	userInfo, err := s.fetchUserInfo(ctx, provider, token)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
-	user, orgID, err := s.findOrCreateUser(ctx, provider, userInfo, token)
+	user, orgID, isNewUser, err := s.findOrCreateUser(ctx, provider, userInfo, token)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
-	return s.createSession(ctx, user, orgID)
+	tokenPair, err := s.createSession(ctx, user, orgID)
+	if err != nil {
+		return nil, false, err
+	}
+	return tokenPair, isNewUser, nil
 }
 
 type oauthUserInfo struct {
@@ -206,7 +210,7 @@ func (s *OAuthService) fetchGoogleUser(client *http.Client) (*oauthUserInfo, err
 	}, nil
 }
 
-func (s *OAuthService) findOrCreateUser(ctx context.Context, provider string, info *oauthUserInfo, token *oauth2.Token) (*models.User, int64, error) {
+func (s *OAuthService) findOrCreateUser(ctx context.Context, provider string, info *oauthUserInfo, token *oauth2.Token) (*models.User, int64, bool, error) {
 	// Check if account already exists
 	account := new(models.Account)
 	err := s.db.NewSelect().Model(account).
@@ -232,11 +236,11 @@ func (s *OAuthService) findOrCreateUser(ctx context.Context, provider string, in
 			}
 		}
 		orgID := s.getDefaultOrgID(ctx, account.User.ID)
-		return account.User, orgID, nil
+		return account.User, orgID, false, nil
 	}
 
 	if !errors.Is(err, sql.ErrNoRows) {
-		return nil, 0, err
+		return nil, 0, false, err
 	}
 
 	// Check if user with same email exists
@@ -253,10 +257,10 @@ func (s *OAuthService) findOrCreateUser(ctx context.Context, provider string, in
 			EmailVerified: true,
 		}
 		if _, err := s.db.NewInsert().Model(user).Exec(ctx); err != nil {
-			return nil, 0, err
+			return nil, 0, false, err
 		}
 	} else if err != nil {
-		return nil, 0, err
+		return nil, 0, false, err
 	}
 
 	// Link account
@@ -271,7 +275,7 @@ func (s *OAuthService) findOrCreateUser(ctx context.Context, provider string, in
 		newAccount.ExpiresAt = token.Expiry.Unix()
 	}
 	if _, err := s.db.NewInsert().Model(newAccount).Exec(ctx); err != nil {
-		return nil, 0, err
+		return nil, 0, false, err
 	}
 
 	// For new users: domain auto-join + invitations; for existing users: invitations only
@@ -298,7 +302,7 @@ func (s *OAuthService) findOrCreateUser(ctx context.Context, provider string, in
 				Slug: fmt.Sprintf("%s-oauth", info.ProviderID),
 			}
 			if _, err := s.db.NewInsert().Model(org).Exec(ctx); err != nil {
-				return nil, 0, err
+				return nil, 0, false, err
 			}
 			om := &models.OrganizationMember{
 				OrganizationID: org.ID,
@@ -306,7 +310,7 @@ func (s *OAuthService) findOrCreateUser(ctx context.Context, provider string, in
 				Role:           models.OrgRoleOwner,
 			}
 			if _, err := s.db.NewInsert().Model(om).Exec(ctx); err != nil {
-				return nil, 0, err
+				return nil, 0, false, err
 			}
 			orgID = org.ID
 		}
@@ -314,7 +318,7 @@ func (s *OAuthService) findOrCreateUser(ctx context.Context, provider string, in
 		orgID = s.getDefaultOrgID(ctx, user.ID)
 	}
 
-	return user, orgID, nil
+	return user, orgID, isNewUser, nil
 }
 
 func (s *OAuthService) getDefaultOrgID(ctx context.Context, userID int64) int64 {

@@ -11,6 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { authClient, saveTokens, isLoggedIn } from "@/lib/auth";
 
+const GETTING_STARTED_FLAG = "colign:show-getting-started";
+
 type OAuthProviders = {
   github: boolean;
   google: boolean;
@@ -98,12 +100,13 @@ export default function AuthPage() {
     try {
       const res = await authClient.register({ email, password, name });
       saveTokens(res.accessToken, res.refreshToken);
+      sessionStorage.setItem(GETTING_STARTED_FLAG, "1");
       const pendingInvite = sessionStorage.getItem("pending_invite_token");
       if (pendingInvite) {
         sessionStorage.removeItem("pending_invite_token");
         router.push(`/invite/${pendingInvite}`);
       } else {
-        router.push("/onboarding");
+        router.push("/projects");
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Registration failed");

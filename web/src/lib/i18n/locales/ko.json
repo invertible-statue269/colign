@@ -431,6 +431,18 @@
     "workspaceReady": "워크스페이스가 준비되었습니다. 첫 번째 프로젝트를 만들어보세요.",
     "goToProjects": "프로젝트로 이동"
   },
+  "gettingStarted": {
+    "eyebrow": "시작 가이드",
+    "title": "첫 스펙을 만들기 전에 Claude Code를 연결하세요",
+    "description": "Colign Claude Code 플러그인을 설치한 뒤 workflow skill로 스펙 탐색, 계획, 구현까지 바로 시작할 수 있습니다.",
+    "installTitle": "1. Claude Code 플러그인 설치",
+    "installDescription": "Claude Code에서 아래 명령으로 Colign marketplace를 등록하고 플러그인을 설치한 뒤 다시 불러오세요.",
+    "skillsTitle": "2. 이 skill부터 써보세요",
+    "skillsDescription": "연결 확인과 첫 작업 시작에 가장 빠른 명령들입니다.",
+    "openGuide": "플러그인 가이드 열기",
+    "startInProjects": "프로젝트로 계속",
+    "openButton": "Claude Code 설정"
+  },
   "org": {
     "members": "조직 멤버",
     "membersDesc": "조직 멤버를 관리합니다.",

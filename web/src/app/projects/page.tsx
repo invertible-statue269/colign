@@ -10,6 +10,10 @@ import { toProjectPath } from "@/lib/project-ref";
 import { Folder, Calendar, icons, type LucideIcon } from "lucide-react";
 import { showError } from "@/lib/toast";
 import { CreateProjectDialog } from "@/components/project/create-project-dialog";
+import { GettingStartedModal } from "@/components/onboarding/getting-started-modal";
+import { GettingStartedTrigger } from "@/components/onboarding/getting-started-trigger";
+
+const GETTING_STARTED_FLAG = "colign:show-getting-started";
 
 const statusConfig: Record<string, { label: string; dotColor: string }> = {
   backlog: { label: "Backlog", dotColor: "bg-muted-foreground" },
@@ -52,6 +56,7 @@ export default function ProjectsPage() {
   const { t } = useI18n();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showGettingStarted, setShowGettingStarted] = useState(false);
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -77,11 +82,24 @@ export default function ProjectsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.sessionStorage.getItem(GETTING_STARTED_FLAG) !== "1") return;
+    setShowGettingStarted(true);
+  }, []);
+
+  function handleGettingStartedOpenChange(nextOpen: boolean) {
+    setShowGettingStarted(nextOpen);
+    if (!nextOpen && typeof window !== "undefined") {
+      window.sessionStorage.removeItem(GETTING_STARTED_FLAG);
+    }
+  }
 
   if (loading) {
     return (
@@ -93,10 +111,14 @@ export default function ProjectsPage() {
 
   return (
     <div className="min-h-screen">
+      <GettingStartedModal open={showGettingStarted} onOpenChange={handleGettingStartedOpenChange} />
       <main className="mx-auto max-w-6xl px-6 py-10">
         <div className="mb-8 flex items-center justify-between">
           <h1 className="text-2xl font-semibold tracking-tight">{t("projects.title")}</h1>
-          <CreateProjectDialog onCreated={fetchProjects} />
+          <div className="flex items-center gap-2">
+            <GettingStartedTrigger onOpen={() => setShowGettingStarted(true)} />
+            <CreateProjectDialog onCreated={fetchProjects} />
+          </div>
         </div>
 
         {projects.length === 0 ? (
@@ -106,7 +128,8 @@ export default function ProjectsPage() {
             </div>
             <p className="text-sm font-medium text-foreground/70">{t("projects.noProjects")}</p>
             <p className="mt-1 text-xs text-muted-foreground">{t("projects.createFirst")}</p>
-            <div className="mt-6">
+            <div className="mt-6 flex items-center gap-2">
+              <GettingStartedTrigger onOpen={() => setShowGettingStarted(true)} />
               <CreateProjectDialog onCreated={fetchProjects}>
                 <Button className="cursor-pointer">{t("projects.createProject")}</Button>
               </CreateProjectDialog>

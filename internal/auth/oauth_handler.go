@@ -63,12 +63,16 @@ func (h *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokenPair, err := h.service.HandleCallback(r.Context(), provider, code)
+	tokenPair, isNewUser, err := h.service.HandleCallback(r.Context(), provider, code)
 	if err != nil {
 		http.Error(w, "oauth failed", http.StatusInternalServerError)
 		return
 	}
 
 	SetBrowserSessionCookies(w, tokenPair, h.cookieOpts)
-	http.Redirect(w, r, h.frontendURL+"/auth/callback", http.StatusTemporaryRedirect)
+	redirectURL := h.frontendURL + "/auth/callback"
+	if isNewUser {
+		redirectURL += "?first=1"
+	}
+	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }

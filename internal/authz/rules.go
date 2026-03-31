@@ -42,6 +42,7 @@ var rpcRules = map[string]AuthRule{
 	"/workflow.v1.WorkflowService/Revert":            {Resource: "workflow", Action: "revert"},
 	"/workflow.v1.WorkflowService/GetHistory":        {Resource: "workflow", Action: "read"},
 	"/workflow.v1.WorkflowService/SetApprovalPolicy": {Resource: "workflow", Action: "set_policy"},
+	"/workflow.v1.WorkflowService/SetSubStatus":      {Resource: "workflow", Action: "advance"},
 
 	// CommentService
 	"/comment.v1.CommentService/CreateComment":  {Resource: "comment", Action: "create"},

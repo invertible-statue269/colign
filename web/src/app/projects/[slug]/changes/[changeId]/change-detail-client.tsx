@@ -466,24 +466,35 @@ export default function ChangeDetailClient() {
                               <div
                                 className="animate-stepper-ripple absolute h-9 w-9 rounded-full"
                                 style={{
-                                  background:
-                                    "radial-gradient(circle, transparent 40%, var(--color-primary) 60%, transparent 75%)",
+                                  background: isActive && subStatus === "ready" && s !== "approved"
+                                    ? "radial-gradient(circle, transparent 40%, rgb(16 185 129) 60%, transparent 75%)"
+                                    : "radial-gradient(circle, transparent 40%, var(--color-primary) 60%, transparent 75%)",
                                 }}
                               />
-                              <div className="animate-stepper-glow absolute h-10 w-10 rounded-full bg-primary/20 blur-md" />
+                              <div className={`animate-stepper-glow absolute h-10 w-10 rounded-full blur-md ${
+                                subStatus === "ready" && s !== "approved" ? "bg-emerald-500/20" : "bg-primary/20"
+                              }`} />
                             </>
                           )}
                           <div
                             className={`relative flex h-9 w-9 items-center justify-center rounded-full border-2 bg-background transition-all duration-300 ${
                               isActive
-                                ? cfg.activeColor
+                                ? subStatus === "ready" && s !== "approved"
+                                  ? "border-emerald-400 bg-emerald-400/10"
+                                  : cfg.activeColor
                                 : isPast
                                   ? "border-emerald-500 bg-emerald-500/10"
                                   : "border-border bg-muted"
                             }`}
                           >
                             <svg
-                              className={`h-4 w-4 ${isActive ? cfg.color : isPast ? "text-emerald-400" : "text-muted-foreground"}`}
+                              className={`h-4 w-4 ${
+                                isActive
+                                  ? subStatus === "ready" && s !== "approved"
+                                    ? "text-emerald-400"
+                                    : cfg.color
+                                  : isPast ? "text-emerald-400" : "text-muted-foreground"
+                              }`}
                               fill="none"
                               stroke="currentColor"
                               viewBox="0 0 24 24"
@@ -561,24 +572,35 @@ export default function ChangeDetailClient() {
                             <div
                               className="animate-stepper-ripple absolute h-10 w-10 rounded-full"
                               style={{
-                                background:
-                                  "radial-gradient(circle, transparent 40%, var(--color-primary) 60%, transparent 75%)",
+                                background: isActive && subStatus === "ready" && s !== "approved"
+                                  ? "radial-gradient(circle, transparent 40%, rgb(16 185 129) 60%, transparent 75%)"
+                                  : "radial-gradient(circle, transparent 40%, var(--color-primary) 60%, transparent 75%)",
                               }}
                             />
-                            <div className="animate-stepper-glow absolute h-10 w-10 rounded-full bg-primary/20 blur-md" />
+                            <div className={`animate-stepper-glow absolute h-10 w-10 rounded-full blur-md ${
+                              subStatus === "ready" && s !== "approved" ? "bg-emerald-500/20" : "bg-primary/20"
+                            }`} />
                           </>
                         )}
                         <div
                           className={`relative flex items-center justify-center rounded-full border-2 transition-all duration-300 ${
                             isActive
-                              ? `h-10 w-10 ${cfg.activeColor}`
+                              ? subStatus === "ready" && s !== "approved"
+                                ? "h-10 w-10 border-emerald-400 bg-emerald-400/10"
+                                : `h-10 w-10 ${cfg.activeColor}`
                               : isPast
                                 ? "h-8 w-8 border-emerald-500 bg-emerald-500/10"
                                 : "h-8 w-8 border-border bg-muted"
                           }`}
                         >
                           <svg
-                            className={`${isActive ? "h-4.5 w-4.5" : "h-3.5 w-3.5"} ${isActive ? cfg.color : isPast ? "text-emerald-400" : "text-muted-foreground"}`}
+                            className={`${isActive ? "h-4.5 w-4.5" : "h-3.5 w-3.5"} ${
+                              isActive
+                                ? subStatus === "ready" && s !== "approved"
+                                  ? "text-emerald-400"
+                                  : cfg.color
+                                : isPast ? "text-emerald-400" : "text-muted-foreground"
+                            }`}
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"

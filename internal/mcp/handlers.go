@@ -172,6 +172,7 @@ func (s *Server) handleGetChange(ctx context.Context, args json.RawMessage) (any
 		"project_id": c.ProjectId,
 		"name":       c.Name,
 		"stage":      c.Stage,
+		"sub_status": c.SubStatus,
 		"number":     c.Number,
 		"identifier": c.Identifier,
 	}, nil
@@ -1026,9 +1027,10 @@ func (s *Server) handleGetChangeSummary(ctx context.Context, args json.RawMessag
 	c := changeResp.Msg.Change
 
 	result := map[string]any{
-		"change_id": c.Id,
-		"name":      c.Name,
-		"stage":     c.Stage,
+		"change_id":  c.Id,
+		"name":       c.Name,
+		"stage":      c.Stage,
+		"sub_status": c.SubStatus,
 	}
 
 	// Task progress
@@ -1165,6 +1167,7 @@ func (s *Server) handleGetGateStatus(ctx context.Context, args json.RawMessage) 
 	return map[string]any{
 		"change_id":     params.ChangeID.Int64(),
 		"current_stage": resp.Msg.Stage,
+		"sub_status":    resp.Msg.SubStatus,
 		"conditions":    resp.Msg.Conditions,
 		"can_advance":   canAdvance,
 	}, nil

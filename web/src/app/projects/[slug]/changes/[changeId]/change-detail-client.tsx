@@ -133,6 +133,7 @@ export default function ChangeDetailClient() {
     [router],
   );
   const [stage, setStage] = useState("");
+  const [subStatus, setSubStatus] = useState("in_progress");
   const [conditions, setConditions] = useState<GateCondition[]>([]);
   const [history, setHistory] = useState<WorkflowEvent[]>([]);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
@@ -198,6 +199,7 @@ export default function ChangeDetailClient() {
         projectClient.getChange({ id: changeId, projectId: pid }),
       ]);
       setStage(statusRes.stage);
+      setSubStatus(statusRes.subStatus || "in_progress");
       setConditions(
         statusRes.conditions.map((c) => ({ name: c.name, description: c.description, met: c.met })),
       );
@@ -500,6 +502,11 @@ export default function ChangeDetailClient() {
                         >
                           {t(`stages.${s}`)}
                         </span>
+                        {isActive && s !== "approved" && (
+                          <span className={`text-[9px] font-medium ${subStatus === "ready" ? "text-emerald-400" : "text-muted-foreground/60"}`}>
+                            {t(`stages.subStatus.${subStatus}`)}
+                          </span>
+                        )}
                       </div>
                       {/* Connection line */}
                       {i < stages.length - 1 && (
@@ -590,6 +597,11 @@ export default function ChangeDetailClient() {
                       >
                         {t(`stages.${s}`)}
                       </span>
+                      {isActive && s !== "approved" && (
+                        <span className={`text-[8px] font-medium ${subStatus === "ready" ? "text-emerald-400" : "text-muted-foreground/60"}`}>
+                          {t(`stages.subStatus.${subStatus}`)}
+                        </span>
+                      )}
                     </div>
                   );
                 })}
@@ -655,6 +667,24 @@ export default function ChangeDetailClient() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  {stage !== "approved" && !archivedAt && (
+                    <Button
+                      variant={subStatus === "ready" ? "default" : "outline"}
+                      size="sm"
+                      className="cursor-pointer"
+                      onClick={async () => {
+                        const next = subStatus === "in_progress" ? "ready" : "in_progress";
+                        try {
+                          await workflowClient.setSubStatus({ changeId, subStatus: next, projectId });
+                          setSubStatus(next);
+                        } catch (err) {
+                          showError(t("toast.workflowFailed"), err);
+                        }
+                      }}
+                    >
+                      {subStatus === "in_progress" ? t("change.markReady") : t("change.markInProgress")}
+                    </Button>
+                  )}
                   {stage !== "approved" && !archivedAt && (
                     <Button
                       onClick={handleAdvance}

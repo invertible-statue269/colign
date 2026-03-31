@@ -150,7 +150,9 @@
     "deleteConfirm": "이 Change를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
     "deleteConfirmButton": "삭제",
     "rename": "이름 변경",
-    "renamePlaceholder": "Change 이름"
+    "renamePlaceholder": "Change 이름",
+    "markReady": "준비 완료로 표시",
+    "markInProgress": "작업 중으로 표시"
   },
   "proposal": {
     "problem": "Problem",
@@ -281,7 +283,11 @@
   "stages": {
     "draft": "초안",
     "spec": "스펙",
-    "approved": "승인됨"
+    "approved": "승인됨",
+    "subStatus": {
+      "in_progress": "작업 중",
+      "ready": "리뷰 대기"
+    }
   },
   "ac": {
     "title": "인수 조건",

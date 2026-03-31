@@ -150,7 +150,9 @@
     "deleteConfirm": "Are you sure you want to delete this change? This action cannot be undone.",
     "deleteConfirmButton": "Delete",
     "rename": "Rename",
-    "renamePlaceholder": "Change name"
+    "renamePlaceholder": "Change name",
+    "markReady": "Mark as Ready",
+    "markInProgress": "Mark as In Progress"
   },
   "proposal": {
     "problem": "Problem",
@@ -281,7 +283,11 @@
   "stages": {
     "draft": "Draft",
     "spec": "Spec",
-    "approved": "Approved"
+    "approved": "Approved",
+    "subStatus": {
+      "in_progress": "In Progress",
+      "ready": "Ready for Review"
+    }
   },
   "ac": {
     "title": "Acceptance Criteria",

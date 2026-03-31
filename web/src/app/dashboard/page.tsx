@@ -31,6 +31,7 @@ interface Change {
   name: string;
   identifier?: string;
   stage: string;
+  subStatus?: string;
   updatedAt?: { seconds: bigint };
   labels: ChangeLabel[];
 }
@@ -85,6 +86,7 @@ export default function DashboardPage() {
                 name: c.name,
                 identifier: c.identifier,
                 stage: c.stage,
+                subStatus: c.subStatus,
                 updatedAt: c.updatedAt ? { seconds: c.updatedAt.seconds } : undefined,
                 labels: (c.labels ?? []).map((l) => ({ id: l.id, name: l.name, color: l.color })),
               },
@@ -251,7 +253,14 @@ export default function DashboardPage() {
                                 {t("dashboard.in")} {item.projectName}
                               </span>
                             </p>
-                            <p className={`text-xs ${config.color}`}>{config.label}</p>
+                            <p className={`text-xs ${config.color}`}>
+                              {config.label}
+                              {item.change.subStatus === "ready" && item.change.stage !== "approved" && (
+                                <span className="ml-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
+                                  {t("stages.subStatus.ready")}
+                                </span>
+                              )}
+                            </p>
                           </div>
                         </div>
                         <span className="shrink-0 text-xs text-muted-foreground/60">
@@ -341,9 +350,16 @@ export default function DashboardPage() {
                                       </span>
                                     ))}
                                   </div>
-                                  <span className={`text-xs font-medium ${config.color}`}>
-                                    {config.label}
-                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    <span className={`text-xs font-medium ${config.color}`}>
+                                      {config.label}
+                                    </span>
+                                    {item.change.subStatus === "ready" && item.change.stage !== "approved" && (
+                                      <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
+                                        {t("stages.subStatus.ready")}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               </Link>
                             );

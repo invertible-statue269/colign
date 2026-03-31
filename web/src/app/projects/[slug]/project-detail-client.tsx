@@ -107,6 +107,7 @@ interface Change {
   name: string;
   identifier?: string;
   stage: string;
+  subStatus?: string;
   archivedAt?: { seconds: bigint; nanos: number };
   labels: ChangeLabel[];
 }
@@ -261,6 +262,7 @@ export default function ProjectDetailClient() {
               name: c.name,
               identifier: c.identifier,
               stage: c.stage,
+              subStatus: c.subStatus,
               archivedAt: c.archivedAt,
               labels: (c.labels ?? []).map((l) => ({ id: l.id, name: l.name, color: l.color })),
             })),
@@ -880,9 +882,16 @@ function OverviewTab({
                         {change.name}
                       </span>
                     </div>
-                    <span className={`text-xs font-medium ${config.color.split(" ")[1]}`}>
-                      {t(`stages.${change.stage}`)}
-                    </span>
+                    <div className="flex items-center">
+                      <span className={`text-xs font-medium ${config.color.split(" ")[1]}`}>
+                        {t(`stages.${change.stage}`)}
+                      </span>
+                      {change.subStatus === "ready" && change.stage !== "approved" && (
+                        <span className="ml-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
+                          {t("stages.subStatus.ready")}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </Link>
               );
@@ -950,11 +959,18 @@ function ChangeRow({
             </div>
           )}
         </div>
-        <span
-          className={`ml-3 inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-xs font-medium ${config.color}`}
-        >
-          {t(`stages.${change.stage}`)}
-        </span>
+        <div className="ml-3 flex shrink-0 items-center gap-1">
+          <span
+            className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${config.color}`}
+          >
+            {t(`stages.${change.stage}`)}
+          </span>
+          {change.subStatus === "ready" && change.stage !== "approved" && (
+            <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
+              {t("stages.subStatus.ready")}
+            </span>
+          )}
+        </div>
       </Link>
       <div className="relative mr-2">
         <button

@@ -28,6 +28,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { AIProposalGenerator } from "@/components/ai/ai-proposal-generator";
+import { AI_APPLY_PROPOSAL_EVENT } from "@/components/ai/chat-proposal-result";
 import { CommentPanel } from "@/components/comment/comment-panel";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -280,7 +281,7 @@ export function StructuredProposal({
     !getPlainText(sections.scope) &&
     !getPlainText(sections.outOfScope);
 
-  function handleAIApply(applied: { problem: string; scope: string; outOfScope: string }) {
+  const handleAIApply = useCallback((applied: { problem: string; scope: string; outOfScope: string }) => {
     setSections((prev) => ({
       ...prev,
       problem: normalizeSectionContent(applied.problem),
@@ -292,7 +293,19 @@ export function StructuredProposal({
       outOfScope: !applied.outOfScope.trim(),
     });
     save();
-  }
+  }, [save]);
+
+  // Listen for AI panel proposal apply events
+  useEffect(() => {
+    function handlePanelApply(e: Event) {
+      const detail = (e as CustomEvent).detail;
+      if (detail && typeof detail === "object" && "problem" in detail) {
+        handleAIApply(detail);
+      }
+    }
+    window.addEventListener(AI_APPLY_PROPOSAL_EVENT, handlePanelApply);
+    return () => window.removeEventListener(AI_APPLY_PROPOSAL_EVENT, handlePanelApply);
+  }, [handleAIApply]);
 
   return (
     <div className="flex items-stretch gap-4 py-4">

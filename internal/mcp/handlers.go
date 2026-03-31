@@ -207,7 +207,12 @@ func (s *Server) handleReadSpec(ctx context.Context, args json.RawMessage) (any,
 
 	d := resp.Msg.Document
 	content := d.Content
-	if params.DocType != "proposal" {
+	if params.DocType == "proposal" {
+		converted, err := convertProposalToMarkdown(d.Content)
+		if err == nil {
+			content = converted
+		}
+	} else {
 		exported, err := exportDocumentToMarkdown(d.Content)
 		if err != nil {
 			return nil, err
@@ -1323,6 +1328,7 @@ func (s *Server) handleGetWorkContext(ctx context.Context, args json.RawMessage)
 		if err == nil && resp.Msg.Document != nil && resp.Msg.Document.Content != "" {
 			var proposal map[string]any
 			if json.Unmarshal([]byte(resp.Msg.Document.Content), &proposal) == nil {
+				convertProposalFieldsToMarkdown(proposal)
 				mu.Lock()
 				result["proposal"] = proposal
 				mu.Unlock()

@@ -132,6 +132,114 @@ export async function* streamProposal(
   }
 }
 
+// Chat message for conversational AI
+export interface ChatStreamChunk {
+  content?: string;
+  result?: unknown; // ChatProposalResult | ChatACResult[] — parsed by caller
+  done?: boolean;
+}
+
+// Streaming chat via SSE
+export async function* streamChat(
+  changeId: number | bigint,
+  messages: { role: string; content: string }[],
+  mode: string,
+  signal?: AbortSignal
+): AsyncGenerator<ChatStreamChunk> {
+  const res = await fetchWithAuth(`${API_BASE}/api/ai/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      changeId: Number(changeId),
+      messages,
+      mode,
+    }),
+    signal,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || "Failed to send message");
+  }
+
+  if (!res.body) {
+    throw new Error("Response body is empty");
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        const data = line.slice(6);
+        if (data === "[DONE]") return;
+        try {
+          yield JSON.parse(data) as ChatStreamChunk;
+        } catch {
+          // skip malformed lines
+        }
+      }
+    }
+  }
+}
+
+// Load chat history for a change
+export interface ChatHistoryMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  result?: unknown;
+  appliedAt?: string;
+  createdAt: string;
+}
+
+export interface ChatHistoryResponse {
+  sessionId: string;
+  messages: ChatHistoryMessage[];
+}
+
+export async function loadChatHistory(
+  changeId: number | bigint
+): Promise<ChatHistoryResponse | null> {
+  const res = await fetchWithAuth(
+    `${API_BASE}/api/ai/chat/history?changeId=${Number(changeId)}`,
+    { method: "GET" },
+  );
+
+  if (res.status === 404) return null;
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || "Failed to load chat history");
+  }
+
+  return res.json();
+}
+
+// Delete chat session (new conversation)
+export async function deleteChatSession(
+  changeId: number | bigint
+): Promise<void> {
+  const res = await fetchWithAuth(
+    `${API_BASE}/api/ai/chat/session?changeId=${Number(changeId)}`,
+    { method: "DELETE" },
+  );
+
+  if (!res.ok && res.status !== 404) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || "Failed to delete chat session");
+  }
+}
+
 // Batch AC generation
 export async function generateAC(
   changeId: number | bigint

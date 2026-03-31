@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, RefreshCw, Sparkles, Square, CheckSquare, X } from "lucide-react";
+import { Check, MessageSquare, RefreshCw, Sparkles, Square, CheckSquare, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { generateAC, GeneratedAC } from "@/lib/ai";
 import { useI18n } from "@/lib/i18n";
 import { showError } from "@/lib/toast";
+import { useAIPanel } from "./ai-panel-context";
 
 type GeneratorState = "idle" | "loading" | "previewing" | "error";
 
@@ -26,6 +27,7 @@ const keywordColor: Record<string, string> = {
 
 export function AIACGenerator({ changeId, hasProposal, hasExistingAC, onApply }: AIACGeneratorProps) {
   const { t } = useI18n();
+  const { open: openPanel } = useAIPanel();
   const [state, setState] = useState<GeneratorState>("idle");
   const [generatedACs, setGeneratedACs] = useState<GeneratedAC[]>([]);
   const [selected, setSelected] = useState<boolean[]>([]);
@@ -256,10 +258,16 @@ export function AIACGenerator({ changeId, hasProposal, hasExistingAC, onApply }:
   // --- Idle state: has existing AC ---
   if (hasExistingAC) {
     return (
-      <Button size="sm" variant="ghost" onClick={startGeneration}>
-        <Sparkles className="size-3.5" />
-        {t("ai.addMoreAC")}
-      </Button>
+      <div className="flex items-center gap-1">
+        <Button size="sm" variant="ghost" onClick={() => openPanel("ac")}>
+          <MessageSquare className="size-3.5" />
+          {t("ai.chatWithAI")}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={startGeneration}>
+          <Sparkles className="size-3.5" />
+          {t("ai.addMoreAC")}
+        </Button>
+      </div>
     );
   }
 
@@ -270,10 +278,19 @@ export function AIACGenerator({ changeId, hasProposal, hasExistingAC, onApply }:
         <Sparkles className="size-4 text-primary/70" />
         <span className="text-sm font-medium text-foreground">{t("ai.generateAC")}</span>
       </div>
-      <Button size="sm" onClick={startGeneration}>
-        <Sparkles className="size-3.5" />
-        {t("ai.generateAC")}
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button size="sm" onClick={startGeneration}>
+          <Sparkles className="size-3.5" />
+          {t("ai.generateAC")}
+        </Button>
+        <button
+          onClick={() => openPanel("ac")}
+          className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-primary"
+        >
+          <MessageSquare className="size-3.5" />
+          {t("ai.chatWithAI")}
+        </button>
+      </div>
     </div>
   );
 }

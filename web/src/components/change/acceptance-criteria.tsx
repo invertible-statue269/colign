@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import { Plus, Trash2, GripVertical, Check, X } from "lucide-react";
 import { showError } from "@/lib/toast";
 import { AIACGenerator } from "@/components/ai/ai-ac-generator";
+import { AI_APPLY_AC_EVENT } from "@/components/ai/chat-ac-result";
 import type { GeneratedAC } from "@/lib/ai";
 
 interface Step {
@@ -115,7 +116,7 @@ export function AcceptanceCriteria({ changeId, projectId, reviewMode = false, ha
     }
   };
 
-  const handleAIApply = async (acs: GeneratedAC[]) => {
+  const handleAIApply = useCallback(async (acs: GeneratedAC[]) => {
     for (const ac of acs) {
       await acceptanceClient.createAC({
         changeId,
@@ -127,7 +128,19 @@ export function AcceptanceCriteria({ changeId, projectId, reviewMode = false, ha
       });
     }
     loadItems();
-  };
+  }, [changeId, projectId, items.length, loadItems]);
+
+  // Listen for AI panel AC apply events
+  useEffect(() => {
+    function handlePanelApply(e: Event) {
+      const detail = (e as CustomEvent).detail;
+      if (Array.isArray(detail)) {
+        handleAIApply(detail as GeneratedAC[]);
+      }
+    }
+    window.addEventListener(AI_APPLY_AC_EVENT, handlePanelApply);
+    return () => window.removeEventListener(AI_APPLY_AC_EVENT, handlePanelApply);
+  }, [handleAIApply]);
 
   const metCount = items.filter((i) => i.met).length;
 

@@ -299,7 +299,19 @@
     "deselectAll": "Deselect all",
     "applySelected": "Apply selected",
     "emptyStateTitle": "Start with AI",
-    "emptyStateDescription": "Describe what you want to build and AI will draft the proposal for you."
+    "emptyStateDescription": "Describe what you want to build and AI will draft the proposal for you.",
+    "chatTitle": "AI Assistant",
+    "chatWithAI": "Chat with AI",
+    "modeProposal": "Proposal",
+    "modeAC": "Acceptance Criteria",
+    "modeGeneral": "General",
+    "chatEmptyTitle": "Start a conversation",
+    "chatEmptyDescription": "Describe what you want to build and AI will help you draft the proposal or generate acceptance criteria.",
+    "chatPlaceholder": "Describe what you want to build...",
+    "openPanel": "Open AI Assistant",
+    "closePanel": "Close AI Assistant",
+    "newConversation": "New conversation",
+    "applyResult": "Apply to editor"
   },
   "aiConfig": {
     "title": "AI Configuration",

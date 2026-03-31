@@ -14,6 +14,8 @@ import { DocumentTab } from "@/components/change/document-tab";
 import { StructuredProposal } from "@/components/change/structured-proposal";
 import { TaskBoard } from "@/components/task/task-board";
 import { useEvents } from "@/lib/events";
+import { AIPanelProvider } from "@/components/ai/ai-panel-context";
+import { AISidePanel, AIPanelToggle } from "@/components/ai/ai-side-panel";
 
 interface GateCondition {
   name: string;
@@ -373,6 +375,7 @@ export default function ChangeDetailClient() {
   }
 
   return (
+    <AIPanelProvider>
     <div className="flex min-h-screen flex-col">
       <Header
         breadcrumbs={[
@@ -396,8 +399,9 @@ export default function ChangeDetailClient() {
         }
       />
 
-      {/* Main Content */}
-      <div className="relative flex-1">
+      {/* Main Content + AI Side Panel */}
+      <div className="relative flex flex-1">
+        <div className="min-w-0 flex-1">
         <div className="mx-auto max-w-5xl px-6 py-6">
           <div className="-mx-6 overflow-x-clip px-6 pb-2">
             {/* Stage Progress — Desktop */}
@@ -1007,7 +1011,11 @@ export default function ChangeDetailClient() {
             </div>
           )}
         </div>
+        </div>
+        <AISidePanel changeId={changeId} projectId={projectId} />
+        <AIPanelToggle />
       </div>
     </div>
+    </AIPanelProvider>
   );
 }

@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, RefreshCw, Sparkles, X } from "lucide-react";
+import { Check, MessageSquare, RefreshCw, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AIStreamingPreview } from "@/components/ai/ai-streaming-preview";
 import { streamProposal } from "@/lib/ai";
 import { useI18n } from "@/lib/i18n";
 import { showError } from "@/lib/toast";
+import { useAIPanel } from "./ai-panel-context";
 
 type GeneratorState = "idle" | "loading" | "previewing";
 
@@ -34,6 +35,7 @@ export function AIProposalGenerator({
   hasExistingContent,
 }: AIProposalGeneratorProps) {
   const { t } = useI18n();
+  const { open: openPanel } = useAIPanel();
   const [state, setState] = useState<GeneratorState>("idle");
   const [description, setDescription] = useState("");
   const [sections, setSections] = useState<ProposalSections>(EMPTY_SECTIONS);
@@ -173,8 +175,12 @@ export function AIProposalGenerator({
   // --- Idle state with existing content: small regenerate button ---
   if (hasExistingContent) {
     return (
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-1">
         {errorMessage && <span className="mr-2 text-xs text-destructive">{errorMessage}</span>}
+        <Button size="sm" variant="ghost" onClick={() => openPanel("proposal")}>
+          <MessageSquare className="size-3.5" />
+          {t("ai.chatWithAI")}
+        </Button>
         <Button size="sm" variant="ghost" onClick={handleGenerate}>
           <RefreshCw className="size-3.5" />
           {t("ai.regenerateProposal")}
@@ -210,6 +216,13 @@ export function AIProposalGenerator({
           {t("ai.generateProposal")}
         </Button>
       </div>
+      <button
+        onClick={() => openPanel("proposal")}
+        className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-primary"
+      >
+        <MessageSquare className="size-3.5" />
+        {t("ai.chatWithAI")}
+      </button>
       {errorMessage && (
         <p className="text-xs text-destructive" role="alert">
           {errorMessage}

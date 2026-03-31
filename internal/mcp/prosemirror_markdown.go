@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"golang.org/x/net/html"
 )
+
+// htmlTagPattern matches opening HTML tags like <p>, <ul>, <li>, <h1>, etc.
+var htmlTagPattern = regexp.MustCompile(`<(p|ul|ol|li|h[1-6]|div|span|br|table|tr|td|th|thead|tbody|blockquote|pre|code|strong|em|b|i|a)\b[^>]*>`)
 
 type pmNode struct {
 	Type    string         `json:"type"`
@@ -511,6 +515,33 @@ func walkHTMLText(b *bytes.Buffer, node *html.Node) {
 			default:
 				walkHTMLText(b, child)
 			}
+		}
+	}
+}
+
+// convertProposalToMarkdown converts HTML values in a proposal JSON string to markdown.
+func convertProposalToMarkdown(content string) (string, error) {
+	var proposal map[string]any
+	if err := json.Unmarshal([]byte(content), &proposal); err != nil {
+		return content, nil
+	}
+	convertProposalFieldsToMarkdown(proposal)
+	result, err := json.Marshal(proposal)
+	if err != nil {
+		return content, nil
+	}
+	return string(result), nil
+}
+
+// convertProposalFieldsToMarkdown converts HTML string values in proposal fields to markdown in-place.
+func convertProposalFieldsToMarkdown(proposal map[string]any) {
+	for _, key := range []string{"problem", "scope", "outOfScope"} {
+		val, ok := proposal[key].(string)
+		if !ok || !htmlTagPattern.MatchString(val) {
+			continue
+		}
+		if md, err := htmlToMarkdown(val); err == nil {
+			proposal[key] = md
 		}
 	}
 }

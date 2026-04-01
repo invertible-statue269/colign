@@ -26,7 +26,8 @@ func NewConnectHandler(service *Service, jwtManager *auth.JWTManager, apiTokenVa
 }
 
 func (h *ConnectHandler) CreateAC(ctx context.Context, req *connect.Request[acceptancev1.CreateACRequest]) (*connect.Response[acceptancev1.CreateACResponse], error) {
-	if _, err := auth.ResolveFromHeader(h.jwtManager, h.apiTokenValidator, ctx, req.Header().Get("Authorization")); err != nil {
+	claims, err := auth.ResolveFromHeader(h.jwtManager, h.apiTokenValidator, ctx, req.Header().Get("Authorization"))
+	if err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, err)
 	}
 
@@ -36,6 +37,7 @@ func (h *ConnectHandler) CreateAC(ctx context.Context, req *connect.Request[acce
 		Steps:     protoStepsToModel(req.Msg.Steps),
 		SortOrder: int(req.Msg.SortOrder),
 		TestRef:   req.Msg.TestRef,
+		CreatedBy: &claims.UserID,
 	}
 	if err := h.service.Create(ctx, ac); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)

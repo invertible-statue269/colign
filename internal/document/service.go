@@ -75,11 +75,12 @@ func (s *Service) Save(ctx context.Context, input SaveInput, orgID int64) (*mode
 	if errors.Is(err, sql.ErrNoRows) {
 		// Create new document
 		doc = &models.Document{
-			ChangeID: input.ChangeID,
-			Type:     input.Type,
-			Title:    input.Title,
-			Content:  input.Content,
-			Version:  1,
+			ChangeID:  input.ChangeID,
+			Type:      input.Type,
+			Title:     input.Title,
+			Content:   input.Content,
+			Version:   1,
+			UpdatedBy: &input.UserID,
 		}
 		if _, err := s.db.NewInsert().Model(doc).Exec(ctx); err != nil {
 			return nil, err
@@ -90,6 +91,7 @@ func (s *Service) Save(ctx context.Context, input SaveInput, orgID int64) (*mode
 		// Update existing
 		doc.Content = input.Content
 		doc.Version++
+		doc.UpdatedBy = &input.UserID
 		doc.UpdatedAt = time.Now()
 		if _, err := s.db.NewUpdate().Model(doc).WherePK().Exec(ctx); err != nil {
 			return nil, err
@@ -153,6 +155,7 @@ func (s *Service) Restore(ctx context.Context, documentID int64, version int, us
 
 	doc.Content = dv.Content
 	doc.Version++
+	doc.UpdatedBy = &userID
 	doc.UpdatedAt = time.Now()
 	if _, err := s.db.NewUpdate().Model(doc).WherePK().Exec(ctx); err != nil {
 		return nil, err

@@ -23,10 +23,12 @@ type Document struct {
 	Title     string       `bun:"title"`
 	Content   string       `bun:"content,notnull,type:text"`
 	Version   int          `bun:"version,notnull,default:1"`
+	UpdatedBy *int64       `bun:"updated_by"`
 	CreatedAt time.Time    `bun:"created_at,notnull,default:current_timestamp"`
 	UpdatedAt time.Time    `bun:"updated_at,notnull,default:current_timestamp"`
 
 	Change *Change `bun:"rel:belongs-to,join:change_id=id"`
+	User   *User   `bun:"rel:belongs-to,join:updated_by=id"`
 }
 
 type DocumentVersion struct {

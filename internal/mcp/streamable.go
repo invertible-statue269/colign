@@ -55,19 +55,21 @@ func registerTools(s *sdkmcp.Server, clients *apiClients) {
 	for _, tool := range ListTools() {
 		schema, _ := json.Marshal(tool.InputSchema)
 		s.AddTool(&sdkmcp.Tool{
+			Meta:        sdkmcp.Meta(tool.Meta),
+			Annotations: toSDKToolAnnotations(tool.Annotations),
 			Name:        tool.Name,
 			Description: tool.Description,
 			InputSchema: json.RawMessage(schema),
-		}, makeToolHandler(tool.Name, clients))
+		}, makeToolHandler(tool, clients))
 	}
 }
 
-func makeToolHandler(name string, clients *apiClients) sdkmcp.ToolHandler {
+func makeToolHandler(tool Tool, clients *apiClients) sdkmcp.ToolHandler {
 	return func(ctx context.Context, req *sdkmcp.CallToolRequest) (*sdkmcp.CallToolResult, error) {
 		// Create a temporary server-like struct to reuse existing handler logic
 		s := &Server{clients: clients}
 
-		result, err := s.callTool(ctx, name, req.Params.Arguments)
+		result, err := tool.Handler(s, ctx, req.Params.Arguments)
 		if err != nil {
 			return &sdkmcp.CallToolResult{
 				Content: []sdkmcp.Content{&sdkmcp.TextContent{Text: fmt.Sprintf("Error: %v", err)}},
@@ -79,5 +81,18 @@ func makeToolHandler(name string, clients *apiClients) sdkmcp.ToolHandler {
 		return &sdkmcp.CallToolResult{
 			Content: []sdkmcp.Content{&sdkmcp.TextContent{Text: string(resultJSON)}},
 		}, nil
+	}
+}
+
+func toSDKToolAnnotations(a *ToolAnnotations) *sdkmcp.ToolAnnotations {
+	if a == nil {
+		return nil
+	}
+	return &sdkmcp.ToolAnnotations{
+		DestructiveHint: a.DestructiveHint,
+		IdempotentHint:  a.IdempotentHint,
+		OpenWorldHint:   a.OpenWorldHint,
+		ReadOnlyHint:    a.ReadOnlyHint,
+		Title:           a.Title,
 	}
 }

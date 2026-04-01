@@ -1,6 +1,12 @@
 package mcp
 
-import "encoding/json"
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"slices"
+	"sync"
+)
 
 type JSONRPCRequest struct {
 	JSONRPC string          `json:"jsonrpc"`
@@ -21,10 +27,28 @@ type Error struct {
 	Message string `json:"message"`
 }
 
+// ToolHandler is the function signature for tool execution.
+type ToolHandler func(s *Server, ctx context.Context, args json.RawMessage) (any, error)
+
+type ToolAnnotations struct {
+	DestructiveHint *bool  `json:"destructiveHint,omitempty"`
+	IdempotentHint  bool   `json:"idempotentHint,omitempty"`
+	OpenWorldHint   *bool  `json:"openWorldHint,omitempty"`
+	ReadOnlyHint    bool   `json:"readOnlyHint,omitempty"`
+	Title           string `json:"title,omitempty"`
+}
+
 type Tool struct {
-	Name        string      `json:"name"`
-	Description string      `json:"description"`
-	InputSchema InputSchema `json:"inputSchema"`
+	Meta        map[string]any   `json:"_meta,omitempty"`
+	Annotations *ToolAnnotations `json:"annotations,omitempty"`
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	InputSchema InputSchema      `json:"inputSchema"`
+	ReadOnly    bool             `json:"-"`
+	Destructive *bool            `json:"-"`
+	Idempotent  bool             `json:"-"`
+	OpenWorld   *bool            `json:"-"`
+	Handler     ToolHandler      `json:"-"`
 }
 
 type InputSchema struct {
@@ -38,406 +62,70 @@ type Property struct {
 	Description string `json:"description"`
 }
 
-func ListTools() []Tool {
-	return []Tool{
-		{
-			Name:        "list_projects",
-			Description: "List all projects the user has access to",
-			InputSchema: InputSchema{Type: "object"},
-		},
-		{
-			Name:        "get_change",
-			Description: "Get details of a specific change including its stage and artifacts",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"change_id":  {Type: "integer", Description: "Change ID"},
-					"project_id": {Type: "integer", Description: "Project ID"},
-				},
-				Required: []string{"change_id", "project_id"},
-			},
-		},
-		{
-			Name:        "read_spec",
-			Description: "Read a spec document for a change. For proposals, the content field is a JSON string with keys: problem, scope, outOfScope.",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"change_id":  {Type: "integer", Description: "Change ID"},
-					"project_id": {Type: "integer", Description: "Project ID"},
-					"doc_type":   {Type: "string", Description: "Document type: proposal, spec, tasks"},
-				},
-				Required: []string{"change_id", "project_id", "doc_type"},
-			},
-		},
-		{
-			Name:        "write_spec",
-			Description: "Write or update a spec document for a change. For proposals, content must be a JSON string with keys: problem (required), scope (required), outOfScope (optional). Example: {\"problem\":\"...\",\"scope\":\"...\",\"outOfScope\":\"...\"}. For other doc types, content is plain markdown.",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"change_id":  {Type: "integer", Description: "Change ID"},
-					"project_id": {Type: "integer", Description: "Project ID"},
-					"doc_type":   {Type: "string", Description: "Document type: proposal, spec, tasks"},
-					"content":    {Type: "string", Description: "For proposal: JSON with problem, scope, outOfScope. For others: markdown text."},
-				},
-				Required: []string{"change_id", "project_id", "doc_type", "content"},
-			},
-		},
-		{
-			Name:        "create_task",
-			Description: "Create a new implementation task for a change",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"change_id":   {Type: "integer", Description: "Change ID"},
-					"project_id":  {Type: "integer", Description: "Project ID"},
-					"title":       {Type: "string", Description: "Task title"},
-					"description": {Type: "string", Description: "Task description (optional)"},
-					"status":      {Type: "string", Description: "Initial status: todo, in_progress, done (default: todo)"},
-				},
-				Required: []string{"change_id", "project_id", "title"},
-			},
-		},
-		{
-			Name:        "list_tasks",
-			Description: "List implementation tasks for a change",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"change_id":  {Type: "integer", Description: "Change ID"},
-					"project_id": {Type: "integer", Description: "Project ID"},
-				},
-				Required: []string{"change_id", "project_id"},
-			},
-		},
-		{
-			Name:        "update_task",
-			Description: "Update a task's status or assignee",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"task_id":        {Type: "integer", Description: "Task ID"},
-					"project_id":     {Type: "integer", Description: "Project ID"},
-					"status":         {Type: "string", Description: "New status: todo, in_progress, done"},
-					"assignee_id":    {Type: "integer", Description: "User ID to assign the task to (optional)"},
-					"clear_assignee": {Type: "boolean", Description: "Set to true to remove the current assignee (optional)"},
-				},
-				Required: []string{"task_id", "project_id"},
-			},
-		},
-		{
-			Name:        "suggest_spec",
-			Description: "Get AI suggestions for improving a spec document",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"change_id":  {Type: "integer", Description: "Change ID"},
-					"project_id": {Type: "integer", Description: "Project ID"},
-					"doc_type":   {Type: "string", Description: "Document type to improve"},
-				},
-				Required: []string{"change_id", "project_id", "doc_type"},
-			},
-		},
-		{
-			Name:        "list_acceptance_criteria",
-			Description: "List acceptance criteria (Given/When/Then scenarios) for a change",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"change_id":  {Type: "integer", Description: "Change ID"},
-					"project_id": {Type: "integer", Description: "Project ID"},
-				},
-				Required: []string{"change_id", "project_id"},
-			},
-		},
-		{
-			Name:        "create_acceptance_criteria",
-			Description: "Create an acceptance criteria with BDD-style Given/When/Then steps for a change",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"change_id":  {Type: "integer", Description: "Change ID"},
-					"project_id": {Type: "integer", Description: "Project ID"},
-					"scenario":   {Type: "string", Description: "Scenario name describing the test case"},
-					"steps":      {Type: "string", Description: "JSON array of steps, each with keyword (Given/When/Then/And/But) and text. Example: [{\"keyword\":\"Given\",\"text\":\"a user is logged in\"},{\"keyword\":\"When\",\"text\":\"they click logout\"},{\"keyword\":\"Then\",\"text\":\"they are redirected to login page\"}]"},
-					"test_ref":   {Type: "string", Description: "Reference to test that verifies this criteria, e.g. 'tests/checkout_test.go::TestPaymentSuccess' (optional)"},
-				},
-				Required: []string{"change_id", "project_id", "scenario", "steps"},
-			},
-		},
-		{
-			Name:        "toggle_acceptance_criteria",
-			Description: "Toggle an acceptance criteria's met/unmet status",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"id":         {Type: "integer", Description: "Acceptance criteria ID"},
-					"project_id": {Type: "integer", Description: "Project ID"},
-					"met":        {Type: "boolean", Description: "Whether the criteria is met (true) or unmet (false)"},
-				},
-				Required: []string{"id", "project_id", "met"},
-			},
-		},
-		{
-			Name:        "link_ac_to_test",
-			Description: "Link an acceptance criteria to a test reference. Set test_ref to empty string to unlink.",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"ac_id":      {Type: "integer", Description: "Acceptance criteria ID"},
-					"project_id": {Type: "integer", Description: "Project ID"},
-					"test_ref":   {Type: "string", Description: "Test reference, e.g. 'tests/checkout_test.go::TestPaymentSuccess'"},
-				},
-				Required: []string{"ac_id", "project_id", "test_ref"},
-			},
-		},
-		{
-			Name:        "create_project",
-			Description: "Create a new project in the current organization",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"name":        {Type: "string", Description: "Project name"},
-					"description": {Type: "string", Description: "Short project description (one-liner, optional)"},
-				},
-				Required: []string{"name"},
-			},
-		},
-		{
-			Name:        "update_project",
-			Description: "Update a project's name, description, or README",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"project_id":  {Type: "integer", Description: "Project ID"},
-					"name":        {Type: "string", Description: "New project name (optional)"},
-					"description": {Type: "string", Description: "Short project description (one-liner)"},
-					"readme":      {Type: "string", Description: "Project README content in markdown (auto-converted to HTML)"},
-				},
-				Required: []string{"project_id"},
-			},
-		},
-		{
-			Name:        "create_change",
-			Description: "Create a new change (feature/initiative) in a project",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"project_id": {Type: "integer", Description: "Project ID"},
-					"name":       {Type: "string", Description: "Change name"},
-				},
-				Required: []string{"project_id", "name"},
-			},
-		},
-		{
-			Name:        "list_changes",
-			Description: "List all changes in a project",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"project_id": {Type: "integer", Description: "Project ID"},
-				},
-				Required: []string{"project_id"},
-			},
-		},
-		{
-			Name:        "advance_stage",
-			Description: "Advance a change to the next workflow stage (draft -> spec -> approved)",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"change_id":  {Type: "integer", Description: "Change ID"},
-					"project_id": {Type: "integer", Description: "Project ID"},
-				},
-				Required: []string{"change_id", "project_id"},
-			},
-		},
-		{
-			Name:        "list_comments",
-			Description: "List comments on a change",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"change_id":     {Type: "integer", Description: "Change ID"},
-					"project_id":    {Type: "integer", Description: "Project ID"},
-					"document_type": {Type: "string", Description: "Document type to filter comments (proposal, spec, tasks)"},
-				},
-				Required: []string{"change_id", "project_id", "document_type"},
-			},
-		},
-		{
-			Name:        "create_comment",
-			Description: "Add a comment to a change",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"change_id":     {Type: "integer", Description: "Change ID"},
-					"project_id":    {Type: "integer", Description: "Project ID"},
-					"content":       {Type: "string", Description: "Comment text"},
-					"document_type": {Type: "string", Description: "Document type for the comment (proposal, spec, tasks)"},
-				},
-				Required: []string{"change_id", "project_id", "content", "document_type"},
-			},
-		},
-		{
-			Name:        "delete_task",
-			Description: "Delete a task",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"task_id":    {Type: "integer", Description: "Task ID"},
-					"project_id": {Type: "integer", Description: "Project ID"},
-				},
-				Required: []string{"task_id", "project_id"},
-			},
-		},
-		{
-			Name:        "get_memory",
-			Description: "Get the project memory (shared context like CLAUDE.md). Contains conventions, decisions, and context that AI should know about this project.",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"project_id": {Type: "integer", Description: "Project ID"},
-				},
-				Required: []string{"project_id"},
-			},
-		},
-		{
-			Name:        "save_memory",
-			Description: "Save or update the project memory (shared context). Use this to persist important conventions, decisions, and context about the project.",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"project_id": {Type: "integer", Description: "Project ID"},
-					"content":    {Type: "string", Description: "Memory content in markdown"},
-				},
-				Required: []string{"project_id", "content"},
-			},
-		},
-		{
-			Name:        "get_change_history",
-			Description: "Get the workflow event history for a change. Returns stage transitions, approvals, and rejections in chronological order.",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"change_id":  {Type: "integer", Description: "Change ID"},
-					"project_id": {Type: "integer", Description: "Project ID"},
-				},
-				Required: []string{"change_id", "project_id"},
-			},
-		},
-		{
-			Name:        "get_change_summary",
-			Description: "Get an aggregated summary of a change: stage, task progress, AC progress, and gate conditions. Ideal for quick status checks.",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"change_id": {Type: "integer", Description: "Change ID"},
-				},
-				Required: []string{"change_id"},
-			},
-		},
-		{
-			Name:        "get_project_dashboard",
-			Description: "Get all active (non-archived) changes in a project with their progress summaries. Shows task and AC progress for each change.",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"project_id": {Type: "integer", Description: "Project ID"},
-				},
-				Required: []string{"project_id"},
-			},
-		},
-		{
-			Name:        "get_gate_status",
-			Description: "Get the gate conditions for a change's current stage and whether it can advance.",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"change_id":  {Type: "integer", Description: "Change ID"},
-					"project_id": {Type: "integer", Description: "Project ID"},
-				},
-				Required: []string{"change_id", "project_id"},
-			},
-		},
-		{
-			Name:        "approve_change",
-			Description: "Approve a change in spec stage. If approval policy is met, the change advances automatically.",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"change_id":  {Type: "integer", Description: "Change ID"},
-					"project_id": {Type: "integer", Description: "Project ID"},
-					"comment":    {Type: "string", Description: "Optional approval comment"},
-				},
-				Required: []string{"change_id", "project_id"},
-			},
-		},
-		{
-			Name:        "reject_change",
-			Description: "Request changes on a review, sending the change back to draft stage.",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"change_id":  {Type: "integer", Description: "Change ID"},
-					"project_id": {Type: "integer", Description: "Project ID"},
-					"reason":     {Type: "string", Description: "Reason for requesting changes"},
-				},
-				Required: []string{"change_id", "project_id", "reason"},
-			},
-		},
-		{
-			Name:        "update_change",
-			Description: "Update a change's name.",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"change_id":  {Type: "integer", Description: "Change ID"},
-					"project_id": {Type: "integer", Description: "Project ID"},
-					"name":       {Type: "string", Description: "New name for the change"},
-				},
-				Required: []string{"change_id", "project_id", "name"},
-			},
-		},
-		{
-			Name:        "archive_change",
-			Description: "Archive a change (cancel or shelve it).",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"change_id":  {Type: "integer", Description: "Change ID"},
-					"project_id": {Type: "integer", Description: "Project ID"},
-				},
-				Required: []string{"change_id", "project_id"},
-			},
-		},
-		{
-			Name:        "get_work_context",
-			Description: "Get all context needed to start working on a change in one call: change info, proposal, tasks, acceptance criteria, memory, gate conditions, and recent comments.",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"change_id": {Type: "integer", Description: "Change ID"},
-				},
-				Required: []string{"change_id"},
-			},
-		},
-		{
-			Name:        "get_me",
-			Description: "Get the current authenticated user's information (ID, name, email, organization).",
-			InputSchema: InputSchema{
-				Type:       "object",
-				Properties: map[string]Property{},
-			},
-		},
-		{
-			Name:        "list_members",
-			Description: "List all members in the current organization. Use this to find user IDs for task assignment.",
-			InputSchema: InputSchema{
-				Type:       "object",
-				Properties: map[string]Property{},
-			},
-		},
+var (
+	toolRegistryMu sync.RWMutex
+	toolRegistry   []Tool
+	toolIndex      = make(map[string]int)
+)
+
+func RegisterTool(t Tool) {
+	normalized := normalizeTool(t)
+
+	toolRegistryMu.Lock()
+	defer toolRegistryMu.Unlock()
+
+	if _, exists := toolIndex[normalized.Name]; exists {
+		panic(fmt.Sprintf("duplicate MCP tool registration: %s", normalized.Name))
 	}
+
+	toolIndex[normalized.Name] = len(toolRegistry)
+	toolRegistry = append(toolRegistry, normalized)
+}
+
+func ListTools() []Tool {
+	toolRegistryMu.RLock()
+	defer toolRegistryMu.RUnlock()
+	return slices.Clone(toolRegistry)
+}
+
+func FindTool(name string) (Tool, bool) {
+	toolRegistryMu.RLock()
+	defer toolRegistryMu.RUnlock()
+
+	i, ok := toolIndex[name]
+	if !ok {
+		return Tool{}, false
+	}
+	return toolRegistry[i], true
+}
+
+// callTool dispatches a tool call to the registered handler.
+func (s *Server) callTool(ctx context.Context, name string, args json.RawMessage) (any, error) {
+	t, ok := FindTool(name)
+	if !ok {
+		return nil, fmt.Errorf("unknown tool: %s", name)
+	}
+	return t.Handler(s, ctx, args)
+}
+
+func normalizeTool(t Tool) Tool {
+	if t.Annotations == nil {
+		t.Annotations = &ToolAnnotations{}
+	}
+	t.Annotations.ReadOnlyHint = t.ReadOnly
+	if t.Destructive != nil {
+		t.Annotations.DestructiveHint = t.Destructive
+	} else if t.ReadOnly {
+		t.Annotations.DestructiveHint = boolPtr(false)
+	}
+	t.Annotations.IdempotentHint = t.Idempotent
+	if t.OpenWorld != nil {
+		t.Annotations.OpenWorldHint = t.OpenWorld
+	}
+
+	return t
+}
+
+func boolPtr(v bool) *bool {
+	return &v
 }

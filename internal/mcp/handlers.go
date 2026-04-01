@@ -22,79 +22,545 @@ import (
 	taskv1 "github.com/gobenpark/colign/gen/proto/task/v1"
 	workflowv1 "github.com/gobenpark/colign/gen/proto/workflow/v1"
 	"github.com/gobenpark/colign/internal/events"
+	"github.com/gobenpark/colign/internal/models"
 )
 
-func (s *Server) callTool(ctx context.Context, name string, args json.RawMessage) (any, error) {
-	switch name {
-	case "list_projects":
-		return s.handleListProjects(ctx)
-	case "get_change":
-		return s.handleGetChange(ctx, args)
-	case "read_spec":
-		return s.handleReadSpec(ctx, args)
-	case "write_spec":
-		return s.handleWriteSpec(ctx, args)
-	case "create_task":
-		return s.handleCreateTask(ctx, args)
-	case "list_tasks":
-		return s.handleListTasks(ctx, args)
-	case "update_task":
-		return s.handleUpdateTask(ctx, args)
-	case "suggest_spec":
-		return s.handleSuggestSpec(ctx, args)
-	case "list_acceptance_criteria":
-		return s.handleListAC(ctx, args)
-	case "create_acceptance_criteria":
-		return s.handleCreateAC(ctx, args)
-	case "toggle_acceptance_criteria":
-		return s.handleToggleAC(ctx, args)
-	case "create_project":
-		return s.handleCreateProject(ctx, args)
-	case "update_project":
-		return s.handleUpdateProject(ctx, args)
-	case "create_change":
-		return s.handleCreateChange(ctx, args)
-	case "list_changes":
-		return s.handleListChanges(ctx, args)
-	case "advance_stage":
-		return s.handleAdvanceStage(ctx, args)
-	case "list_comments":
-		return s.handleListComments(ctx, args)
-	case "create_comment":
-		return s.handleCreateComment(ctx, args)
-	case "delete_task":
-		return s.handleDeleteTask(ctx, args)
-	case "get_memory":
-		return s.handleGetMemory(ctx, args)
-	case "save_memory":
-		return s.handleSaveMemory(ctx, args)
-	case "get_change_history":
-		return s.handleGetChangeHistory(ctx, args)
-	case "link_ac_to_test":
-		return s.handleLinkACToTest(ctx, args)
-	case "get_change_summary":
-		return s.handleGetChangeSummary(ctx, args)
-	case "get_project_dashboard":
-		return s.handleGetProjectDashboard(ctx, args)
-	case "get_gate_status":
-		return s.handleGetGateStatus(ctx, args)
-	case "approve_change":
-		return s.handleApproveChange(ctx, args)
-	case "reject_change":
-		return s.handleRejectChange(ctx, args)
-	case "update_change":
-		return s.handleUpdateChange(ctx, args)
-	case "archive_change":
-		return s.handleArchiveChange(ctx, args)
-	case "get_work_context":
-		return s.handleGetWorkContext(ctx, args)
-	case "get_me":
-		return s.handleGetMe(ctx)
-	case "list_members":
-		return s.handleListMembers(ctx)
-	default:
-		return nil, fmt.Errorf("unknown tool: %s", name)
-	}
+func init() {
+	// ── project ──────────────────────────────────────────────────────
+	RegisterTool(Tool{
+		Name:        "list_projects",
+		Description: "List all projects the user has access to",
+		InputSchema: InputSchema{Type: "object"},
+		ReadOnly:    true,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleListProjects(ctx)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "create_project",
+		Description: "Create a new project in the current organization",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"name":        {Type: "string", Description: "Project name"},
+				"description": {Type: "string", Description: "Short project description (one-liner, optional)"},
+			},
+			Required: []string{"name"},
+		},
+		ReadOnly: false,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleCreateProject(ctx, args)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "update_project",
+		Description: "Update a project's name, description, or README",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"project_id":  {Type: "integer", Description: "Project ID"},
+				"name":        {Type: "string", Description: "New project name (optional)"},
+				"description": {Type: "string", Description: "Short project description (one-liner)"},
+				"readme":      {Type: "string", Description: "Project README content in markdown (auto-converted to HTML)"},
+			},
+			Required: []string{"project_id"},
+		},
+		ReadOnly: false,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleUpdateProject(ctx, args)
+		},
+	})
+
+	// ── change ───────────────────────────────────────────────────────
+	RegisterTool(Tool{
+		Name:        "get_change",
+		Description: "Get details of a specific change including its stage and artifacts",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"change_id":  {Type: "integer", Description: "Change ID"},
+				"project_id": {Type: "integer", Description: "Project ID"},
+			},
+			Required: []string{"change_id", "project_id"},
+		},
+		ReadOnly: true,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleGetChange(ctx, args)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "list_changes",
+		Description: "List all changes in a project",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"project_id": {Type: "integer", Description: "Project ID"},
+			},
+			Required: []string{"project_id"},
+		},
+		ReadOnly: true,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleListChanges(ctx, args)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "get_work_context",
+		Description: "Get all context needed to start working on a change in one call: change info, proposal, tasks, acceptance criteria, memory, gate conditions, and recent comments.",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"change_id": {Type: "integer", Description: "Change ID"},
+			},
+			Required: []string{"change_id"},
+		},
+		ReadOnly: true,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleGetWorkContext(ctx, args)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "get_change_summary",
+		Description: "Get an aggregated summary of a change: stage, task progress, AC progress, and gate conditions. Ideal for quick status checks.",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"change_id": {Type: "integer", Description: "Change ID"},
+			},
+			Required: []string{"change_id"},
+		},
+		ReadOnly: true,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleGetChangeSummary(ctx, args)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "get_change_history",
+		Description: "Get the workflow event history for a change. Returns stage transitions, approvals, and rejections in chronological order.",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"change_id":  {Type: "integer", Description: "Change ID"},
+				"project_id": {Type: "integer", Description: "Project ID"},
+			},
+			Required: []string{"change_id", "project_id"},
+		},
+		ReadOnly: true,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleGetChangeHistory(ctx, args)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "get_project_dashboard",
+		Description: "Get all active (non-archived) changes in a project with their progress summaries. Shows task and AC progress for each change.",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"project_id": {Type: "integer", Description: "Project ID"},
+			},
+			Required: []string{"project_id"},
+		},
+		ReadOnly: true,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleGetProjectDashboard(ctx, args)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "create_change",
+		Description: "Create a new change (feature/initiative) in a project",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"project_id": {Type: "integer", Description: "Project ID"},
+				"name":       {Type: "string", Description: "Change name"},
+			},
+			Required: []string{"project_id", "name"},
+		},
+		ReadOnly: false,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleCreateChange(ctx, args)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "update_change",
+		Description: "Update a change's name and/or workflow status. Use status for composite workflow states like draft(ready) or spec(in_progress). Approved changes must still go through approve_change. At least one of name, sub_status, or status must be provided.",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"change_id":     {Type: "integer", Description: "Change ID"},
+				"project_id":    {Type: "integer", Description: "Project ID"},
+				"name":          {Type: "string", Description: "New name for the change (optional)"},
+				"sub_status":    {Type: "string", Description: "Sub-status only: in_progress or ready (optional). Cannot be combined with status."},
+				"status":        {Type: "string", Description: "Composite workflow status: draft(in_progress), draft(ready), spec(in_progress), or spec(ready) (optional). Cannot be used to transition to approved."},
+				"status_reason": {Type: "string", Description: "Reason recorded when moving the change backward to an earlier stage (optional)."},
+			},
+			Required: []string{"change_id", "project_id"},
+		},
+		ReadOnly: false,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleUpdateChange(ctx, args)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "archive_change",
+		Description: "Archive a change (cancel or shelve it).",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"change_id":  {Type: "integer", Description: "Change ID"},
+				"project_id": {Type: "integer", Description: "Project ID"},
+			},
+			Required: []string{"change_id", "project_id"},
+		},
+		ReadOnly: false,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleArchiveChange(ctx, args)
+		},
+	})
+
+	// ── spec ─────────────────────────────────────────────────────────
+	RegisterTool(Tool{
+		Name:        "read_spec",
+		Description: "Read a spec document for a change. For proposals, the content field is a JSON string with keys: problem, scope, outOfScope.",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"change_id":  {Type: "integer", Description: "Change ID"},
+				"project_id": {Type: "integer", Description: "Project ID"},
+				"doc_type":   {Type: "string", Description: "Document type: proposal, spec, tasks"},
+			},
+			Required: []string{"change_id", "project_id", "doc_type"},
+		},
+		ReadOnly: true,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleReadSpec(ctx, args)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "suggest_spec",
+		Description: "Get AI suggestions for improving a spec document",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"change_id":  {Type: "integer", Description: "Change ID"},
+				"project_id": {Type: "integer", Description: "Project ID"},
+				"doc_type":   {Type: "string", Description: "Document type to improve"},
+			},
+			Required: []string{"change_id", "project_id", "doc_type"},
+		},
+		ReadOnly: true,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleSuggestSpec(ctx, args)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "write_spec",
+		Description: "Write or update a spec document for a change. For proposals, content must be a JSON string with keys: problem (required), scope (required), outOfScope (optional). Example: {\"problem\":\"...\",\"scope\":\"...\",\"outOfScope\":\"...\"}. For other doc types, content is plain markdown.",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"change_id":  {Type: "integer", Description: "Change ID"},
+				"project_id": {Type: "integer", Description: "Project ID"},
+				"doc_type":   {Type: "string", Description: "Document type: proposal, spec, tasks"},
+				"content":    {Type: "string", Description: "For proposal: JSON with problem, scope, outOfScope. For others: markdown text."},
+			},
+			Required: []string{"change_id", "project_id", "doc_type", "content"},
+		},
+		ReadOnly: false,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleWriteSpec(ctx, args)
+		},
+	})
+
+	// ── task ─────────────────────────────────────────────────────────
+	RegisterTool(Tool{
+		Name:        "list_tasks",
+		Description: "List implementation tasks for a change",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"change_id":  {Type: "integer", Description: "Change ID"},
+				"project_id": {Type: "integer", Description: "Project ID"},
+			},
+			Required: []string{"change_id", "project_id"},
+		},
+		ReadOnly: true,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleListTasks(ctx, args)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "create_task",
+		Description: "Create a new implementation task for a change",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"change_id":   {Type: "integer", Description: "Change ID"},
+				"project_id":  {Type: "integer", Description: "Project ID"},
+				"title":       {Type: "string", Description: "Task title"},
+				"description": {Type: "string", Description: "Task description (optional)"},
+				"status":      {Type: "string", Description: "Initial status: todo, in_progress, done (default: todo)"},
+			},
+			Required: []string{"change_id", "project_id", "title"},
+		},
+		ReadOnly: false,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleCreateTask(ctx, args)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "update_task",
+		Description: "Update a task's status or assignee",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"task_id":        {Type: "integer", Description: "Task ID"},
+				"project_id":     {Type: "integer", Description: "Project ID"},
+				"status":         {Type: "string", Description: "New status: todo, in_progress, done"},
+				"assignee_id":    {Type: "integer", Description: "User ID to assign the task to (optional)"},
+				"clear_assignee": {Type: "boolean", Description: "Set to true to remove the current assignee (optional)"},
+			},
+			Required: []string{"task_id", "project_id"},
+		},
+		ReadOnly: false,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleUpdateTask(ctx, args)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "delete_task",
+		Description: "Delete a task",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"task_id":    {Type: "integer", Description: "Task ID"},
+				"project_id": {Type: "integer", Description: "Project ID"},
+			},
+			Required: []string{"task_id", "project_id"},
+		},
+		ReadOnly: false,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleDeleteTask(ctx, args)
+		},
+	})
+
+	// ── ac (acceptance criteria) ─────────────────────────────────────
+	RegisterTool(Tool{
+		Name:        "list_acceptance_criteria",
+		Description: "List acceptance criteria (Given/When/Then scenarios) for a change",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"change_id":  {Type: "integer", Description: "Change ID"},
+				"project_id": {Type: "integer", Description: "Project ID"},
+			},
+			Required: []string{"change_id", "project_id"},
+		},
+		ReadOnly: true,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleListAC(ctx, args)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "create_acceptance_criteria",
+		Description: "Create an acceptance criteria with BDD-style Given/When/Then steps for a change",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"change_id":  {Type: "integer", Description: "Change ID"},
+				"project_id": {Type: "integer", Description: "Project ID"},
+				"scenario":   {Type: "string", Description: "Scenario name describing the test case"},
+				"steps":      {Type: "string", Description: "JSON array of steps, each with keyword (Given/When/Then/And/But) and text. Example: [{\"keyword\":\"Given\",\"text\":\"a user is logged in\"},{\"keyword\":\"When\",\"text\":\"they click logout\"},{\"keyword\":\"Then\",\"text\":\"they are redirected to login page\"}]"},
+				"test_ref":   {Type: "string", Description: "Reference to test that verifies this criteria, e.g. 'tests/checkout_test.go::TestPaymentSuccess' (optional)"},
+			},
+			Required: []string{"change_id", "project_id", "scenario", "steps"},
+		},
+		ReadOnly: false,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleCreateAC(ctx, args)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "toggle_acceptance_criteria",
+		Description: "Toggle an acceptance criteria's met/unmet status",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"id":         {Type: "integer", Description: "Acceptance criteria ID"},
+				"project_id": {Type: "integer", Description: "Project ID"},
+				"met":        {Type: "boolean", Description: "Whether the criteria is met (true) or unmet (false)"},
+			},
+			Required: []string{"id", "project_id", "met"},
+		},
+		ReadOnly: false,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleToggleAC(ctx, args)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "link_ac_to_test",
+		Description: "Link an acceptance criteria to a test reference. Set test_ref to empty string to unlink.",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"ac_id":      {Type: "integer", Description: "Acceptance criteria ID"},
+				"project_id": {Type: "integer", Description: "Project ID"},
+				"test_ref":   {Type: "string", Description: "Test reference, e.g. 'tests/checkout_test.go::TestPaymentSuccess'"},
+			},
+			Required: []string{"ac_id", "project_id", "test_ref"},
+		},
+		ReadOnly: false,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleLinkACToTest(ctx, args)
+		},
+	})
+
+	// ── workflow ──────────────────────────────────────────────────────
+	RegisterTool(Tool{
+		Name:        "get_gate_status",
+		Description: "Get the gate conditions for a change's current stage and whether it can advance.",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"change_id":  {Type: "integer", Description: "Change ID"},
+				"project_id": {Type: "integer", Description: "Project ID"},
+			},
+			Required: []string{"change_id", "project_id"},
+		},
+		ReadOnly: true,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleGetGateStatus(ctx, args)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "approve_change",
+		Description: "Approve a change in spec stage. If approval policy is met, the change advances automatically.",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"change_id":  {Type: "integer", Description: "Change ID"},
+				"project_id": {Type: "integer", Description: "Project ID"},
+				"comment":    {Type: "string", Description: "Optional approval comment"},
+			},
+			Required: []string{"change_id", "project_id"},
+		},
+		ReadOnly: false,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleApproveChange(ctx, args)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "reject_change",
+		Description: "Request changes on a review, sending the change back to draft stage.",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"change_id":  {Type: "integer", Description: "Change ID"},
+				"project_id": {Type: "integer", Description: "Project ID"},
+				"reason":     {Type: "string", Description: "Reason for requesting changes"},
+			},
+			Required: []string{"change_id", "project_id", "reason"},
+		},
+		ReadOnly: false,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleRejectChange(ctx, args)
+		},
+	})
+
+	// ── comment ──────────────────────────────────────────────────────
+	RegisterTool(Tool{
+		Name:        "list_comments",
+		Description: "List comments on a change",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"change_id":     {Type: "integer", Description: "Change ID"},
+				"project_id":    {Type: "integer", Description: "Project ID"},
+				"document_type": {Type: "string", Description: "Document type to filter comments (proposal, spec, tasks)"},
+			},
+			Required: []string{"change_id", "project_id", "document_type"},
+		},
+		ReadOnly: true,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleListComments(ctx, args)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "create_comment",
+		Description: "Add a comment to a change",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"change_id":     {Type: "integer", Description: "Change ID"},
+				"project_id":    {Type: "integer", Description: "Project ID"},
+				"content":       {Type: "string", Description: "Comment text"},
+				"document_type": {Type: "string", Description: "Document type for the comment (proposal, spec, tasks)"},
+			},
+			Required: []string{"change_id", "project_id", "content", "document_type"},
+		},
+		ReadOnly: false,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleCreateComment(ctx, args)
+		},
+	})
+
+	// ── memory ───────────────────────────────────────────────────────
+	RegisterTool(Tool{
+		Name:        "get_memory",
+		Description: "Get the project memory (shared context like CLAUDE.md). Contains conventions, decisions, and context that AI should know about this project.",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"project_id": {Type: "integer", Description: "Project ID"},
+			},
+			Required: []string{"project_id"},
+		},
+		ReadOnly: true,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleGetMemory(ctx, args)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "save_memory",
+		Description: "Save or update the project memory (shared context). Use this to persist important conventions, decisions, and context about the project.",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"project_id": {Type: "integer", Description: "Project ID"},
+				"content":    {Type: "string", Description: "Memory content in markdown"},
+			},
+			Required: []string{"project_id", "content"},
+		},
+		ReadOnly: false,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleSaveMemory(ctx, args)
+		},
+	})
+
+	// ── auth ─────────────────────────────────────────────────────────
+	RegisterTool(Tool{
+		Name:        "get_me",
+		Description: "Get the current authenticated user's information (ID, name, email, organization).",
+		InputSchema: InputSchema{
+			Type:       "object",
+			Properties: map[string]Property{},
+		},
+		ReadOnly: true,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleGetMe(ctx)
+		},
+	})
+	RegisterTool(Tool{
+		Name:        "list_members",
+		Description: "List all members in the current organization. Use this to find user IDs for task assignment.",
+		InputSchema: InputSchema{
+			Type:       "object",
+			Properties: map[string]Property{},
+		},
+		ReadOnly: true,
+		Handler: func(s *Server, ctx context.Context, args json.RawMessage) (any, error) {
+			return s.handleListMembers(ctx)
+		},
+	})
 }
 
 func (s *Server) handleCreateProject(ctx context.Context, args json.RawMessage) (any, error) {
@@ -797,30 +1263,6 @@ func (s *Server) handleListChanges(ctx context.Context, args json.RawMessage) (a
 	}, nil
 }
 
-func (s *Server) handleAdvanceStage(ctx context.Context, args json.RawMessage) (any, error) {
-	var params struct {
-		ChangeID  FlexInt64 `json:"change_id"`
-		ProjectID FlexInt64 `json:"project_id"`
-	}
-	if err := json.Unmarshal(args, &params); err != nil {
-		return nil, fmt.Errorf("invalid arguments: %w", err)
-	}
-
-	resp, err := s.clients.workflow.Advance(ctx, connect.NewRequest(&workflowv1.AdvanceRequest{
-		ChangeId:  params.ChangeID.Int64(),
-		ProjectId: params.ProjectID.Int64(),
-	}))
-	if err != nil {
-		return nil, err
-	}
-
-	return map[string]any{
-		"change_id": params.ChangeID.Int64(),
-		"new_stage": resp.Msg.NewStage,
-		"advanced":  true,
-	}, nil
-}
-
 func (s *Server) handleListComments(ctx context.Context, args json.RawMessage) (any, error) {
 	var params struct {
 		ChangeID     FlexInt64 `json:"change_id"`
@@ -1232,31 +1674,200 @@ func (s *Server) handleRejectChange(ctx context.Context, args json.RawMessage) (
 }
 
 func (s *Server) handleUpdateChange(ctx context.Context, args json.RawMessage) (any, error) {
-	var params struct {
-		ChangeID  FlexInt64 `json:"change_id"`
-		ProjectID FlexInt64 `json:"project_id"`
-		Name      string    `json:"name"`
-	}
+	var params updateChangeParams
 	if err := json.Unmarshal(args, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
-	resp, err := s.clients.project.UpdateChange(ctx, connect.NewRequest(&projectv1.UpdateChangeRequest{
-		Id:        params.ChangeID.Int64(),
-		ProjectId: params.ProjectID.Int64(),
-		Name:      params.Name,
-	}))
-	if err != nil {
-		return nil, err
+	if params.Name == "" && params.SubStatus == "" && params.Status == "" {
+		return nil, fmt.Errorf("at least one of name, sub_status, or status must be provided")
+	}
+	if params.SubStatus != "" && params.Status != "" {
+		return nil, fmt.Errorf("sub_status and status cannot be provided together")
 	}
 
-	c := resp.Msg.Change
-	return map[string]any{
-		"id":         c.Id,
-		"name":       c.Name,
-		"identifier": c.Identifier,
-		"updated":    true,
-	}, nil
+	var currentChange *projectv1.Change
+	var originalName string
+	if params.Status != "" || (params.Name != "" && params.SubStatus != "") {
+		changeResp, err := s.clients.project.GetChange(ctx, connect.NewRequest(&projectv1.GetChangeRequest{
+			Id: params.ChangeID.Int64(),
+		}))
+		if err != nil {
+			return nil, err
+		}
+		currentChange = changeResp.Msg.Change
+		originalName = currentChange.Name
+	}
+
+	result := map[string]any{
+		"id":      params.ChangeID.Int64(),
+		"updated": true,
+	}
+
+	if params.Name != "" {
+		resp, err := s.clients.project.UpdateChange(ctx, connect.NewRequest(&projectv1.UpdateChangeRequest{
+			Id:        params.ChangeID.Int64(),
+			ProjectId: params.ProjectID.Int64(),
+			Name:      params.Name,
+		}))
+		if err != nil {
+			return nil, err
+		}
+		result["name"] = resp.Msg.Change.Name
+		result["identifier"] = resp.Msg.Change.Identifier
+	}
+
+	if params.SubStatus != "" || params.Status != "" {
+		stage, subStatus, err := s.applyChangeStatusUpdate(ctx, params, currentChange)
+		if err != nil {
+			if params.Name != "" && originalName != "" {
+				_, rollbackErr := s.clients.project.UpdateChange(ctx, connect.NewRequest(&projectv1.UpdateChangeRequest{
+					Id:        params.ChangeID.Int64(),
+					ProjectId: params.ProjectID.Int64(),
+					Name:      originalName,
+				}))
+				if rollbackErr != nil {
+					return nil, fmt.Errorf("status update failed: %w; rollback failed: %v", err, rollbackErr)
+				}
+			}
+			return nil, err
+		}
+		result["stage"] = string(stage)
+		if stage != models.StageApproved {
+			result["sub_status"] = string(subStatus)
+		}
+		result["status"] = formatCompositeChangeStatus(stage, subStatus)
+	}
+
+	return result, nil
+}
+
+type updateChangeParams struct {
+	ChangeID     FlexInt64 `json:"change_id"`
+	ProjectID    FlexInt64 `json:"project_id"`
+	Name         string    `json:"name"`
+	SubStatus    string    `json:"sub_status"`
+	Status       string    `json:"status"`
+	StatusReason string    `json:"status_reason"`
+}
+
+func (s *Server) applyChangeStatusUpdate(ctx context.Context, params updateChangeParams, currentChange *projectv1.Change) (models.ChangeStage, models.SubStatus, error) {
+	if params.Status == "" {
+		if currentChange == nil {
+			changeResp, err := s.clients.project.GetChange(ctx, connect.NewRequest(&projectv1.GetChangeRequest{
+				Id: params.ChangeID.Int64(),
+			}))
+			if err != nil {
+				return "", "", err
+			}
+			currentChange = changeResp.Msg.Change
+		}
+		_, err := s.clients.workflow.SetSubStatus(ctx, connect.NewRequest(&workflowv1.SetSubStatusRequest{
+			ChangeId:  params.ChangeID.Int64(),
+			ProjectId: params.ProjectID.Int64(),
+			SubStatus: params.SubStatus,
+		}))
+		return models.ChangeStage(currentChange.Stage), models.SubStatus(params.SubStatus), err
+	}
+
+	if currentChange == nil {
+		changeResp, err := s.clients.project.GetChange(ctx, connect.NewRequest(&projectv1.GetChangeRequest{
+			Id: params.ChangeID.Int64(),
+		}))
+		if err != nil {
+			return "", "", err
+		}
+		currentChange = changeResp.Msg.Change
+	}
+
+	targetStage, targetSubStatus, err := parseCompositeChangeStatus(params.Status)
+	if err != nil {
+		return "", "", err
+	}
+
+	currentStage := models.ChangeStage(currentChange.Stage)
+	currentSubStatus := models.SubStatus(currentChange.SubStatus)
+	revertReason := params.StatusReason
+	if revertReason == "" {
+		revertReason = fmt.Sprintf("set status via MCP to %s", params.Status)
+	}
+
+	for currentStage != targetStage {
+		if stageRank(currentStage) < stageRank(targetStage) {
+			resp, err := s.clients.workflow.Advance(ctx, connect.NewRequest(&workflowv1.AdvanceRequest{
+				ChangeId:  params.ChangeID.Int64(),
+				ProjectId: params.ProjectID.Int64(),
+			}))
+			if err != nil {
+				return "", "", err
+			}
+			currentStage = models.ChangeStage(resp.Msg.NewStage)
+			currentSubStatus = models.SubStatusInProgress
+			continue
+		}
+
+		resp, err := s.clients.workflow.Revert(ctx, connect.NewRequest(&workflowv1.RevertRequest{
+			ChangeId:  params.ChangeID.Int64(),
+			ProjectId: params.ProjectID.Int64(),
+			Reason:    revertReason,
+		}))
+		if err != nil {
+			return "", "", err
+		}
+		currentStage = models.ChangeStage(resp.Msg.NewStage)
+		currentSubStatus = models.SubStatusInProgress
+	}
+
+	if targetStage != models.StageApproved && currentSubStatus != targetSubStatus {
+		_, err := s.clients.workflow.SetSubStatus(ctx, connect.NewRequest(&workflowv1.SetSubStatusRequest{
+			ChangeId:  params.ChangeID.Int64(),
+			ProjectId: params.ProjectID.Int64(),
+			SubStatus: string(targetSubStatus),
+		}))
+		if err != nil {
+			return "", "", err
+		}
+		currentSubStatus = targetSubStatus
+	}
+
+	return currentStage, currentSubStatus, nil
+}
+
+func parseCompositeChangeStatus(raw string) (models.ChangeStage, models.SubStatus, error) {
+	switch raw {
+	case "draft(in_progress)":
+		return models.StageDraft, models.SubStatusInProgress, nil
+	case "draft(ready)":
+		return models.StageDraft, models.SubStatusReady, nil
+	case "spec(in_progress)":
+		return models.StageSpec, models.SubStatusInProgress, nil
+	case "spec(ready)":
+		return models.StageSpec, models.SubStatusReady, nil
+	case "approved":
+		return "", "", fmt.Errorf("status %q is not supported by update_change; use approve_change to move a change to approved", raw)
+	default:
+		return "", "", fmt.Errorf("invalid status %q; expected one of draft(in_progress), draft(ready), spec(in_progress), spec(ready)", raw)
+	}
+}
+
+func formatCompositeChangeStatus(stage models.ChangeStage, subStatus models.SubStatus) string {
+	if stage == models.StageApproved {
+		return string(models.StageApproved)
+	}
+	return fmt.Sprintf("%s(%s)", stage, subStatus)
+}
+
+func stageRank(stage models.ChangeStage) int {
+	switch stage {
+	case models.StageDraft:
+		return 0
+	case models.StageSpec:
+		return 1
+	case models.StageApproved:
+		return 2
+	default:
+		return -1
+	}
 }
 
 func (s *Server) handleArchiveChange(ctx context.Context, args json.RawMessage) (any, error) {

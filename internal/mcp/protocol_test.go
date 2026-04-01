@@ -203,6 +203,50 @@ func TestCommentToolsHaveDocumentType(t *testing.T) {
 	})
 }
 
+func TestToolMetadataIncludesStandardAnnotations(t *testing.T) {
+	tools := ListTools()
+	toolMap := make(map[string]*Tool)
+	for i, tool := range tools {
+		toolMap[tool.Name] = &tools[i]
+	}
+
+	readOnlyTool := toolMap["list_projects"]
+	require.NotNil(t, readOnlyTool)
+	require.NotNil(t, readOnlyTool.Annotations)
+	assert.True(t, readOnlyTool.Annotations.ReadOnlyHint)
+	if assert.NotNil(t, readOnlyTool.Annotations.DestructiveHint) {
+		assert.False(t, *readOnlyTool.Annotations.DestructiveHint)
+	}
+
+	mutatingTool := toolMap["update_change"]
+	require.NotNil(t, mutatingTool)
+	require.NotNil(t, mutatingTool.Annotations)
+	assert.False(t, mutatingTool.Annotations.ReadOnlyHint)
+	assert.Nil(t, mutatingTool.Annotations.DestructiveHint)
+	assert.Contains(t, mutatingTool.InputSchema.Properties, "status")
+	assert.Contains(t, mutatingTool.InputSchema.Properties, "status_reason")
+}
+
+func TestToolsListJSONIncludesMetadata(t *testing.T) {
+	tools := ListTools()
+	raw, err := json.Marshal(tools)
+	require.NoError(t, err)
+
+	var decoded []map[string]any
+	require.NoError(t, json.Unmarshal(raw, &decoded))
+	require.NotEmpty(t, decoded)
+
+	var updateChange map[string]any
+	for _, tool := range decoded {
+		if tool["name"] == "update_change" {
+			updateChange = tool
+			break
+		}
+	}
+	require.NotNil(t, updateChange)
+	assert.Contains(t, updateChange, "annotations")
+}
+
 func TestJSONRPCRequest(t *testing.T) {
 	raw := `{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}`
 	var req JSONRPCRequest

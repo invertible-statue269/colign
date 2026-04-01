@@ -64,9 +64,13 @@ func (s *Service) EvaluateAndAdvance(ctx context.Context, changeID int64, orgID 
 	}
 
 	// Advance
+	subStatus := models.SubStatusInProgress
+	if next == models.StageApproved {
+		subStatus = ""
+	}
 	_, err = s.db.NewUpdate().Model((*models.Change)(nil)).
 		Set("stage = ?", next).
-		Set("sub_status = ?", models.SubStatusInProgress).
+		Set("sub_status = ?", subStatus).
 		Set("updated_at = ?", time.Now()).
 		Where("id = ?", changeID).
 		Exec(ctx)
@@ -113,9 +117,13 @@ func (s *Service) Advance(ctx context.Context, changeID int64, userID int64, org
 		return change.Stage, fmt.Errorf("already at final stage")
 	}
 
+	subStatus := models.SubStatusInProgress
+	if next == models.StageApproved {
+		subStatus = ""
+	}
 	_, err = s.db.NewUpdate().Model((*models.Change)(nil)).
 		Set("stage = ?", next).
-		Set("sub_status = ?", models.SubStatusInProgress).
+		Set("sub_status = ?", subStatus).
 		Set("updated_at = ?", time.Now()).
 		Where("id = ?", changeID).
 		Exec(ctx)

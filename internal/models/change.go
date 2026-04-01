@@ -45,7 +45,7 @@ type Change struct {
 	Number     int         `bun:"number,notnull"`
 	Name       string      `bun:"name,notnull"`
 	Stage      ChangeStage `bun:"stage,notnull,default:'draft'"`
-	SubStatus  SubStatus   `bun:"sub_status,notnull,default:'in_progress'"`
+	SubStatus  SubStatus   `bun:"sub_status,default:'in_progress'"`
 	ChangeType ChangeType  `bun:"change_type,notnull,default:'feature'"`
 	CreatedAt  time.Time   `bun:"created_at,notnull,default:current_timestamp"`
 	UpdatedAt  time.Time   `bun:"updated_at,notnull,default:current_timestamp"`

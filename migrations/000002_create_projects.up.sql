@@ -53,6 +53,7 @@ CREATE TABLE changes (
     project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     stage TEXT NOT NULL DEFAULT 'draft' CHECK (stage IN ('draft', 'design', 'review', 'ready')),
+    sub_status TEXT DEFAULT 'in_progress',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

@@ -1227,14 +1227,18 @@ func (s *Server) handleListChanges(ctx context.Context, args json.RawMessage) (a
 		Name         string       `json:"name"`
 		Identifier   string       `json:"identifier"`
 		Stage        string       `json:"stage"`
-		SubStatus    string       `json:"sub_status"`
+		SubStatus    string       `json:"sub_status,omitempty"`
 		TaskProgress progressInfo `json:"task_progress"`
 		ACProgress   progressInfo `json:"ac_progress"`
 	}
 
 	changes := make([]changeInfo, len(resp.Msg.Changes))
 	for i, c := range resp.Msg.Changes {
-		ci := changeInfo{ID: c.Id, Name: c.Name, Identifier: c.Identifier, Stage: c.Stage, SubStatus: c.SubStatus}
+		subStatus := c.SubStatus
+		if c.Stage == "approved" {
+			subStatus = ""
+		}
+		ci := changeInfo{ID: c.Id, Name: c.Name, Identifier: c.Identifier, Stage: c.Stage, SubStatus: subStatus}
 
 		if taskResp, err := s.clients.task.ListTasks(ctx, connect.NewRequest(&taskv1.ListTasksRequest{ChangeId: c.Id, ProjectId: params.ProjectID.Int64()})); err == nil {
 			ci.TaskProgress.Total = len(taskResp.Msg.Tasks)

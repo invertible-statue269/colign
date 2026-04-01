@@ -83,6 +83,17 @@ spec:
                   name: {{ .Release.Name }}-secrets
                   key: google-client-secret
             {{- end }}
+            {{- if .Values.api.env.vapidPublicKey }}
+            - name: VAPID_PUBLIC_KEY
+              value: {{ .Values.api.env.vapidPublicKey | quote }}
+            - name: VAPID_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-secrets
+                  key: vapid-private-key
+            - name: VAPID_SUBJECT
+              value: {{ .Values.api.env.vapidSubject | default "mailto:admin@colign.io" | quote }}
+            {{- end }}
             {{- if and .Values.hocuspocus.enabled .Values.hocuspocus.apiSecret }}
             - name: HOCUSPOCUS_URL
               value: {{ printf "http://%s-hocuspocus:%v" .Release.Name (.Values.hocuspocus.service.port | default 1234) | quote }}

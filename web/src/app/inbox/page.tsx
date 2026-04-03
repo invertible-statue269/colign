@@ -228,8 +228,10 @@ export default function InboxPage() {
         const stage = stageConfig[n.stage] ?? stageConfig.draft;
         return (
           <p className="text-sm">
+            <span className="font-medium text-foreground">{n.actorName}</span>
+            <span className="text-muted-foreground"> {t("inbox.moved")} </span>
             <span className="font-medium text-foreground">{n.changeName}</span>
-            <span className="text-muted-foreground"> {t("inbox.movedTo")} </span>
+            <span className="text-muted-foreground"> → </span>
             <span className={`font-medium ${stage.color}`}>{stage.label}</span>
           </p>
         );

@@ -64,16 +64,16 @@ func (s *Service) EvaluateAndAdvance(ctx context.Context, changeID int64, orgID 
 	}
 
 	// Advance
-	subStatus := models.SubStatusInProgress
-	if next == models.StageApproved {
-		subStatus = ""
-	}
-	_, err = s.db.NewUpdate().Model((*models.Change)(nil)).
+	q := s.db.NewUpdate().Model((*models.Change)(nil)).
 		Set("stage = ?", next).
-		Set("sub_status = ?", subStatus).
 		Set("updated_at = ?", time.Now()).
-		Where("id = ?", changeID).
-		Exec(ctx)
+		Where("id = ?", changeID)
+	if next == models.StageApproved {
+		q = q.Set("sub_status = NULL")
+	} else {
+		q = q.Set("sub_status = ?", models.SubStatusInProgress)
+	}
+	_, err = q.Exec(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -129,16 +129,16 @@ func (s *Service) Advance(ctx context.Context, changeID int64, userID int64, org
 		}
 	}
 
-	subStatus := models.SubStatusInProgress
-	if next == models.StageApproved {
-		subStatus = ""
-	}
-	_, err = s.db.NewUpdate().Model((*models.Change)(nil)).
+	q := s.db.NewUpdate().Model((*models.Change)(nil)).
 		Set("stage = ?", next).
-		Set("sub_status = ?", subStatus).
 		Set("updated_at = ?", time.Now()).
-		Where("id = ?", changeID).
-		Exec(ctx)
+		Where("id = ?", changeID)
+	if next == models.StageApproved {
+		q = q.Set("sub_status = NULL")
+	} else {
+		q = q.Set("sub_status = ?", models.SubStatusInProgress)
+	}
+	_, err = q.Exec(ctx)
 	if err != nil {
 		return "", err
 	}

@@ -3,6 +3,9 @@ package notification
 import (
 	"context"
 
+	"log/slog"
+	"strings"
+
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -45,9 +48,26 @@ func (h *ConnectHandler) ListNotifications(ctx context.Context, req *connect.Req
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
+	// Collect all mentioned user IDs for batch lookup.
+	allMentionedIDs := make(map[int64]struct{})
+	for _, n := range notifications {
+		for _, id := range n.MentionedUserIDs {
+			allMentionedIDs[id] = struct{}{}
+		}
+	}
+	ids := make([]int64, 0, len(allMentionedIDs))
+	for id := range allMentionedIDs {
+		ids = append(ids, id)
+	}
+	mentionedUsers, err := h.service.LookupUsers(ctx, ids)
+	if err != nil {
+		slog.WarnContext(ctx, "failed to lookup mentioned users", slog.String("error", err.Error()))
+		mentionedUsers = make(map[int64]MentionedUserInfo)
+	}
+
 	protoNotifs := make([]*notificationv1.Notification, len(notifications))
 	for i, n := range notifications {
-		protoNotifs[i] = notificationToProto(&n)
+		protoNotifs[i] = notificationToProto(&n, mentionedUsers)
 	}
 
 	return connect.NewResponse(&notificationv1.ListNotificationsResponse{
@@ -126,7 +146,7 @@ func (h *ConnectHandler) Subscribe(ctx context.Context, req *connect.Request[not
 	}
 }
 
-func notificationToProto(n *models.Notification) *notificationv1.Notification {
+func notificationToProto(n *models.Notification, mentionedUsers map[int64]MentionedUserInfo) *notificationv1.Notification {
 	proto := &notificationv1.Notification{
 		Id:             n.ID,
 		UserId:         n.UserID,
@@ -149,6 +169,20 @@ func notificationToProto(n *models.Notification) *notificationv1.Notification {
 		proto.ProjectName = n.Project.Name
 		proto.ProjectSlug = n.Project.Slug
 		proto.OrganizationId = n.Project.OrganizationID
+	}
+	for _, uid := range n.MentionedUserIDs {
+		if u, ok := mentionedUsers[uid]; ok {
+			// Only send the local part of the email to avoid exposing full addresses.
+			emailLocal := u.Email
+			if idx := strings.IndexByte(emailLocal, '@'); idx >= 0 {
+				emailLocal = emailLocal[:idx]
+			}
+			proto.MentionedUsers = append(proto.MentionedUsers, &notificationv1.MentionedUser{
+				UserId: u.ID,
+				Name:   u.Name,
+				Email:  emailLocal,
+			})
+		}
 	}
 	return proto
 }

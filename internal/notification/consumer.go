@@ -75,13 +75,14 @@ func (c *Consumer) handle(ctx context.Context, evt events.NotificationEvent) {
 
 		notifType := mapEventType(evt.Type)
 		n, err := c.service.Create(ctx, CreateInput{
-			UserID:         userID,
-			Type:           notifType,
-			ActorID:        evt.ActorID,
-			ChangeID:       evt.ChangeID,
-			ProjectID:      evt.ProjectID,
-			Stage:          getMetaString(evt.Metadata, "new_stage"),
-			CommentPreview: getMetaString(evt.Metadata, "preview"),
+			UserID:           userID,
+			Type:             notifType,
+			ActorID:          evt.ActorID,
+			ChangeID:         evt.ChangeID,
+			ProjectID:        evt.ProjectID,
+			Stage:            getMetaString(evt.Metadata, "new_stage"),
+			CommentPreview:   getMetaString(evt.Metadata, "preview"),
+			MentionedUserIDs: getMetaInt64Slice(evt.Metadata, "mentioned_user_ids"),
 		})
 		if err != nil {
 			slog.WarnContext(ctx, "notification consumer: create failed",

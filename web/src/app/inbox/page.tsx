@@ -10,6 +10,8 @@ import { orgClient } from "@/lib/organization";
 import { toChangePath, toProjectPath } from "@/lib/project-ref";
 import { getTokenPayload, saveTokens } from "@/lib/auth";
 import { showError } from "@/lib/toast";
+import { renderMentionBody } from "@/components/comment/mention-textarea";
+import type { MentionMember } from "@/components/comment/mention-textarea";
 import {
   Eye,
   MessageSquare,
@@ -37,6 +39,7 @@ interface Notification {
   organizationId: bigint;
   stage: string;
   commentPreview: string;
+  mentionedUsers: MentionMember[];
   createdAt?: { seconds: bigint };
 }
 
@@ -103,6 +106,11 @@ export default function InboxPage() {
           organizationId: n.organizationId,
           stage: n.stage,
           commentPreview: n.commentPreview,
+          mentionedUsers: (n.mentionedUsers ?? []).map((u) => ({
+            userId: u.userId,
+            userName: u.name,
+            userEmail: u.email,
+          })),
           createdAt: n.createdAt ? { seconds: n.createdAt.seconds } : undefined,
         })),
       );
@@ -195,7 +203,9 @@ export default function InboxPage() {
               <span className="font-medium text-foreground">{n.changeName}</span>
             </p>
             {n.commentPreview && (
-              <p className="mt-0.5 truncate text-xs text-muted-foreground/70">{n.commentPreview}</p>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground/70">
+                {renderMentionBody(n.commentPreview, n.mentionedUsers)}
+              </p>
             )}
           </div>
         );
@@ -208,7 +218,9 @@ export default function InboxPage() {
               <span className="font-medium text-foreground">{n.changeName}</span>
             </p>
             {n.commentPreview && (
-              <p className="mt-0.5 truncate text-xs text-muted-foreground/70">{n.commentPreview}</p>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground/70">
+                {renderMentionBody(n.commentPreview, n.mentionedUsers)}
+              </p>
             )}
           </div>
         );

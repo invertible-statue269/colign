@@ -241,12 +241,13 @@ func (s *Service) notifyMentions(ctx context.Context, input mentionNotificationI
 
 	for _, userID := range memberIDs {
 		if _, err := s.notifications.Create(ctx, notification.CreateInput{
-			UserID:         userID,
-			Type:           models.NotifMention,
-			ActorID:        input.ActorID,
-			ChangeID:       input.ChangeID,
-			ProjectID:      input.ProjectID,
-			CommentPreview: preview,
+			UserID:           userID,
+			Type:             models.NotifMention,
+			ActorID:          input.ActorID,
+			ChangeID:         input.ChangeID,
+			ProjectID:        input.ProjectID,
+			CommentPreview:   preview,
+			MentionedUserIDs: memberIDs,
 		}); err != nil {
 			slog.Warn("failed to create mention notification", "error", err, "user_id", userID, "change_id", input.ChangeID)
 		}

@@ -26,9 +26,10 @@ type Notification struct {
 	ActorID        int64            `bun:"actor_id"`
 	ChangeID       int64            `bun:"change_id"`
 	ProjectID      int64            `bun:"project_id"`
-	Stage          string           `bun:"stage"`
-	CommentPreview string           `bun:"comment_preview"`
-	CreatedAt      time.Time        `bun:"created_at,notnull,default:current_timestamp"`
+	Stage            string           `bun:"stage"`
+	CommentPreview   string           `bun:"comment_preview"`
+	MentionedUserIDs []int64          `bun:"mentioned_user_ids,array"`
+	CreatedAt        time.Time        `bun:"created_at,notnull,default:current_timestamp"`
 
 	User    *User    `bun:"rel:belongs-to,join:user_id=id"`
 	Actor   *User    `bun:"rel:belongs-to,join:actor_id=id"`

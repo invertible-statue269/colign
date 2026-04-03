@@ -35,8 +35,7 @@ export function Header({ breadcrumbs = [], actions }: HeaderProps) {
   }, []);
 
   return (
-    <>
-    <header className="fixed inset-x-0 top-0 z-40 h-(--header-height) border-b border-border/50 bg-background/95 backdrop-blur-md">
+    <header className="sticky top-0 z-30 border-b border-border/50 bg-background/80 backdrop-blur-md">
       <div className="flex items-center justify-between px-6 py-3">
         <div className="flex items-center gap-3">
           <Link href="/projects" className="flex items-center">
@@ -212,8 +211,6 @@ export function Header({ breadcrumbs = [], actions }: HeaderProps) {
         </div>
       </div>
     </header>
-    <div className="h-(--header-height)" />
-    </>
   );
 }
 

